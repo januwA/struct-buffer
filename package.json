@@ -1,0 +1,37 @@
+{
+  "name": "struct-buffer",
+  "version": "0.1.0",
+  "description": "Add structure to ArrayBuffer",
+  "private": true,
+  "main": "./dist/struct-buffer.js",
+  "types": "./dist/src/index.d.ts",
+  "scripts": {
+    "build": "webpack --config __config__/webpack/prod.config.js",
+    "test": "jest"
+  },
+  "keywords": [
+    "struct-buffer",
+    "ArrayBuffer",
+    "DataView"
+  ],
+  "author": "Ajanuw",
+  "license": "MIT",
+  "homepage": "https://github.com/januwA/struct-buffer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/januwA/struct-buffer.git"
+  },
+  "devDependencies": {
+    "@types/jest": "^26.0.19",
+    "clean-webpack-plugin": "^3.0.0",
+    "jest": "^26.6.3",
+    "terser-webpack-plugin": "^5.0.3",
+    "ts-jest": "^26.4.4",
+    "ts-loader": "^8.0.12",
+    "ts-node": "^9.1.1",
+    "typescript": "^4.1.3",
+    "webpack": "^5.11.0",
+    "webpack-cli": "^4.2.0"
+  },
+  "dependencies": {}
+}
