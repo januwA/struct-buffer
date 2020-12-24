@@ -1,8 +1,8 @@
 {
   "name": "struct-buffer",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Add structure to ArrayBuffer",
-  "private": true,
+  "private": false,
   "main": "./dist/struct-buffer.js",
   "types": "./dist/src/index.d.ts",
   "scripts": {

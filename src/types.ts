@@ -1,44 +1,60 @@
-export class Char {}
-// char[10] or char
-export const char: any = new Proxy(new Char(), {
-  get(_, k) {
-    k = k.toString();
-    if (/\d+/.test(k)) {
-      return `char[${k}]`;
-    } else {
-      throw new Error("CHAR type error.");
-    }
-  },
-});
+import {
+  Char,
+  Double,
+  Float,
+  String_t,
+  Int8_t,
+  Int16_t,
+  Int32_t,
+  Int64_t,
+  Byte,
+  Word,
+  Dword,
+  Qword,
+  Uint8_t,
+  Uint16_t,
+  Uint32_t,
+  Uint64_t,
+} from "./class-type";
 
-export class String_t {}
-export const string_t: any = new Proxy(new String_t(), {
-  get(_, k) {
-    k = k.toString();
-    if (/\d+/.test(k)) {
-      return `string_t[${k}]`;
-    } else {
-      throw new Error("string_t type error.");
-    }
-  },
-});
+export const char = new Char();
+export const string_t = new String_t();
 
 // Floating point / 浮点
-export const float = "float";
-export const double = "doubel";
+export const float = new Float();
+export const double = new Double();
 
 // signed integer / 有符号整数
-export const int8_t = "int8_t";
-export const int16_t = "int16_t";
-export const int32_t = "int32_t";
-export const int64_t = "int64_t";
+export const int8_t = new Int8_t();
+export const int16_t = new Int16_t();
+export const int32_t = new Int32_t();
+export const int64_t = new Int64_t();
 
 // unsigned integer / 无符号整数
-export const BYTE = "byte";
-export const WORD = "word";
-export const DWORD = "dword";
-export const QWORD = "qword";
-export const uint8_t = "uint8_t";
-export const uint16_t = "uint16_t";
-export const uint32_t = "uint32_t";
-export const uint64_t = "uint64_t";
+export const BYTE = new Byte();
+export const WORD = new Word();
+export const DWORD = new Dword();
+export const QWORD = new Qword();
+export const uint8_t = new Uint8_t();
+export const uint16_t = new Uint16_t();
+export const uint32_t = new Uint32_t();
+export const uint64_t = new Uint64_t();
+
+export const ALL_TYPE_NAMES: string[] = [
+  int8_t.typeName,
+  int16_t.typeName,
+  int32_t.typeName,
+  int64_t.typeName,
+  uint8_t.typeName,
+  uint16_t.typeName,
+  uint32_t.typeName,
+  uint64_t.typeName,
+  BYTE.typeName,
+  WORD.typeName,
+  DWORD.typeName,
+  QWORD.typeName,
+  float.typeName,
+  double.typeName,
+  char.typeName,
+  string_t.typeName,
+];

@@ -103,12 +103,15 @@ const myStruct = {
 };
 ```
 
+## note
+- Does not support multi-level arrays (e.g. DWORD[4][4x4] )
+
 ## test
 > $ npm test
 
 ## build
 > $ npm run build
 
-
 ## See also:
+  - [See the test for more examples](https://github.com/januwA/struct-buffer/blob/main/test/test.test.ts)
   - [DataView](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/DataView)
