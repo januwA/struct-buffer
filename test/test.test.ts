@@ -76,7 +76,7 @@ describe("test string_t", () => {
   beforeAll(() => {
     struct = new StructBuffer({
       a: string_t,
-      b: "string_t[]",
+      b: string_t,
       c: string_t[2],
     });
   });
@@ -112,7 +112,7 @@ describe("test char", () => {
   beforeAll(() => {
     struct = new StructBuffer({
       a: char,
-      b: "char[]",
+      b: char[1],
       c: char[2],
     });
   });
@@ -146,105 +146,73 @@ describe("test char", () => {
 describe("test sizeof", () => {
   it("test byte", () => {
     expect(sizeof(BYTE)).toBe(1);
-    expect(sizeof("BYTE")).toBe(1);
-    expect(sizeof("byte[4]")).toBe(4);
     expect(sizeof(BYTE[10])).toBe(10);
   });
 
   it("test WORD", () => {
     expect(sizeof(WORD)).toBe(2);
-    expect(sizeof("WORD")).toBe(2);
-    expect(sizeof("WORD[4]")).toBe(8);
     expect(sizeof(WORD[10])).toBe(20);
+    expect(sizeof(WORD[3][4])).toBe(24);
   });
 
   it("test DWORD", () => {
     expect(sizeof(DWORD)).toBe(4);
-    expect(sizeof("DWORD")).toBe(4);
-    expect(sizeof("DWORD[4]")).toBe(16);
     expect(sizeof(DWORD[10])).toBe(40);
+    expect(sizeof(DWORD[2][4])).toBe(32);
   });
 
   it("test QWORD", () => {
     expect(sizeof(QWORD)).toBe(8);
-    expect(sizeof("QWORD")).toBe(8);
-    expect(sizeof("QWORD[4]")).toBe(32);
     expect(sizeof(QWORD[10])).toBe(80);
   });
 
   it("test int8_t", () => {
     expect(sizeof(int8_t)).toBe(1);
-    expect(sizeof("int8_t")).toBe(1);
-    expect(sizeof("int8_t[4]")).toBe(4);
     expect(sizeof(int8_t[10])).toBe(10);
   });
   it("test int16_t", () => {
     expect(sizeof(int16_t)).toBe(2);
-    expect(sizeof("int16_t")).toBe(2);
-    expect(sizeof("int16_t[4]")).toBe(8);
     expect(sizeof(int16_t[10])).toBe(20);
   });
   it("test int32_t", () => {
     expect(sizeof(int32_t)).toBe(4);
-    expect(sizeof("int32_t")).toBe(4);
-    expect(sizeof("int32_t[4]")).toBe(4 * 4);
     expect(sizeof(int32_t[10])).toBe(4 * 10);
   });
   it("test int64_t", () => {
     expect(sizeof(int64_t)).toBe(8);
-    expect(sizeof("int64_t")).toBe(8);
-    expect(sizeof("int64_t[4]")).toBe(8 * 4);
     expect(sizeof(int64_t[10])).toBe(8 * 10);
   });
   it("test uint8_t", () => {
     expect(sizeof(uint8_t)).toBe(1);
-    expect(sizeof("uint8_t")).toBe(1);
-    expect(sizeof("uint8_t[4]")).toBe(4);
     expect(sizeof(uint8_t[10])).toBe(10);
   });
   it("test uint16_t", () => {
     expect(sizeof(uint16_t)).toBe(2);
-    expect(sizeof("uint16_t")).toBe(2);
-    expect(sizeof("uint16_t[4]")).toBe(8);
     expect(sizeof(uint16_t[10])).toBe(20);
   });
   it("test uint32_t", () => {
     expect(sizeof(uint32_t)).toBe(4);
-    expect(sizeof("uint32_t")).toBe(4);
-    expect(sizeof("uint32_t[4]")).toBe(4 * 4);
     expect(sizeof(uint32_t[10])).toBe(4 * 10);
   });
   it("test uint64_t", () => {
     expect(sizeof(uint64_t)).toBe(8);
-    expect(sizeof("uint64_t")).toBe(8);
-    expect(sizeof("uint64_t[4]")).toBe(8 * 4);
     expect(sizeof(uint64_t[10])).toBe(8 * 10);
   });
   it("test float", () => {
     expect(sizeof(float)).toBe(4);
-    expect(sizeof("float")).toBe(4);
-    expect(sizeof("float[4]")).toBe(4 * 4);
     expect(sizeof(float[10])).toBe(4 * 10);
   });
   it("test double", () => {
     expect(sizeof(double)).toBe(8);
-    expect(sizeof("double")).toBe(8);
-    expect(sizeof("double[4]")).toBe(8 * 4);
     expect(sizeof(double[10])).toBe(8 * 10);
   });
   it("test char", () => {
     expect(sizeof(char)).toBe(1);
-    expect(sizeof("char")).toBe(1);
-    expect(sizeof("char[]")).toBe(1);
     expect(sizeof(char[10])).toBe(10);
-    expect(sizeof("char[10]")).toBe(10);
   });
   it("test string_t", () => {
     expect(sizeof(string_t)).toBe(1);
-    expect(sizeof("string_t")).toBe(1);
-    expect(sizeof("string_t[]")).toBe(1);
     expect(sizeof(string_t[10])).toBe(10);
-    expect(sizeof("string_t[10]")).toBe(10);
   });
 });
 
@@ -300,5 +268,99 @@ describe("test display", () => {
   it("test double", () => {
     const data = display(dview, double);
     expect(data[0].value).toBe(22.23456);
+  });
+});
+
+describe("test pos", () => {
+  let view: DataView;
+  let struct: StructBuffer;
+  beforeAll(() => {
+    view = new DataView(new ArrayBuffer(2 * 8 * 4));
+
+    view.setFloat64(0 * 8, 1.23);
+    view.setFloat64(1 * 8, 22.66);
+
+    view.setFloat64(2 * 8, 140.67);
+    view.setFloat64(3 * 8, 742.45);
+
+    view.setFloat64(4 * 8, 123.23);
+    view.setFloat64(5 * 8, 1231.23);
+
+    view.setFloat64(6 * 8, 534.23);
+    view.setFloat64(7 * 8, 873.35);
+
+    struct = new StructBuffer({
+      pos: double[4][2],
+    });
+  });
+
+  it("test decode", () => {
+    const { pos } = struct.decode(view);
+    expect(pos.length).toBe(4);
+    expect(pos[0].length).toBe(2);
+    expect(pos[1].length).toBe(2);
+    expect(pos[2].length).toBe(2);
+    expect(pos[3].length).toBe(2);
+
+    expect(pos[0][0]).toBe(1.23);
+    expect(pos[0][1]).toBe(22.66);
+
+    expect(pos[3][0]).toBe(534.23);
+    expect(pos[3][1]).toBe(873.35);
+  });
+
+  it("test decode", () => {
+    const view = struct.encode({
+      pos: [
+        [1.23, 22.66],
+        [140.67, 742.45],
+        [123.23, 1231.23],
+        [534.23, 873.35],
+      ],
+    });
+    expect(view.getFloat64(0 * 8)).toBe(1.23);
+    expect(view.getFloat64(7 * 8)).toBe(873.35);
+  });
+
+  it("test byteLength", () => {
+    expect(struct.byteLength).toBe(2 * 8 * 4);
+  });
+});
+
+describe("test names", () => {
+  let view: DataView;
+  let struct: StructBuffer;
+  beforeAll(() => {
+    view = new DataView(new ArrayBuffer(3 * 4));
+
+    view.setUint32(0 * 4, 0x61626364);
+    view.setUint32(1 * 4, 0x61626365);
+    view.setUint32(2 * 4, 0x61626366);
+
+    struct = new StructBuffer({
+      names: string_t[3][4],
+    });
+  });
+
+  it("test decode", () => {
+    const { names } = struct.decode(view);
+    expect(names.length).toBe(3);
+    expect(names[0].length).toBe(4);
+    expect(names[0]).toBe("abcd");
+    expect(names[1]).toBe("abce");
+    expect(names[2]).toBe("abcf");
+  });
+
+  it("test decode", () => {
+    const view = struct.encode({
+      names: ["abcd", "abce", "abcf"],
+    });
+    expect(view.getUint32(0 * 4)).toBe(0x61626364);
+    expect(view.getUint32(1 * 4)).toBe(0x61626365);
+    expect(view.getUint32(2 * 4)).toBe(0x61626366);
+  });
+
+  it("test byteLength", () => {
+    expect(struct.byteLength).toBe(12);
   });
 });

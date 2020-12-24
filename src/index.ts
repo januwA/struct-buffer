@@ -1,4 +1,4 @@
-export { StructBuffer, sizeof, display, parseStrType } from "./struct-buffer";
+export { StructBuffer, sizeof, display } from "./struct-buffer";
 export {
   BYTE,
   WORD,

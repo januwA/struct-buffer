@@ -5,7 +5,7 @@ export interface AnyObject {
 }
 
 export interface StructOption {
-  [k: string]: StructType | string;
+  [k: string]: StructType;
 }
 
 export interface Type<T extends Object> extends Function {

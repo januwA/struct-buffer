@@ -1,24 +1,67 @@
+class StructTypeNext {
+  deeps: number[] = [];
+
+  constructor(k: number, public readonly typeName: string) {
+    this.deeps.push(k);
+    const proxy: this = new Proxy(this, {
+      get(o: any, k: string | number | symbol) {
+        if (k in o) return o[k];
+
+        k = k.toString();
+        if (/\d+/.test(k)) {
+          o.deeps.push(parseInt(k));
+        }
+        return proxy;
+      },
+    });
+    return proxy;
+  }
+}
+
 export abstract class StructType extends Array {
   abstract typeName: string;
 
-  constructor() {
-    super();
-    return new Proxy(this, {
-      get: this.get,
-    });
+  deeps: number[] = [];
+
+  /**
+   * ```
+   * <type>[<n>]
+   * <type>[<n>][<n>]...
+   * ```
+   */
+  get isList(): boolean {
+    return !!this.deeps.length;
   }
 
-  private get(target: any, k: string | number | symbol) {
-    if (k === "typeName") return target[k];
+  // 最少会返回1
+  get count(): number {
+    return this.deeps.reduce((acc, it) => (acc *= it), 1);
+  }
 
-    k = k.toString();
-    if (/\d+/.test(k)) {
-      return `${target.typeName.toLowerCase()}[${k}]`;
-    } else {
-      throw new Error(
-        `StructBuffer: (${target.typeName.toUpperCase()}) type error.`
-      );
-    }
+  constructor() {
+    super();
+    const proxy: this = new Proxy(this, {
+      get(o: any, k: string | number | symbol) {
+        // 普通属性直接返回
+        if (k in o) return o[k];
+
+        // 如果访问char[2] ，数字属性，那么立即返回一个新的proxy，避免上下文冲突
+        k = k.toString();
+        if (/\d+/.test(k)) {
+          const newProxy: any = new StructTypeNext(parseInt(k), o.typeName);
+
+          // 避免 instanceof 检测
+          // 同时prototype上的属性和方法也会拷贝过去
+          Object.setPrototypeOf(newProxy, StructType.prototype);
+          return newProxy;
+        } else {
+          throw new Error(
+            `StructBuffer: (${o.typeName.toUpperCase()}) type error.`
+          );
+        }
+      },
+    });
+    return proxy;
   }
 }
 

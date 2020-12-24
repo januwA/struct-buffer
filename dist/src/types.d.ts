@@ -1,21 +1,19 @@
-export declare class Char {
-}
-export declare const char: any;
-export declare class String_t {
-}
-export declare const string_t: any;
-export declare const float = "float";
-export declare const double = "doubel";
-export declare const int8_t = "int8_t";
-export declare const int16_t = "int16_t";
-export declare const int32_t = "int32_t";
-export declare const int64_t = "int64_t";
-export declare const BYTE = "byte";
-export declare const WORD = "word";
-export declare const DWORD = "dword";
-export declare const QWORD = "qword";
-export declare const uint8_t = "uint8_t";
-export declare const uint16_t = "uint16_t";
-export declare const uint32_t = "uint32_t";
-export declare const uint64_t = "uint64_t";
+import { Char, Double, Float, String_t, Int8_t, Int16_t, Int32_t, Int64_t, Byte, Word, Dword, Qword, Uint8_t, Uint16_t, Uint32_t, Uint64_t } from "./class-type";
+export declare const char: Char;
+export declare const string_t: String_t;
+export declare const float: Float;
+export declare const double: Double;
+export declare const int8_t: Int8_t;
+export declare const int16_t: Int16_t;
+export declare const int32_t: Int32_t;
+export declare const int64_t: Int64_t;
+export declare const BYTE: Byte;
+export declare const WORD: Word;
+export declare const DWORD: Dword;
+export declare const QWORD: Qword;
+export declare const uint8_t: Uint8_t;
+export declare const uint16_t: Uint16_t;
+export declare const uint32_t: Uint32_t;
+export declare const uint64_t: Uint64_t;
+export declare const ALL_TYPE_NAMES: string[];
 //# sourceMappingURL=types.d.ts.map

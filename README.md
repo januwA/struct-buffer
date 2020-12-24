@@ -75,9 +75,12 @@ import {
 } from "struct-buffer";
 
 const myStruct = {
-  key: BYTE,
-  key: WORD,
+  key: BYTE, // BYTE key;
+  key: WORD, // WORD key;
+  key: WORD[2], // WORD key[2];
   key: DWORD,
+  key: DWORD[2],    // size 8
+  key: DWORD[2][3], // size 24
   key: QWORD,
 
   key: int8_t,
@@ -94,17 +97,12 @@ const myStruct = {
   key: double, // size 8
 
   key: char,     // size 1
-  key: "char[]", // size 1
   key: char[10], // size 10
 
   key: string_t,     // size 1
-  key: "string_t[]", // size 1
   key: string_t[10], // size 10
 };
 ```
-
-## note
-- Does not support multi-level arrays (e.g. DWORD[4][4x4] )
 
 ## test
 > $ npm test

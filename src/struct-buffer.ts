@@ -32,102 +32,41 @@ enum TYPE_SIZE {
   QWORD = 8,
 }
 
-export function isStrType(type: StructType | string): type is string {
-  return typeof type === "string";
-}
+/**
+ * 设置数组嵌套层数
+ * @param array
+ * @param deeps
+ * @param isString
+ */
+function unflattenDeep(
+  array: any[] | string,
+  deeps: number[],
+  isString = false
+) {
+  let r: any = array;
 
-const STRING_TYPE_EXP = /(?<type>\w+)(?<list>\[(?<size>\d+)?\])?/i;
-export function parseStrType(type: string) {
-  let m = type.match(STRING_TYPE_EXP);
+  if (isString && typeof r === "string") r = (r as any).split("");
 
-  if (!m || !m.groups?.type)
-    throw new Error(`StructBuffer: (${type}) type error.`);
+  for (let i = deeps.length - 1; i >= 1; i--) {
+    const isFirst = i === deeps.length - 1;
+    const value = deeps[i];
+    r = r.reduce((acc: any, it: any, index: number) => {
+      if (index % value === 0) acc.push([]);
+      acc[acc.length - 1].push(it);
+      return acc;
+    }, []);
 
-  let rtype: StructType;
-  const _type: string = m.groups.type.toLowerCase();
-
-  switch (_type) {
-    //========== int ===============//
-    case int8_t.typeName:
-      rtype = int8_t;
-      break;
-
-    case int16_t.typeName:
-      rtype = int16_t;
-      break;
-
-    case int32_t.typeName:
-      rtype = int32_t;
-      break;
-
-    case int64_t.typeName:
-      rtype = int64_t;
-      break;
-
-    //========== uint ===============//
-    case BYTE.typeName:
-    case uint8_t.typeName:
-      rtype = uint8_t;
-      break;
-
-    case WORD.typeName:
-    case uint16_t.typeName:
-      rtype = uint16_t;
-      break;
-
-    case DWORD.typeName:
-    case uint32_t.typeName:
-      rtype = uint32_t;
-      break;
-
-    case QWORD.typeName:
-    case uint64_t.typeName:
-      rtype = uint64_t;
-      break;
-
-    //========== float ===============//
-    case float.typeName:
-      rtype = float;
-      break;
-
-    case double.typeName:
-      rtype = double;
-      break;
-
-    //========== char ===============//
-    case char.typeName:
-      rtype = char;
-      break;
-
-    //========== string_t ===============//
-    case string_t.typeName:
-      rtype = string_t;
-      break;
-
-    default:
-      throw new Error(`StructBuffer: (${_type}) type does not exist.`);
-  }
-
-  const r: {
-    type: StructType;
-    length: number;
-    isList: boolean;
-  } = {
-    type: rtype,
-    isList: Boolean(m.groups.list),
-    length: 1,
-  };
-
-  if (m.groups?.size) {
-    r.length = parseInt(m.groups?.size);
+    if (isString && isFirst) {
+      r = r.map((it: any) => it.join(""));
+    }
   }
   return r;
 }
 
 export function typeHandle(type: StructType, options: TypeHandleOptions) {
-  switch (type) {
+  switch (type.typeName) {
     //========== int ===============//
-    case int8_t:
+    case int8_t.typeName:
       if (options[int8_t.typeName])
         options[int8_t.typeName]({
           get: "getInt8",
@@ -136,7 +75,7 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
         });
       break;
 
-    case int16_t:
+    case int16_t.typeName:
       if (options[int16_t.typeName])
         options[int16_t.typeName]({
           get: "getInt16",
@@ -145,7 +84,7 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
         });
       break;
 
-    case int32_t:
+    case int32_t.typeName:
       if (options[int32_t.typeName])
         options[int32_t.typeName]({
           get: "getInt32",
@@ -154,7 +93,7 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
         });
       break;
 
-    case int64_t:
+    case int64_t.typeName:
       if (options[int64_t.typeName])
         options[int64_t.typeName]({
           get: "getBigInt64",
@@ -164,7 +103,7 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
       break;
 
     //========== uint ===============//
-    case BYTE:
+    case BYTE.typeName:
       if (options[BYTE.typeName])
         options[BYTE.typeName]({
           get: "getUint8",
@@ -172,7 +111,7 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
           size: TYPE_SIZE.BYTE,
         });
       break;
-    case uint8_t:
+    case uint8_t.typeName:
       if (options[uint8_t.typeName])
         options[uint8_t.typeName]({
           get: "getUint8",
@@ -181,7 +120,7 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
         });
       break;
 
-    case WORD:
+    case WORD.typeName:
       if (options[WORD.typeName])
         options[WORD.typeName]({
           get: "getUint16",
@@ -189,7 +128,7 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
           size: TYPE_SIZE.WORD,
         });
       break;
-    case uint16_t:
+    case uint16_t.typeName:
       if (options[uint16_t.typeName])
         options[uint16_t.typeName]({
           get: "getUint16",
@@ -198,7 +137,7 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
         });
       break;
 
-    case DWORD:
+    case DWORD.typeName:
       if (options[DWORD.typeName])
         options[DWORD.typeName]({
           get: "getUint32",
@@ -206,7 +145,7 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
           size: TYPE_SIZE.DWORD,
         });
       break;
-    case uint32_t:
+    case uint32_t.typeName:
       if (options[uint32_t.typeName])
         options[uint32_t.typeName]({
           get: "getUint32",
@@ -215,7 +154,7 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
         });
       break;
 
-    case QWORD:
+    case QWORD.typeName:
       if (options[QWORD.typeName])
         options[QWORD.typeName]({
           get: "getBigUint64",
@@ -223,7 +162,7 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
           size: TYPE_SIZE.QWORD,
         });
       break;
-    case uint64_t:
+    case uint64_t.typeName:
       if (options[uint64_t.typeName])
         options[uint64_t.typeName]({
           get: "getBigUint64",
@@ -233,7 +172,7 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
       break;
 
     //========== float ===============//
-    case float:
+    case float.typeName:
       if (options[float.typeName])
         options[float.typeName]({
           get: "getFloat32",
@@ -242,7 +181,7 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
         });
       break;
 
-    case double:
+    case double.typeName:
       if (options[double.typeName])
         options[double.typeName]({
           get: "getFloat64",
@@ -251,7 +190,7 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
         });
       break;
 
-    case char:
+    case char.typeName:
       if (options[char.typeName])
         options[char.typeName]({
           get: "getUint8",
@@ -260,7 +199,7 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
         });
       break;
 
-    case string_t:
+    case string_t.typeName:
       if (options[string_t.typeName])
         options[string_t.typeName]({
           get: "getUint8",
@@ -284,22 +223,16 @@ export function typeHandle(type: StructType, options: TypeHandleOptions) {
  * ```
  * @param type
  */
-export function sizeof(type: StructType | string): number {
-  let r = 0;
-  let length = 1;
-  if (isStrType(type)) {
-    const p = parseStrType(type);
-    type = p.type;
-    length = p.length;
-  }
-
+export function sizeof(type: StructType): number {
+  let typeSize = 0;
   const handle = ALL_TYPE_NAMES.reduce<TypeHandleOptions>((acc, typeName) => {
-    acc[typeName] = (opt) => (r = opt.size);
+    acc[typeName] = (opt) => (typeSize = opt.size);
     return acc;
   }, {});
 
   typeHandle(type, handle);
-  return r * length;
+  if (type.isList) return typeSize * type.count;
+  return typeSize;
 }
 
 export function display(
@@ -392,41 +325,14 @@ export class StructBuffer {
   decode(view: DataView, littleEndian: boolean = false): AnyObject {
     const r: AnyObject = {};
     for (const key in this.struct) {
-      let type: StructType | string = this.struct[key];
-      let length = 1;
-      let isList = false;
-
-      if (isStrType(type)) {
-        const p = parseStrType(type);
-        type = p.type;
-        length = p.length;
-        isList = p.isList;
-      }
-
-      const _readValue = this._readValue.bind(
-        this,
-        view,
-        isList,
-        length,
-        littleEndian
-      );
+      const type: StructType = this.struct[key];
+      const _readValue = this._readValue.bind(this, view, type, littleEndian);
 
       const handle = ALL_TYPE_NAMES.reduce<TypeHandleOptions>(
         (acc, typeName) => {
           acc[typeName] = (opt) => {
             if (typeName === char.typeName || typeName === string_t.typeName) {
-              if (isList) {
-                r[key] = this._readBytes(view, length);
-                if (type === string_t) {
-                  r[key] = this._decode(new Uint8Array(r[key]));
-                }
-              } else {
-                r[key] = view.getUint8(this._offset);
-                if (type === string_t)
-                  r[key] = this._decode(new Uint8Array([r[key]]));
-
-                this._offset += TYPE_SIZE.BYTE;
-              }
+              r[key] = this._readBytes(view, type);
             } else {
               r[key] = _readValue(opt.get, opt.size);
             }
@@ -447,24 +353,13 @@ export class StructBuffer {
     const view = new DataView(new ArrayBuffer(this.byteLength));
 
     for (const key in this.struct) {
-      let type: StructType | string = this.struct[key];
-      let length = 1;
-      let isList = false;
-
-      if (isStrType(type)) {
-        const p = parseStrType(type);
-        type = p.type;
-        length = p.length;
-        isList = p.isList;
-      }
-
+      let type: StructType = this.struct[key];
       const value = obj[key];
 
       const _writeValue = this._writeValue.bind(
         this,
         view,
-        isList,
-        length,
+        type,
         littleEndian,
         value
       );
@@ -473,19 +368,7 @@ export class StructBuffer {
         (acc, typeName) => {
           acc[typeName] = (opt) => {
             if (typeName === char.typeName || typeName === string_t.typeName) {
-              if (isList) {
-                this._writeBytes(
-                  view,
-                  type === char ? value : this._encode(value.toString()),
-                  length
-                );
-              } else {
-                this._writeBytes(
-                  view,
-                  type === char ? [value] : this._encode(value.toString()),
-                  TYPE_SIZE.BYTE
-                );
-              }
+              this._writeBytes(view, type, value);
             } else {
               _writeValue(opt.set, opt.size);
             }
@@ -501,43 +384,79 @@ export class StructBuffer {
     return view;
   }
 
-  private _readBytes(view: DataView, size: number) {
-    const bytes: number[] = [];
-    for (let i = 0; i < size; i++) {
-      bytes.push(view.getUint8(this._offset));
+  private _readBytes(view: DataView, type: StructType) {
+    let r;
+    const isString = type.typeName === string_t.typeName;
+    if (type.isList) {
+      r = [];
+      for (let i = 0; i < type.count; i++) {
+        r.push(view.getUint8(this._offset));
+        this._offset++;
+      }
+
+      if (isString) {
+        r = this._decode(new Uint8Array(r));
+
+        // string_t[3] => 'abc'
+        if (type.deeps.length < 2) return r;
+      }
+
+      r = unflattenDeep(r, type.deeps, isString);
+      return r;
+    } else {
+      r = view.getUint8(this._offset);
+      if (isString) {
+        r = this._decode(new Uint8Array([r]));
+      }
       this._offset++;
+      return r;
     }
-    return bytes;
   }
 
-  private _writeBytes(
-    view: DataView,
-    bytes: number[] | Uint8Array,
-    size: number
-  ) {
-    for (let i = 0; i < size; i++) {
-      let it = bytes[i];
-      if (it === undefined) it = 0; // 填充0
-      view.setUint8(this._offset, it);
+  private _writeBytes(view: DataView, type: StructType, value: any) {
+    const isString = type.typeName === string_t.typeName;
+    if (type.isList) {
+      // string_t[10] 可以是非数组
+      if (Array.isArray(value)) {
+        value = value.flat();
+
+        // string[]
+        if (isString) value = value.join("");
+      }
+
+      // string
+      if (isString) value = this._encode(value);
+
+      for (let i = 0; i < type.count; i++) {
+        let it = value[i];
+        if (it === undefined) it = 0; // 填充0
+        view.setUint8(this._offset, it);
+        this._offset++;
+      }
+    } else {
+      if (isString) {
+        value = this._encode(value)[0];
+      }
+      view.setUint8(this._offset, value);
       this._offset++;
     }
   }
 
   private _readValue(
     view: DataView,
-    isList: boolean,
-    length: number,
+    type: StructType,
     littleEndian: boolean,
     m: string,
     size: number
   ): number | number[] {
     let r;
-    if (isList) {
+    if (type.isList) {
       r = [];
-      for (let i = 0; i < length; i++) {
+      for (let i = 0; i < type.count; i++) {
         r.push((view as any)[m](this._offset, littleEndian));
         this._offset += size;
       }
+      r = unflattenDeep(r, type.deeps);
     } else {
       r = (view as any)[m](this._offset, littleEndian);
       this._offset += size;
@@ -547,15 +466,15 @@ export class StructBuffer {
 
   private _writeValue(
     view: DataView,
-    isList: boolean,
-    length: number,
+    type: StructType,
     littleEndian: boolean,
     value: any,
     m: string,
     size: number
   ): void {
-    if (isList) {
-      for (let i = 0; i < length; i++) {
+    if (type.isList && Array.isArray(value)) {
+      value = value.flat();
+      for (let i = 0; i < type.count; i++) {
         (view as any)[m](this._offset, value[i], littleEndian);
         this._offset += size;
       }
