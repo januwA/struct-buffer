@@ -34,20 +34,16 @@ function unflattenDeep(
 }
 
 /**
- * ```js
- * sizeof(string_t) // 1
- * sizeof(string_t[10]) // 10
- *
- * sizeof(char) // 1
- * sizeof(char[10]) // 1
- *
- * sizeof(DWORD) // 4
- * sizeof(DWORD[4]) // 16
- * ```
- * @param type
+ * Get the size after byte alignment
+ * @param type Single type or Struct Buffer
  */
 export function sizeof(type: StructType | StructBuffer): number {
-  if (type instanceof StructBuffer) return type.byteLength;
+  if (type instanceof StructBuffer) {
+    let padidng = 0;
+    const maxSize = type.maxSize;
+    while ((type.byteLength + padidng) % maxSize !== 0) padidng++;
+    return type.byteLength + padidng;
+  }
   return type.isList ? type.size * type.count : type.size;
 }
 
@@ -83,14 +79,67 @@ export function display(
   return result;
 }
 
-export class StructBuffer {
+class StructBufferNext {
   constructor(
-    private readonly struct: {
+    public readonly i: number,
+    public readonly structName: string,
+    public readonly struct: {
       [k: string]: StructType | StructBuffer;
     }
   ) {}
+}
 
+export class StructBuffer extends Array {
+  i?: number;
   private _textDecode = new TextDecoder();
+  private _textEncoder = new TextEncoder();
+
+  /**
+   *
+   * Only supports one layer of array
+   * ```js
+   * s_user = new StructBuffer({})
+   * s_users = new StructBuffer({
+   *   users: s_user[2]
+   * })
+   * s_users.decode(...)
+   * ```
+   */
+  get isList(): boolean {
+    return !!this.i;
+  }
+
+  get count(): number {
+    return this.i ?? 1;
+  }
+
+  constructor(
+    public readonly structName: string,
+    public readonly struct: {
+      [k: string]: StructType | StructBuffer;
+    }
+  ) {
+    super();
+    return new Proxy(this, {
+      get(o: any, k: string | number | symbol) {
+        if (k in o) return o[k];
+
+        k = k.toString();
+        if (/\d+/.test(k)) {
+          const newProxy: any = new StructBufferNext(
+            parseInt(k),
+            o.structName,
+            o.struct
+          );
+          newProxy._textDecode = o._textDecode;
+          newProxy._textEncoder = o._textEncoder;
+          Object.setPrototypeOf(newProxy, StructBuffer.prototype);
+          return newProxy;
+        }
+      },
+    });
+  }
+
   get textDecode() {
     return this._textDecode;
   }
@@ -101,7 +150,6 @@ export class StructBuffer {
     return this.textDecode.decode(input);
   }
 
-  private _textEncoder = new TextEncoder();
   get textEncoder() {
     return this._textEncoder;
   }
@@ -113,9 +161,23 @@ export class StructBuffer {
   }
 
   get byteLength(): number {
-    return Object.values(this.struct).reduce(
-      (acc, type) => (acc += sizeof(type)),
-      0
+    const typeByteLength = Object.values(this.struct).reduce((acc, type) => {
+      if (type instanceof StructBuffer) {
+        acc += type.byteLength;
+      } else {
+        acc += sizeof(type);
+      }
+      return acc;
+    }, 0);
+    return typeByteLength * this.count;
+  }
+
+  get maxSize(): number {
+    return Math.max(
+      ...Object.values(this.struct).map((type) => {
+        if (type instanceof StructBuffer) return type.maxSize;
+        return type.size;
+      })
     );
   }
 
@@ -131,8 +193,16 @@ export class StructBuffer {
     const result = Object.entries(this.struct).reduce<AnyObject>(
       (acc, [key, type]) => {
         if (type instanceof StructBuffer) {
-          acc[key] = type.decode(view, littleEndian, offset);
-          offset += type.byteLength;
+          if (type.isList) {
+            acc[key] = [];
+            for (let i = 0; i < type.count; i++) {
+              acc[key].push(type.decode(view, littleEndian, offset));
+              offset += type.byteLength / type.count;
+            }
+          } else {
+            acc[key] = type.decode(view, littleEndian, offset);
+            offset += type.byteLength;
+          }
         } else {
           let value;
           const isString = string_t.is(type);
@@ -178,8 +248,15 @@ export class StructBuffer {
       (acc: DataView, [key, type]) => {
         let value = obj[key];
         if (type instanceof StructBuffer) {
-          type.encode(value, littleEndian, offset, acc);
-          offset += type.byteLength;
+          if (type.isList) {
+            for (let i = 0; i < type.count; i++) {
+              type.encode(value[i], littleEndian, offset, acc);
+              offset += type.byteLength / type.count;
+            }
+          } else {
+            type.encode(value, littleEndian, offset, acc);
+            offset += type.byteLength;
+          }
         } else {
           const isString = string_t.is(type);
 
@@ -211,5 +288,23 @@ export class StructBuffer {
       v
     );
     return result;
+  }
+
+  toCStruct() {
+    let props = "";
+    for (let [propName, type] of Object.entries(this.struct)) {
+      const typeName = type instanceof StructType ? type.names[0] : type.structName;
+      if (type.isList) {
+        propName = `${propName}[${type.count}]`;
+      }
+      props += `\t${typeName} ${propName};\n`;
+    }
+
+    return `
+typedef struct _${this.structName}
+{
+${props.replace(/\n$/, '')}
+} ${this.structName}, *${this.structName};
+`;
   }
 }

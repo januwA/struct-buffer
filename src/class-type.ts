@@ -12,14 +12,14 @@ function typeHandle(type: StructType): { set: string; get: string } {
       };
 
     case 4:
-      const isFloat = type.typeName === "float";
+      const isFloat = type.isName("float");
       return {
         get: isFloat ? "getFloat32" : type.unsigned ? "getUint32" : "getInt32",
         set: isFloat ? "setFloat32" : type.unsigned ? "setUint32" : "setInt32",
       };
 
     case 8:
-      const isDouble = type.typeName === "double";
+      const isDouble = type.isName("double");
       return {
         get: isDouble
           ? "getFloat64"
@@ -42,14 +42,14 @@ class StructTypeNext {
   deeps: number[] = [];
 
   constructor(
-    k: number,
-    public readonly typeName: string,
+    i: number,
+    public readonly names: string[],
     public readonly size: number,
     public readonly unsigned: boolean,
     public readonly get: string,
     public readonly set: string
   ) {
-    this.deeps.push(k);
+    this.deeps.push(i);
     const proxy: this = new Proxy(this, {
       get(o: any, k: string | number | symbol) {
         if (k in o) return o[k];
@@ -66,6 +66,7 @@ class StructTypeNext {
 }
 
 export class StructType extends Array {
+  names: string[];
   deeps: number[] = [];
 
   /**
@@ -84,32 +85,40 @@ export class StructType extends Array {
   }
 
   is(type: StructType): boolean {
-    return type.typeName === this.typeName;
+    for (const name of type.names) {
+      if (this.names.includes(name)) return true;
+    }
+    return false;
+  }
+
+  isName(typeName: string) {
+    return this.names.includes(typeName);
   }
 
   get: string;
   set: string;
 
   constructor(
-    public readonly typeName: string,
+    typeName: string | string[],
     public readonly size: 1 | 2 | 4 | 8,
     public readonly unsigned: boolean
   ) {
     super();
+
+    this.names = Array.isArray(typeName) ? typeName : [typeName];
     const { set, get } = typeHandle(this);
     this.set = set;
     this.get = get;
-    const proxy: this = new Proxy(this, {
+    return new Proxy(this, {
       get(o: any, k: string | number | symbol) {
-        // 普通属性直接返回
         if (k in o) return o[k];
 
-        // 如果访问char[2] ，数字属性，那么立即返回一个新的proxy，避免上下文冲突
+        // 如果访问char[2] ，数字属性，返回一个新的proxy，避免上下文冲突
         k = k.toString();
         if (/\d+/.test(k)) {
           const newProxy: any = new StructTypeNext(
             parseInt(k),
-            o.typeName,
+            o.names,
             o.size,
             o.unsigned,
             o.get,
@@ -120,21 +129,36 @@ export class StructType extends Array {
           // 同时prototype上的属性和方法也会拷贝过去
           Object.setPrototypeOf(newProxy, StructType.prototype);
           return newProxy;
-        } else {
-          throw new Error(
-            `StructBuffer: (${o.typeName.toUpperCase()}) type error.`
-          );
         }
       },
     });
-    return proxy;
   }
 }
 
+/**
+ *
+ * @param typeName
+ * @param size
+ * @param unsigned
+ */
 export function registerType(
-  typeName: string,
+  typeName: string | string[],
   size: 1 | 2 | 4 | 8,
   unsigned = true
 ): StructType {
   return new StructType(typeName, size, unsigned);
+}
+
+/**
+ *
+ * ```js
+ * int8_t = typedef("int8_t", char);
+ * ```
+ *
+ * @param typeName
+ * @param type
+ */
+export function typedef(typeName: string | string[], type: StructType) {
+  const newType = registerType(typeName, type.size, type.unsigned);
+  return newType;
 }

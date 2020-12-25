@@ -11,7 +11,7 @@ $ npm i struct-buffer
 ```ts
 import { DWORD, string_t, StructBuffer, uint32_t } from "struct-buffer";
 
-const struct = new StructBuffer({
+const struct = new StructBuffer("Player",{
   hp: DWORD,
   mp: uint32_t,
   name: string_t[3],
@@ -43,58 +43,11 @@ const view = struct.encode({
 </script>
 ```
 
-## Types
-```ts
-import {
-  BYTE, WORD, DWORD, QWORD,
-
-  int8_t, int16_t, int32_t, int64_t,
-
-  uint8_t, uint16_t, uint32_t, uint64_t,
-  
-  float, double, 
-
-  char, string_t,
-} from "struct-buffer";
-
-const myStruct = {
-  key: BYTE, // BYTE key;
-  key: WORD, // WORD key;
-  key: WORD[2], // WORD key[2];
-  key: DWORD,
-  key: DWORD[2],    // size 8
-  key: DWORD[2][3], // size 24
-  key: QWORD,
-
-  key: int8_t,
-  key: int16_t,
-  key: int32_t,
-  key: int64_t,
-
-  key: uint8_t,
-  key: uint16_t,
-  key: uint32_t,
-  key: uint64_t,
-
-  key: float,  // size 4
-  key: double, // size 8
-
-  key: char,     // size 1
-  key: char[10], // size 10
-
-  key: string_t,     // size 1
-  key: string_t[10], // size 10
-};
-```
-
-## Custom type
-
-Use `registerType(typeName: string, size: 1 | 2 | 4 | 8, unsigned = true): StructType`
-
+## register Type
 ```ts
 short = registerType("short", 2, false);
 
-struct = new StructBuffer({
+struct = new StructBuffer("Player", {
   hp: short,
   mp: short,
   pos: short[2],
@@ -111,6 +64,13 @@ data = struct.encode({
   pos: [100, 200],
 });
 // data =>  <00 02 00 0a 00 64 00 c8>
+```
+
+## typedef
+```ts
+const HANDLE = typedef("HANDLE", DWORD);
+HANDLE.size // 4
+HANDLE.unsigned // true
 ```
 
 
@@ -178,6 +138,94 @@ XINPUT_STATE.encode({
 });
 ```
 
+## parse c-struct
+```ts
+const cStruct = `
+//
+// Structures used by XInput APIs
+//
+typedef struct _XINPUT_GAMEPAD
+{
+    WORD                                wButtons;
+    BYTE                                bLeftTrigger;
+    BYTE                                bRightTrigger;
+    SHORT                               sThumbLX;
+    SHORT                               sThumbLY;
+    SHORT                               sThumbRX;
+    SHORT                               sThumbRY;
+} XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
+
+typedef struct _XINPUT_STATE
+{
+    DWORD                               dwPacketNumber;
+    XINPUT_GAMEPAD                      Gamepad;
+} XINPUT_STATE, *PXINPUT_STATE;
+
+typedef struct _XINPUT_VIBRATION
+{
+    WORD                                wLeftMotorSpeed;
+    WORD                                wRightMotorSpeed;
+} XINPUT_VIBRATION, *PXINPUT_VIBRATION;
+
+typedef struct _XINPUT_BATTERY_INFORMATION
+{
+    BYTE BatteryType;
+    BYTE BatteryLevel;
+} XINPUT_BATTERY_INFORMATION, *PXINPUT_BATTERY_INFORMATION;
+`;
+
+const structs = parseCStruct(cStruct);
+sizeof(structs.XINPUT_GAMEPAD) // 12
+sizeof(structs.XINPUT_STATE) // 16
+sizeof(structs.XINPUT_VIBRATION) // 4
+sizeof(structs.XINPUT_BATTERY_INFORMATION) // 2
+```
+
+## struct list
+```ts
+s_user = new StructBuffer("User", {
+  name: string_t[2],
+  name2: string_t[2],
+});
+
+s_users = new StructBuffer("Users", {
+  users: s_user[2],
+});
+
+const data = s_users.decode(
+  new Uint8Array([0x61, 0x31, 0x61, 0x32, 0x62, 0x31, 0x62, 0x32])
+);
+// data.users.length => 2
+// data.users[0] => { name: "a1", name2: "a2" }
+// data.users[1] => { name: "b1", name2: "b2" }
+```
+
+## StructBuffer to c-struct
+```ts
+const XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
+  wButtons: WORD,
+  bLeftTrigger: BYTE,
+  bRightTrigger: BYTE,
+  sThumbLX: int16_t,
+  sThumbLY: int16_t,
+  sThumbRX: int16_t,
+  sThumbRY: int16_t[2],
+});
+const cStruct = XINPUT_GAMEPAD.toCStruct();
+
+// console.log(cStruct) => 
+typedef struct _XINPUT_GAMEPAD
+{
+    WORD wButtons;
+    BYTE bLeftTrigger;
+    BYTE bRightTrigger;
+    int16_t sThumbLX;
+    int16_t sThumbLY;
+    int16_t sThumbRX;
+    int16_t sThumbRY[2];
+} XINPUT_GAMEPAD, *XINPUT_GAMEPAD;
+```
+
 ## test
 > $ npm test
 
@@ -187,3 +235,5 @@ XINPUT_STATE.encode({
 ## See also:
   - [See the test for more examples](https://github.com/januwA/struct-buffer/blob/main/test/test.test.ts)
   - [DataView](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/DataView)
+  - [C_data_types](https://en.wikipedia.org/wiki/C_data_types)
+  - [Built-in types (C++)](https://docs.microsoft.com/en-us/cpp/cpp/fundamental-types-cpp?view=msvc-160)

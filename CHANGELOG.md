@@ -1,3 +1,12 @@
+## 3.0.0 2020/12/25
+
+- Support reading "c-struct" string template and converting it into StructBuffer
+- Support converting StructBuffer into "c-struct" string
+- Support StructBuffer list
+- Added typedef function for more convenient type definition
+- Added more default types
+- Fixed sizeof function
+
 ## 2.0.0 2020/12/25
 
 - Support custom type (e.g. short = registerType("short", 2, false))

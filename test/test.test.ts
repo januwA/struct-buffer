@@ -19,14 +19,16 @@ import {
   StructBuffer,
   display,
   registerType,
+  parseCStruct,
+  uchar,
 } from "../src";
-import { StructType } from "../src/class-type";
+import { StructType, typedef } from "../src/class-type";
 
 describe("test decode and encode", () => {
   let struct: StructBuffer;
 
   beforeAll(() => {
-    struct = new StructBuffer({
+    struct = new StructBuffer("Player", {
       hp: DWORD,
       mp: uint32_t,
       name: string_t[3],
@@ -77,7 +79,7 @@ describe("test string_t", () => {
   let struct: StructBuffer;
 
   beforeAll(() => {
-    struct = new StructBuffer({
+    struct = new StructBuffer("Test", {
       a: string_t,
       b: string_t,
       c: string_t[2],
@@ -112,7 +114,7 @@ describe("test char", () => {
   let struct: StructBuffer;
 
   beforeAll(() => {
-    struct = new StructBuffer({
+    struct = new StructBuffer("Test", {
       a: char,
       b: char[1],
       c: char[2],
@@ -141,6 +143,16 @@ describe("test char", () => {
 
   it("test byteLength", () => {
     expect(struct.byteLength).toBe(4);
+  });
+
+  it("test char and uchar", () => {
+    const s = new StructBuffer("Test", {
+      a: char,
+      b: uchar,
+    });
+    const data = s.decode(new Uint8Array([255, 255]));
+    expect(data.a).toBe(-1);
+    expect(data.b).toBe(255);
   });
 });
 
@@ -214,6 +226,48 @@ describe("test sizeof", () => {
   it("test string_t", () => {
     expect(sizeof(string_t)).toBe(1);
     expect(sizeof(string_t[10])).toBe(10);
+  });
+  it("test pading", () => {
+    expect(
+      sizeof(
+        new StructBuffer("Test", {
+          a: DWORD,
+          b: BYTE,
+        })
+      )
+    ).toBe(8);
+
+    expect(
+      sizeof(
+        new StructBuffer("Test", {
+          a: char[5],
+          b: BYTE,
+        })
+      )
+    ).toBe(6);
+
+    expect(
+      sizeof(
+        new StructBuffer("Test", {
+          a: QWORD,
+          b: WORD,
+          c: BYTE,
+        })
+      )
+    ).toBe(16);
+
+    const A = new StructBuffer("Test", {
+      a: QWORD,
+      b: BYTE,
+    });
+    const B = new StructBuffer("Test", {
+      a: DWORD,
+      b: A,
+      c: BYTE,
+    });
+    expect(B.maxSize).toBe(8);
+    expect(B.byteLength).toBe(14);
+    expect(sizeof(B)).toBe(16);
   });
 });
 
@@ -290,7 +344,7 @@ describe("test pos", () => {
     view.setFloat64(6 * 8, 534.23);
     view.setFloat64(7 * 8, 873.35);
 
-    struct = new StructBuffer({
+    struct = new StructBuffer("Pos", {
       pos: double[4][2],
     });
   });
@@ -338,7 +392,7 @@ describe("test names", () => {
     view.setUint32(1 * 4, 0x61626365);
     view.setUint32(2 * 4, 0x61626366);
 
-    struct = new StructBuffer({
+    struct = new StructBuffer("Names", {
       names: string_t[3][4],
     });
   });
@@ -372,7 +426,7 @@ describe("test registerType", () => {
 
   beforeAll(() => {
     short = registerType("short", 2, false);
-    struct = new StructBuffer({
+    struct = new StructBuffer("Player", {
       hp: short,
       mp: short,
       pos: short[2],
@@ -427,7 +481,7 @@ describe("test struct nesting", () => {
   let XINPUT_STATE: StructBuffer;
   let XINPUT_GAMEPAD: StructBuffer;
   beforeAll(() => {
-    XINPUT_GAMEPAD = new StructBuffer({
+    XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
       wButtons: WORD,
       bLeftTrigger: BYTE,
       bRightTrigger: BYTE,
@@ -436,7 +490,7 @@ describe("test struct nesting", () => {
       sThumbRX: int16_t,
       sThumbRY: int16_t,
     });
-    XINPUT_STATE = new StructBuffer({
+    XINPUT_STATE = new StructBuffer("XINPUT_STATE", {
       dwPacketNumber: DWORD,
       Gamepad: XINPUT_GAMEPAD,
     });
@@ -493,5 +547,141 @@ describe("test struct nesting", () => {
 
   it("test byteLength", () => {
     expect(XINPUT_STATE.byteLength).toBe(16);
+  });
+});
+
+describe("test parseCStruct", () => {
+  it("test parse", () => {
+    const cStruct = `
+//
+// Structures used by XInput APIs
+//
+typedef struct _XINPUT_GAMEPAD
+{
+    WORD                                wButtons;
+    BYTE                                bLeftTrigger;
+    BYTE                                bRightTrigger;
+    SHORT                               sThumbLX;
+    SHORT                               sThumbLY;
+    SHORT                               sThumbRX;
+    SHORT                               sThumbRY;
+} XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
+
+typedef struct _XINPUT_STATE
+{
+    DWORD                               dwPacketNumber;
+    XINPUT_GAMEPAD                      Gamepad;
+} XINPUT_STATE, *PXINPUT_STATE;
+
+typedef struct _XINPUT_VIBRATION
+{
+    WORD                                wLeftMotorSpeed;
+    WORD                                wRightMotorSpeed;
+} XINPUT_VIBRATION, *PXINPUT_VIBRATION;
+
+typedef struct _XINPUT_BATTERY_INFORMATION
+{
+    BYTE BatteryType;
+    BYTE BatteryLevel;
+} XINPUT_BATTERY_INFORMATION, *PXINPUT_BATTERY_INFORMATION;
+
+`;
+    const structs = parseCStruct(cStruct);
+    expect(sizeof(structs.XINPUT_GAMEPAD)).toBe(12);
+    expect(sizeof(structs.XINPUT_STATE)).toBe(16);
+    expect(sizeof(structs.XINPUT_VIBRATION)).toBe(4);
+    expect(sizeof(structs.XINPUT_BATTERY_INFORMATION)).toBe(2);
+  });
+
+  it("test parse 2", () => {
+    const structs = parseCStruct(`
+  struct Player {
+    char name[10];
+    unsigned   int   health;
+    DWORD coins;
+    float x;
+    float y;
+    float z;
+  };
+`);
+
+    expect(sizeof(structs.Player)).toBe(32);
+    expect(structs.Player.byteLength).toBe(30);
+  });
+});
+
+describe("test typedef", () => {
+  it("test typedef", () => {
+    const HANDLE = typedef("HANDLE", DWORD);
+    expect(HANDLE.size).toBe(4);
+    expect(HANDLE.unsigned).toBe(true);
+  });
+});
+
+describe("test struct list", () => {
+  let s_user: StructBuffer;
+  let s_users: StructBuffer;
+  beforeAll(() => {
+    s_user = new StructBuffer("User", {
+      name: string_t[2],
+      name2: string_t[2],
+    });
+    s_users = new StructBuffer("Users", {
+      users: s_user[2],
+    });
+  });
+
+  it("test decode", () => {
+    const data = s_users.decode(
+      new Uint8Array([0x61, 0x31, 0x61, 0x32, 0x62, 0x31, 0x62, 0x32])
+    );
+    expect(data.users.length).toBe(2);
+    expect(data.users[0]).toEqual({ name: "a1", name2: "a2" });
+    expect(data.users[1]).toEqual({ name: "b1", name2: "b2" });
+  });
+
+  it("test encode", () => {
+    const view = s_users.encode({
+      users: [
+        { name: "a1", name2: "a2" },
+        { name: "b1", name2: "b2" },
+      ],
+    });
+    expect(view.getUint32(0)).toBe(0x61316132);
+    expect(view.getUint32(4)).toBe(0x62316232);
+  });
+
+  it("test byteLength", () => {
+    expect(s_users.byteLength).toBe(8);
+    expect(sizeof(s_users)).toBe(8);
+  });
+});
+
+describe("test toCStruct", () => {
+  it("test toCStruct", () => {
+    const XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
+      wButtons: WORD,
+      bLeftTrigger: BYTE,
+      bRightTrigger: BYTE,
+      sThumbLX: int16_t,
+      sThumbLY: int16_t,
+      sThumbRX: int16_t,
+      sThumbRY: int16_t[2],
+    });
+    const cStruct = XINPUT_GAMEPAD.toCStruct();
+    expect(cStruct).toEqual(
+      expect.not.stringContaining(`
+    typedef struct _XINPUT_GAMEPAD
+    {
+        WORD wButtons;
+        BYTE bLeftTrigger;
+        BYTE bRightTrigger;
+        int16_t sThumbLX;
+        int16_t sThumbLY;
+        int16_t sThumbRX;
+        int16_t sThumbRY[2];
+    } XINPUT_GAMEPAD, *XINPUT_GAMEPAD;
+    `)
+    );
   });
 });
