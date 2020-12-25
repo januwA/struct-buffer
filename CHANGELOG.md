@@ -1,3 +1,9 @@
+## 2.0.0 2020/12/25
+
+- Support custom type (e.g. short = registerType("short", 2, false))
+- struct nesting
+
+
 ## 1.0.0 2020/12/24
 
 - Add sizeof and display function

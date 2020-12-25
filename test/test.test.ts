@@ -18,7 +18,9 @@ import {
   double,
   StructBuffer,
   display,
+  registerType,
 } from "../src";
+import { StructType } from "../src/class-type";
 
 describe("test decode and encode", () => {
   let struct: StructBuffer;
@@ -45,7 +47,8 @@ describe("test decode and encode", () => {
       0x62,
       0x63,
     ]);
-    const data = struct.decode(new DataView(buffer.buffer));
+    const data = struct.decode(buffer);
+
     expect(data.hp).toBe(0x0a);
     expect(data.mp).toBe(100);
     expect(data.name).toBe("abc");
@@ -82,8 +85,7 @@ describe("test string_t", () => {
   });
 
   it("test decode", () => {
-    const buffer = new Uint8Array([0x61, 0x62, 0x63, 0x64]);
-    const data = struct.decode(new DataView(buffer.buffer));
+    const data = struct.decode(new Uint8Array([0x61, 0x62, 0x63, 0x64]));
     expect(data.a).toBe("a");
     expect(data.b).toBe("b");
     expect(data.c).toBe("cd");
@@ -118,8 +120,7 @@ describe("test char", () => {
   });
 
   it("test decode", () => {
-    const buffer = new Uint8Array([0x61, 0x62, 0x63, 0x64]);
-    const data = struct.decode(new DataView(buffer.buffer));
+    const data = struct.decode(new Uint8Array([0x61, 0x62, 0x63, 0x64]));
 
     expect(data.a).toBe(0x61);
     expect(data.b).toEqual([0x62]);
@@ -362,5 +363,135 @@ describe("test names", () => {
 
   it("test byteLength", () => {
     expect(struct.byteLength).toBe(12);
+  });
+});
+
+describe("test registerType", () => {
+  let short: StructType;
+  let struct: StructBuffer;
+
+  beforeAll(() => {
+    short = registerType("short", 2, false);
+    struct = new StructBuffer({
+      hp: short,
+      mp: short,
+      pos: short[2],
+    });
+  });
+
+  it("test decode", () => {
+    const data = struct.decode(new Uint8Array([0, 0x2, 0, 0xa, 0, 1, 0, 2]));
+
+    expect(data.hp).toBe(2);
+    expect(data.mp).toBe(10);
+    expect(data.pos).toEqual([1, 2]);
+  });
+
+  it("test encode", () => {
+    const data = struct.encode({
+      hp: 2,
+      mp: 10,
+      pos: [100, 200],
+    });
+
+    expect(data.getInt16(0)).toBe(2);
+    expect(data.getInt16(2)).toBe(10);
+    expect(data.getInt16(4)).toBe(100);
+    expect(data.getInt16(6)).toBe(200);
+  });
+
+  it("test ByteLength", () => {
+    expect(struct.byteLength).toBe(8);
+  });
+});
+
+describe("test struct nesting", () => {
+  /*
+    typedef struct _XINPUT_STATE {
+      DWORD          dwPacketNumber;
+      XINPUT_GAMEPAD Gamepad;
+    } XINPUT_STATE, *PXINPUT_STATE;
+
+
+    typedef struct _XINPUT_GAMEPAD {
+      WORD  wButtons;
+      BYTE  bLeftTrigger;
+      BYTE  bRightTrigger;
+      SHORT sThumbLX;
+      SHORT sThumbLY;
+      SHORT sThumbRX;
+      SHORT sThumbRY;
+    } XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
+ */
+
+  let XINPUT_STATE: StructBuffer;
+  let XINPUT_GAMEPAD: StructBuffer;
+  beforeAll(() => {
+    XINPUT_GAMEPAD = new StructBuffer({
+      wButtons: WORD,
+      bLeftTrigger: BYTE,
+      bRightTrigger: BYTE,
+      sThumbLX: int16_t,
+      sThumbLY: int16_t,
+      sThumbRX: int16_t,
+      sThumbRY: int16_t,
+    });
+    XINPUT_STATE = new StructBuffer({
+      dwPacketNumber: DWORD,
+      Gamepad: XINPUT_GAMEPAD,
+    });
+  });
+
+  it("test decode", () => {
+    const data = XINPUT_STATE.decode(
+      new Uint8Array([
+        0,
+        0,
+        0,
+        0, // dwPacketNumber
+        0,
+        1, // wButtons
+        0, // bLeftTrigger
+        0, // bRightTrigger
+        0,
+        1, // sThumbLX
+        0,
+        2, // sThumbLY
+        0,
+        3, // sThumbRX
+        0,
+        4, // sThumbRY
+      ])
+    );
+    expect(data.dwPacketNumber).toBe(0);
+    expect(data.Gamepad.wButtons).toBe(1);
+    expect(data.Gamepad.bLeftTrigger).toBe(0);
+    expect(data.Gamepad.bRightTrigger).toBe(0);
+    expect(data.Gamepad.sThumbLX).toBe(1);
+    expect(data.Gamepad.sThumbLY).toBe(2);
+    expect(data.Gamepad.sThumbRX).toBe(3);
+    expect(data.Gamepad.sThumbRY).toBe(4);
+  });
+
+  it("test encode", () => {
+    const data = XINPUT_STATE.encode({
+      dwPacketNumber: 0,
+      Gamepad: {
+        wButtons: 1,
+        bLeftTrigger: 0,
+        bRightTrigger: 0,
+        sThumbLX: 1,
+        sThumbLY: 2,
+        sThumbRX: 3,
+        sThumbRY: 4,
+      },
+    });
+
+    expect(data.getUint32(0)).toBe(0);
+    expect(data.getUint16(4)).toBe(1);
+  });
+
+  it("test byteLength", () => {
+    expect(XINPUT_STATE.byteLength).toBe(16);
   });
 });

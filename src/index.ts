@@ -17,3 +17,5 @@ export {
   char,
   string_t,
 } from "./types";
+
+export { registerType } from "./class-type";

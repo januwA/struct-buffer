@@ -1,6 +1,6 @@
 {
   "name": "struct-buffer",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Add structure to ArrayBuffer",
   "private": false,
   "main": "./dist/struct-buffer.js",
