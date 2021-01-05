@@ -5,24 +5,20 @@ export const string_t = registerType("string_t", 1);
 // c-type
 export const char = registerType(["char", "signed char"], 1, false);
 export const uchar = registerType("unsigned char", 1);
-
 export const short = registerType(
   ["short", "short int", "signed short", "signed short int"],
   2,
   false
 );
 export const ushort = registerType(["unsigned short", "unsigned short int"], 2);
-
 export const int = registerType(["int", "signed", "signed int"], 4, false);
 export const uint = registerType(["unsigned", "unsigned int"], 4);
-
 export const long = registerType(
   ["long", "long int", "signed long", "signed long int"],
   4,
   false
 );
 export const ulong = registerType(["unsigned long", "unsigned long int"], 4);
-
 export const longlong = registerType(
   ["long long", "long long int", "signed long long", "signed long long int"],
   8,
@@ -32,7 +28,6 @@ export const ulonglong = registerType(
   ["unsigned long long", "unsigned long long int"],
   8
 );
-
 export const float = registerType("float", 4);
 export const double = registerType(["double", "long double"], 8);
 
@@ -55,6 +50,7 @@ export const DWORD = typedef("DWORD", ulong);
 export const QWORD = registerType("QWORD", 8);
 
 export const FLOAT = typedef("FLOAT", float);
+export const DOUBLE = typedef("DOUBLE", double);
 
 export const CHAR = typedef("CHAR", char);
 export const UCHAR = typedef("UCHAR", uchar);

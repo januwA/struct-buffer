@@ -1,3 +1,10 @@
+## 4.0.0 2021/1/5
+
+- fix: [#1](https://github.com/januwA/struct-buffer/issues/1)
+- Support struct multi array
+- Some api changes (e.g. parseCStruct => CStruct.parse, toCStruct => CStruct.from)
+- Add When reading a string, it will end reading directly when it encounters 0x0, and the following bytes will be filled with 0
+
 ## 3.0.0 2020/12/25
 
 - Support reading "c-struct" string template and converting it into StructBuffer

@@ -32,7 +32,7 @@
     "noImplicitThis": true, /* 使用隐含的“ any”类型引发“ this”表达式的错误。*/
     "alwaysStrict": true, /* 以严格模式解析并为每个源文件发出“使用严格”信息。 */
     /* 额外检查 */
-    "noUnusedLocals": true, /* 报告未使用的本地错误。 */
+    "noUnusedLocals": false, /* 报告未使用的本地错误。 */
     "noUnusedParameters": true, /* 报告未使用参数的错误。 */
     "noImplicitReturns": true, /* 当函数中的所有代码路径均未返回值时，报告错误。 */
     "noFallthroughCasesInSwitch": true, /* 在switch语句中报告失败案例的错误. */

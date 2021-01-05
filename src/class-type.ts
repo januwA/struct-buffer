@@ -1,3 +1,11 @@
+import { AnyObject } from "./interfaces";
+import {
+  arrayNextProxy,
+  arrayProxy,
+  createDataView,
+  unflattenDeep,
+} from "./utils";
+
 function typeHandle(type: StructType): { set: string; get: string } {
   switch (type.size) {
     case 1:
@@ -50,22 +58,11 @@ class StructTypeNext {
     public readonly set: string
   ) {
     this.deeps.push(i);
-    const proxy: this = new Proxy(this, {
-      get(o: any, k: string | number | symbol) {
-        if (k in o) return o[k];
-
-        k = k.toString();
-        if (/\d+/.test(k)) {
-          o.deeps.push(parseInt(k));
-        }
-        return proxy;
-      },
-    });
-    return proxy;
+    return arrayNextProxy(this);
   }
 }
 
-export class StructType extends Array {
+export class StructType extends Array<StructType> {
   names: string[];
   deeps: number[] = [];
 
@@ -85,10 +82,7 @@ export class StructType extends Array {
   }
 
   is(type: StructType): boolean {
-    for (const name of type.names) {
-      if (this.names.includes(name)) return true;
-    }
-    return false;
+    return type.names.some((name) => this.names.includes(name));
   }
 
   isName(typeName: string) {
@@ -109,29 +103,115 @@ export class StructType extends Array {
     const { set, get } = typeHandle(this);
     this.set = set;
     this.get = get;
-    return new Proxy(this, {
-      get(o: any, k: string | number | symbol) {
-        if (k in o) return o[k];
+    return arrayProxy(this, (o, i) => {
+      const newProxy: any = new StructTypeNext(
+        i,
+        o.names,
+        o.size,
+        o.unsigned,
+        o.get,
+        o.set
+      );
 
-        // 如果访问char[2] ，数字属性，返回一个新的proxy，避免上下文冲突
-        k = k.toString();
-        if (/\d+/.test(k)) {
-          const newProxy: any = new StructTypeNext(
-            parseInt(k),
-            o.names,
-            o.size,
-            o.unsigned,
-            o.get,
-            o.set
-          );
-
-          // 避免 instanceof 检测
-          // 同时prototype上的属性和方法也会拷贝过去
-          Object.setPrototypeOf(newProxy, StructType.prototype);
-          return newProxy;
-        }
-      },
+      // 避免 instanceof 检测
+      // 同时prototype上的属性和方法也会拷贝过去
+      Object.setPrototypeOf(newProxy, StructType.prototype);
+      return newProxy;
     });
+  }
+
+  /**
+   *
+   * ```ts
+   * DWORD.decode( new Uint8Array([0,0,0,1]) ) => 1
+   *
+   * DWORD[2].decode( new Uint8Array([0,0,0,1, 0,0,0,2]) ) => [1, 2]
+   * ```
+   *
+   * @param view
+   * @param littleEndian
+   * @param offset
+   * @param textDecode
+   */
+  decode(
+    view: ArrayBufferView,
+    littleEndian: boolean = false,
+    offset: number = 0,
+    textDecode?: TextDecoder
+  ): any {
+    if (!(view instanceof DataView)) view = new DataView(view.buffer);
+
+    const isString = this.isName("string_t");
+    const result: AnyObject[] = [];
+    for (let i = 0; i < this.count; i++) {
+      let data = (view as any)[this.get](offset, littleEndian);
+      if (isString) {
+        // 截断字符串
+        if (data === 0) break;
+        if (!textDecode) textDecode = new TextDecoder();
+        data = textDecode.decode(new Uint8Array([data]));
+      }
+      result.push(data);
+      offset += this.size;
+    }
+
+    // string_t[2] => 'ab'
+    // string_t[2][1] => ['a', 'b']
+    if (isString && this.deeps.length < 2) return result.join("");
+
+    return this.isList
+      ? unflattenDeep(result, this.deeps, isString)
+      : result[0];
+  }
+
+  /**
+   *
+   * ```ts
+   * DWORD.encode(4)         => <00 00 00 02>
+   *
+   * DWORD[2].encode([1,2])  => <00 00 00 01 00 00 00 02>
+   *
+   * // padding zero
+   * DWORD[2].encode([1])    => <00 00 00 01 00 00 00 00>
+   * ```
+   *
+   * @param obj
+   * @param littleEndian
+   * @param offset
+   * @param view
+   * @param textEncoder
+   */
+  encode(
+    obj: any /* AnyObject | string | number | undefined */,
+    littleEndian: boolean = false,
+    offset: number = 0,
+    view?: DataView,
+    textEncoder?: TextEncoder
+  ): DataView {
+    const v = createDataView(this.count * this.size, view);
+    const isString = this.isName("string_t");
+
+    if (this.isList && Array.isArray(obj)) {
+      obj = obj.flat();
+      if (isString) obj = obj.join("");
+    }
+
+    if (isString) {
+      if (!textEncoder) textEncoder = new TextEncoder();
+      obj = textEncoder.encode(obj);
+    }
+
+    for (let i = 0; i < this.count; i++) {
+      const it = (this.isList ? obj[i] : obj) ?? 0;
+      try {
+        (v as any)[this.set](offset, it, littleEndian);
+      } catch (error) {
+        (v as any)[this.set](offset, BigInt(it), littleEndian);
+      }
+      offset += this.size;
+    }
+
+    return v;
   }
 }
 

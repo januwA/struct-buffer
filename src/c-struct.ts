@@ -1,6 +1,7 @@
 import { StructType } from "./class-type";
 import { StructBuffer } from "./struct-buffer";
 import * as dtypes from "./types";
+import { char, string_t } from "./types";
 
 export interface ExpGroups {
   typedef?: string;
@@ -26,13 +27,12 @@ export const defaultTypes = dtypes;
 
 const exp = /\s*(?<typedef>typedef)?\s*(?<struct>struct)\s*(?<structName>\w+)\s*{(?<props>[^}]*)}(\s*(?<aliasName1>\w+)?\s*,\s*(?<aliasName2>\*\w+)?\s*;\s*)?/gi;
 
-
 /**
- * 
+ *
  * @param cStructTemp c-struct template
  * @param types Parse the type used in the template
  */
-export function parseCStruct(
+export function parse(
   cStructTemp: string,
   types?: {
     [typeName: string]: StructBuffer | StructType;
@@ -148,4 +148,33 @@ export function parseCStruct(
   }
 
   return structBuffers;
+}
+
+/**
+ * string_t => char
+ */
+export function from(sb: StructBuffer) {
+  let props = "";
+
+  for (let [propName, type] of Object.entries(sb.struct)) {
+    const typeName =
+      type instanceof StructType
+        ? string_t.is(type)
+          ? char.names[0]
+          : type.names[0]
+        : type.structName;
+
+    if (type.isList) {
+      const arr = type.deeps.map((i) => `[${i}]`).join("");
+      propName = `${propName}${arr}`;
+    }
+    props += `\t${typeName} ${propName};\n`;
+  }
+
+  return `
+typedef struct _${sb.structName}
+{
+${props.replace(/\n$/, "")}
+} ${sb.structName}, *${sb.structName};
+`;
 }

@@ -43,6 +43,20 @@ const view = struct.encode({
 </script>
 ```
 
+## Use ["type"](https://github.com/januwA/struct-buffer/blob/main/src/types.ts) for conversion
+
+```ts
+import { DWORD } from "struct-buffer";
+
+// encode
+const view = DWORD[2].encode([1, 2]); 
+// view => <00 00 00 01 00 00 00 02>
+
+// decode
+const data = DWORD[2].decode(new Uint8Array([0, 0, 0, 1, 0, 0, 0, 2]));
+// data => [ 1, 2 ]
+```
+
 ## register Type
 ```ts
 short = registerType("short", 2, false);
@@ -94,7 +108,7 @@ HANDLE.unsigned // true
     } XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
  */
 
-XINPUT_GAMEPAD = new StructBuffer({
+XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
   wButtons: WORD,
   bLeftTrigger: BYTE,
   bRightTrigger: BYTE,
@@ -104,7 +118,7 @@ XINPUT_GAMEPAD = new StructBuffer({
   sThumbRY: int16_t,
 });
 
-XINPUT_STATE = new StructBuffer({
+XINPUT_STATE = new StructBuffer("XINPUT_STATE", {
   dwPacketNumber: DWORD,
   Gamepad: XINPUT_GAMEPAD,
 });
@@ -140,6 +154,8 @@ XINPUT_STATE.encode({
 
 ## parse c-struct
 ```ts
+import { CStruct } from "struct-buffer";
+
 const cStruct = `
 //
 // Structures used by XInput APIs
@@ -174,7 +190,7 @@ typedef struct _XINPUT_BATTERY_INFORMATION
 } XINPUT_BATTERY_INFORMATION, *PXINPUT_BATTERY_INFORMATION;
 `;
 
-const structs = parseCStruct(cStruct);
+const structs = CStruct.parse(cStruct);
 sizeof(structs.XINPUT_GAMEPAD) // 12
 sizeof(structs.XINPUT_STATE) // 16
 sizeof(structs.XINPUT_VIBRATION) // 4
@@ -198,10 +214,19 @@ const data = s_users.decode(
 // data.users.length => 2
 // data.users[0] => { name: "a1", name2: "a2" }
 // data.users[1] => { name: "b1", name2: "b2" }
+
+// or
+
+const users = s_user[2].decode(
+  new Uint8Array([0x61, 0x31, 0x61, 0x32, 0x62, 0x31, 0x62, 0x32])
+);
+// users => [ { name: 'a1', name2: 'a2' }, { name: 'b1', name2: 'b2' } ]
 ```
 
 ## StructBuffer to c-struct
 ```ts
+import { CStruct } from "struct-buffer";
+
 const XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
   wButtons: WORD,
   bLeftTrigger: BYTE,
@@ -211,7 +236,7 @@ const XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
   sThumbRX: int16_t,
   sThumbRY: int16_t[2],
 });
-const cStruct = XINPUT_GAMEPAD.toCStruct();
+const cStruct = CStruct.from(XINPUT_GAMEPAD);
 
 // console.log(cStruct) => 
 typedef struct _XINPUT_GAMEPAD
@@ -224,6 +249,12 @@ typedef struct _XINPUT_GAMEPAD
     int16_t sThumbRX;
     int16_t sThumbRY[2];
 } XINPUT_GAMEPAD, *XINPUT_GAMEPAD;
+```
+
+## "string_t" Truncate when encountering 0
+```ts
+string_t[4].decode(new Uint8Array([0x61, 0x62, 0x63, 0x64]); // abcd
+string_t[4].decode(new Uint8Array([0x61, 0x62, 0   , 0x64]); // ab
 ```
 
 ## test
