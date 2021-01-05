@@ -25,6 +25,7 @@ export declare const WORD: import("./class-type").StructType;
 export declare const DWORD: import("./class-type").StructType;
 export declare const QWORD: import("./class-type").StructType;
 export declare const FLOAT: import("./class-type").StructType;
+export declare const DOUBLE: import("./class-type").StructType;
 export declare const CHAR: import("./class-type").StructType;
 export declare const UCHAR: import("./class-type").StructType;
 export declare const SHORT: import("./class-type").StructType;

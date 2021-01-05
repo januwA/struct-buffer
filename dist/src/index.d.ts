@@ -1,5 +1,6 @@
-export { StructBuffer, sizeof, display } from "./struct-buffer";
+export { StructBuffer, sizeof } from "./struct-buffer";
 export * from "./types";
 export { registerType, typedef } from "./class-type";
-export { parseCStruct, defaultTypes } from "./parse-cstruct";
+export * as CStruct from "./c-struct";
+export { display } from "./display";
 //# sourceMappingURL=index.d.ts.map

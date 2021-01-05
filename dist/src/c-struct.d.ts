@@ -19,9 +19,10 @@ export interface CStruct {
     [propName: string]: CStructProp;
 }
 export declare const defaultTypes: typeof dtypes;
-export declare function parseCStruct(cStructTemp: string, types?: {
+export declare function parse(cStructTemp: string, types?: {
     [typeName: string]: StructBuffer | StructType;
 }): {
     [structName: string]: StructBuffer;
 };
-//# sourceMappingURL=parse-cstruct.d.ts.map
+export declare function from(sb: StructBuffer): string;
+//# sourceMappingURL=c-struct.d.ts.map

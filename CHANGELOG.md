@@ -1,3 +1,7 @@
+## 4.0.1 2021/1/5
+
+- build "v4.0.0" 😂
+
 ## 4.0.0 2021/1/5
 
 - fix: [#1](https://github.com/januwA/struct-buffer/issues/1)

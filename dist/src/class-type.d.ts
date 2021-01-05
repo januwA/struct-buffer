@@ -1,4 +1,4 @@
-export declare class StructType extends Array {
+export declare class StructType extends Array<StructType> {
     readonly size: 1 | 2 | 4 | 8;
     readonly unsigned: boolean;
     names: string[];
@@ -10,6 +10,8 @@ export declare class StructType extends Array {
     get: string;
     set: string;
     constructor(typeName: string | string[], size: 1 | 2 | 4 | 8, unsigned: boolean);
+    decode(view: ArrayBufferView, littleEndian?: boolean, offset?: number, textDecode?: TextDecoder): any;
+    encode(obj: any, littleEndian?: boolean, offset?: number, view?: DataView, textEncoder?: TextEncoder): DataView;
 }
 export declare function registerType(typeName: string | string[], size: 1 | 2 | 4 | 8, unsigned?: boolean): StructType;
 export declare function typedef(typeName: string | string[], type: StructType): StructType;
