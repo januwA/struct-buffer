@@ -6,44 +6,47 @@ import {
   unflattenDeep,
 } from "./utils";
 
-function typeHandle(type: StructType): { set: string; get: string } {
-  switch (type.size) {
-    case 1:
-      return {
-        get: type.unsigned ? "getUint8" : "getInt8",
-        set: type.unsigned ? "setUint8" : "setInt8",
-      };
-    case 2:
-      return {
-        get: type.unsigned ? "getUint16" : "getInt16",
-        set: type.unsigned ? "setUint16" : "setInt16",
-      };
+const FLOAT_TYPE = "float";
+const DOUBLE_TYPE = "double";
+const STRING_TYPE = "string_t";
 
-    case 4:
-      const isFloat = type.isName("float");
-      return {
-        get: isFloat ? "getFloat32" : type.unsigned ? "getUint32" : "getInt32",
-        set: isFloat ? "setFloat32" : type.unsigned ? "setUint32" : "setInt32",
-      };
+const hData: any = {
+  1: {
+    1: "getUint8",
+    0: "getInt8",
+  },
+  2: {
+    1: "getUint16",
+    0: "getInt16",
+  },
+  4: {
+    1: "getUint32",
+    0: "getInt32",
+  },
+  8: {
+    1: "getBigUint64",
+    0: "getBigInt64",
+  },
+  f: "getFloat32",
+  d: "getFloat64",
+};
 
-    case 8:
-      const isDouble = type.isName("double");
-      return {
-        get: isDouble
-          ? "getFloat64"
-          : type.unsigned
-          ? "getBigUint64"
-          : "getBigInt64",
-        set: isDouble
-          ? "setFloat64"
-          : type.unsigned
-          ? "setBigUint64"
-          : "setBigInt64",
-      };
+function typeHandle(type: StructType): [get: string, set: string] {
+  let h: string | undefined = undefined;
+  const isFloat =
+    type.isName(FLOAT_TYPE.toLowerCase()) ||
+    type.isName(FLOAT_TYPE.toUpperCase());
 
-    default:
-      throw new Error(`StructBuffer: Unrecognized ${type} type.`);
-  }
+  const isDouble =
+    type.isName(DOUBLE_TYPE.toLowerCase()) ||
+    type.isName(DOUBLE_TYPE.toUpperCase());
+  if (isFloat) h = hData["f"];
+  if (isDouble) h = hData["d"];
+
+  if (!h) h = hData[type.size][+type.unsigned];
+  if (!h) throw new Error(`StructBuffer: Unrecognized ${type} type.`);
+
+  return [h, h.replace(/^(g)/, "s")];
 }
 
 class StructTypeNext {
@@ -100,7 +103,7 @@ export class StructType extends Array<StructType> {
     super();
 
     this.names = Array.isArray(typeName) ? typeName : [typeName];
-    const { set, get } = typeHandle(this);
+    const [get, set] = typeHandle(this);
     this.set = set;
     this.get = get;
     return arrayProxy(this, (o, i) => {
@@ -112,9 +115,6 @@ export class StructType extends Array<StructType> {
         o.get,
         o.set
       );
-
-      // 避免 instanceof 检测
-      // 同时prototype上的属性和方法也会拷贝过去
       Object.setPrototypeOf(newProxy, StructType.prototype);
       return newProxy;
     });
@@ -141,7 +141,7 @@ export class StructType extends Array<StructType> {
   ): any {
     if (!(view instanceof DataView)) view = new DataView(view.buffer);
 
-    const isString = this.isName("string_t");
+    const isString = this.isName(STRING_TYPE);
     const result: AnyObject[] = [];
     for (let i = 0; i < this.count; i++) {
       let data = (view as any)[this.get](offset, littleEndian);
@@ -189,7 +189,7 @@ export class StructType extends Array<StructType> {
     textEncoder?: TextEncoder
   ): DataView {
     const v = createDataView(this.count * this.size, view);
-    const isString = this.isName("string_t");
+    const isString = this.isName(STRING_TYPE);
 
     if (this.isList && Array.isArray(obj)) {
       obj = obj.flat();
@@ -217,6 +217,11 @@ export class StructType extends Array<StructType> {
 
 /**
  *
+ * Register a new type
+ *
+ * ```ts
+ * const int = registerType(["int", "signed", "signed int"], 4, false);
+ * ```
  * @param typeName
  * @param size
  * @param unsigned
@@ -231,10 +236,11 @@ export function registerType(
 
 /**
  *
- * ```js
- * int8_t = typedef("int8_t", char);
- * ```
+ * Inherit the "size" and "unsigned" attributes
  *
+ * ```ts
+ * const int8_t = typedef("int8_t", char);
+ * ```
  * @param typeName
  * @param type
  */

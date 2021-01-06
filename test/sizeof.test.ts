@@ -17,6 +17,8 @@ import {
   float,
   double,
   StructBuffer,
+  FLOAT,
+  DOUBLE,
 } from "../src";
 
 describe("test sizeof", () => {
@@ -86,11 +88,15 @@ describe("test sizeof", () => {
   it("test float", () => {
     expect(sizeof(float)).toBe(4);
     expect(sizeof(float[10])).toBe(4 * 10);
+    expect(sizeof(FLOAT)).toBe(4);
+    expect(sizeof(FLOAT[10])).toBe(4 * 10);
   });
 
   it("test double", () => {
     expect(sizeof(double)).toBe(8);
     expect(sizeof(double[10])).toBe(8 * 10);
+    expect(sizeof(DOUBLE)).toBe(8);
+    expect(sizeof(DOUBLE[10])).toBe(8 * 10);
   });
 
   it("test char", () => {
