@@ -36,4 +36,3 @@ export declare const LONG: import("./class-type").StructType;
 export declare const ULONG: import("./class-type").StructType;
 export declare const LONGLONG: import("./class-type").StructType;
 export declare const ULONGLONG: import("./class-type").StructType;
-//# sourceMappingURL=types.d.ts.map

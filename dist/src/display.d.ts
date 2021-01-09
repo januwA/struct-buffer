@@ -4,4 +4,3 @@ export declare function display(view: DataView, type: StructType, options?: {
     hex?: boolean;
     littleEndian?: boolean;
 }): DysplayResult[];
-//# sourceMappingURL=display.d.ts.map

@@ -1,6 +1,12 @@
-import { registerType, typedef } from "./class-type";
+import {
+  DOUBLE_TYPE,
+  FLOAT_TYPE,
+  registerType,
+  STRING_TYPE,
+  typedef,
+} from "./class-type";
 
-export const string_t = registerType("string_t", 1);
+export const string_t = registerType(STRING_TYPE, 1);
 
 // c-type
 export const char = registerType(["char", "signed char"], 1, false);
@@ -28,8 +34,8 @@ export const ulonglong = registerType(
   ["unsigned long long", "unsigned long long int"],
   8
 );
-export const float = registerType("float", 4);
-export const double = registerType(["double", "long double"], 8);
+export const float = registerType(FLOAT_TYPE, 4);
+export const double = registerType([DOUBLE_TYPE, "long double"], 8);
 
 // c++ type
 export const int8_t = typedef(["int8_t", "__int8"], char);
@@ -49,8 +55,8 @@ export const WORD = typedef("WORD", ushort);
 export const DWORD = typedef("DWORD", ulong);
 export const QWORD = registerType("QWORD", 8);
 
-export const FLOAT = typedef("FLOAT", float);
-export const DOUBLE = typedef("DOUBLE", double);
+export const FLOAT = typedef(FLOAT_TYPE.toUpperCase(), float);
+export const DOUBLE = typedef(DOUBLE_TYPE.toUpperCase(), double);
 
 export const CHAR = typedef("CHAR", char);
 export const UCHAR = typedef("UCHAR", uchar);

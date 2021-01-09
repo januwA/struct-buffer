@@ -1,3 +1,7 @@
+## 4.1.0 2021/1/9
+
+- When decode input array, convert to Uint8Array
+
 ## 4.0.2 2021/1/6
 
 - fix FLOAT and DOUBLE

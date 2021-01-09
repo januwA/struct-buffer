@@ -9,6 +9,7 @@ export declare class StructBuffer extends Array<StructBuffer> {
     deeps: number[];
     textDecode: TextDecoder;
     textEncoder: TextEncoder;
+    structKV: [string, StructType | StructBuffer][];
     get isList(): boolean;
     get count(): number;
     constructor(structName: string, struct: {
@@ -16,7 +17,6 @@ export declare class StructBuffer extends Array<StructBuffer> {
     });
     get byteLength(): number;
     get maxSize(): number;
-    decode(view: ArrayBufferView, littleEndian?: boolean, offset?: number): AnyObject;
+    decode(view: ArrayBufferView | number[], littleEndian?: boolean, offset?: number): AnyObject;
     encode(obj: AnyObject, littleEndian?: boolean, offset?: number, view?: DataView): DataView;
 }
-//# sourceMappingURL=struct-buffer.d.ts.map

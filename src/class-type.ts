@@ -3,12 +3,13 @@ import {
   arrayNextProxy,
   arrayProxy,
   createDataView,
+  makeDataView,
   unflattenDeep,
 } from "./utils";
 
-const FLOAT_TYPE = "float";
-const DOUBLE_TYPE = "double";
-const STRING_TYPE = "string_t";
+export const FLOAT_TYPE = "float";
+export const DOUBLE_TYPE = "double";
+export const STRING_TYPE = "string_t";
 
 const hData: any = {
   1: {
@@ -33,6 +34,7 @@ const hData: any = {
 
 function typeHandle(type: StructType): [get: string, set: string] {
   let h: string | undefined = undefined;
+
   const isFloat =
     type.isName(FLOAT_TYPE.toLowerCase()) ||
     type.isName(FLOAT_TYPE.toUpperCase());
@@ -40,6 +42,7 @@ function typeHandle(type: StructType): [get: string, set: string] {
   const isDouble =
     type.isName(DOUBLE_TYPE.toLowerCase()) ||
     type.isName(DOUBLE_TYPE.toUpperCase());
+
   if (isFloat) h = hData["f"];
   if (isDouble) h = hData["d"];
 
@@ -134,16 +137,17 @@ export class StructType extends Array<StructType> {
    * @param textDecode
    */
   decode(
-    view: ArrayBufferView,
+    view: ArrayBufferView | number[],
     littleEndian: boolean = false,
     offset: number = 0,
     textDecode?: TextDecoder
   ): any {
-    if (!(view instanceof DataView)) view = new DataView(view.buffer);
+    view = makeDataView(view);
 
     const isString = this.isName(STRING_TYPE);
     const result: AnyObject[] = [];
-    for (let i = 0; i < this.count; i++) {
+    let i = this.count;
+    while (i--) {
       let data = (view as any)[this.get](offset, littleEndian);
       if (isString) {
         // 截断字符串

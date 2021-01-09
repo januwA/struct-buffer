@@ -12,7 +12,7 @@ import {
   registerType,
   uchar,
   typedef,
-  CStruct
+  CStruct,
 } from "../src";
 import { StructType } from "../src/class-type";
 
@@ -68,15 +68,15 @@ describe("test decode and encode", () => {
 
   it("test dword encode", () => {
     const view = DWORD[2].encode([1, 2]);
-    
+
     expect(view.byteLength).toBe(8);
     expect(view.getUint32(0)).toBe(1);
     expect(view.getUint32(4)).toBe(2);
   });
 
   it("test dword decode", () => {
-    const data = DWORD[2].decode(new Uint8Array([0, 0, 0, 1, 0, 0, 0, 2]));
-    
+    const data = DWORD[2].decode([0, 0, 0, 1, 0, 0, 0, 2]);
+
     expect(data.length).toBe(2);
     expect(data[0]).toBe(1);
     expect(data[1]).toBe(2);
@@ -95,7 +95,7 @@ describe("test string_t", () => {
   });
 
   it("test decode", () => {
-    const data = struct.decode(new Uint8Array([0x61, 0x62, 0x63, 0x64]));
+    const data = struct.decode([0x61, 0x62, 0x63, 0x64]);
     expect(data.a).toBe("a");
     expect(data.b).toBe("b");
     expect(data.c).toBe("cd");
@@ -452,7 +452,6 @@ describe("test struct list", () => {
       new Uint8Array([0x61, 0x31, 0x61, 0x32, 0x62, 0x31, 0x62, 0x32])
     );
     expect(users.length).toBe(2);
-    
   });
 
   it("test encode", () => {

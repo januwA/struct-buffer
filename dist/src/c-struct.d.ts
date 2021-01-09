@@ -25,4 +25,3 @@ export declare function parse(cStructTemp: string, types?: {
     [structName: string]: StructBuffer;
 };
 export declare function from(sb: StructBuffer): string;
-//# sourceMappingURL=c-struct.d.ts.map

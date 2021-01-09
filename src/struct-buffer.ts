@@ -4,6 +4,7 @@ import {
   arrayNextProxy,
   arrayProxy,
   createDataView,
+  makeDataView,
   unflattenDeep,
   zeroMemory,
 } from "./utils";
@@ -50,6 +51,7 @@ export class StructBuffer extends Array<StructBuffer> {
   deeps: number[] = [];
   textDecode = new TextDecoder();
   textEncoder = new TextEncoder();
+  structKV: [string, StructType | StructBuffer][];
 
   /**
    *
@@ -79,10 +81,12 @@ export class StructBuffer extends Array<StructBuffer> {
     }
   ) {
     super();
+    this.structKV = Object.entries(struct);
     return arrayProxy(this, (o, i) => {
       const newProxy: any = new StructBufferNext(i, o.structName, o.struct);
       newProxy.textDecode = o.textDecode;
       newProxy.textEncoder = o.textEncoder;
+      newProxy.structKV = o.structKV;
       Object.setPrototypeOf(newProxy, StructBuffer.prototype);
       return newProxy;
     });
@@ -94,35 +98,31 @@ export class StructBuffer extends Array<StructBuffer> {
 
   get maxSize(): number {
     return Math.max(
-      ...Object.values(this.struct).map((type) => {
-        if (type instanceof StructBuffer) return type.maxSize;
-        return type.size;
-      })
+      ...Object.values(this.struct).map((type) =>
+        type instanceof StructBuffer ? type.maxSize : type.size
+      )
     );
   }
 
   decode(
-    view: ArrayBufferView,
+    view: ArrayBufferView | number[],
     littleEndian: boolean = false,
     offset: number = 0
   ): AnyObject {
-    if (!(view instanceof DataView)) view = new DataView(view.buffer);
-
+    view = makeDataView(view);
     const result: AnyObject[] = [];
-    for (let i = 0; i < this.count; i++) {
-      const data = Object.entries(this.struct).reduce<AnyObject>(
-        (acc, [key, type]) => {
-          if (type instanceof StructBuffer) {
-            acc[key] = type.decode(view, littleEndian, offset);
-            offset += type.byteLength;
-          } else {
-            acc[key] = type.decode(view, littleEndian, offset, this.textDecode);
-            offset += sizeof(type);
-          }
-          return acc;
-        },
-        {}
-      );
+    let i = this.count;
+    while (i--) {
+      const data = this.structKV.reduce<AnyObject>((acc, [key, type]) => {
+        if (type instanceof StructBuffer) {
+          acc[key] = type.decode(view, littleEndian, offset);
+          offset += type.byteLength;
+        } else {
+          acc[key] = type.decode(view, littleEndian, offset, this.textDecode);
+          offset += sizeof(type);
+        }
+        return acc;
+      }, {});
       result.push(data);
     }
 
@@ -147,20 +147,17 @@ export class StructBuffer extends Array<StructBuffer> {
         offset += itemSize;
         continue;
       }
-      Object.entries(this.struct).reduce<DataView>(
-        (acc: DataView, [key, type]) => {
-          const value = it[key];
-          if (type instanceof StructBuffer) {
-            type.encode(value, littleEndian, offset, acc);
-            offset += type.byteLength;
-          } else {
-            type.encode(value, littleEndian, offset, acc, this.textEncoder);
-            offset += sizeof(type);
-          }
-          return acc;
-        },
-        v
-      );
+      this.structKV.reduce<DataView>((acc: DataView, [key, type]) => {
+        const value = it[key];
+        if (type instanceof StructBuffer) {
+          type.encode(value, littleEndian, offset, acc);
+          offset += type.byteLength;
+        } else {
+          type.encode(value, littleEndian, offset, acc, this.textEncoder);
+          offset += sizeof(type);
+        }
+        return acc;
+      }, v);
     }
     return v;
   }

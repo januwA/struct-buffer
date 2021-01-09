@@ -37,6 +37,14 @@ export function createDataView(byteLength: number, view?: DataView) {
   return view ? view : new DataView(new ArrayBuffer(byteLength));
 }
 
+export function makeDataView(view: ArrayBufferView | number[]): DataView {
+  if (view instanceof DataView) return view;
+  if (Array.isArray(view)) view = Uint8Array.from(view);
+  if (!ArrayBuffer.isView(view))
+    throw new Error(`Type Error: (${view}) is not an ArrayBuffer!!!`);
+  return new DataView(view.buffer);
+}
+
 export function arrayProxy(
   context: any,
   cb: (target: any, index: number) => any
