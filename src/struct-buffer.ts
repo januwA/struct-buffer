@@ -13,7 +13,7 @@ import {
  * Get the size after byte alignment
  * @param type Single type or Struct Buffer
  */
-export function sizeof(type: StructType | StructBuffer): number {
+export function sizeof(type: StructType | StructBuffer<AnyObject>): number {
   if (type instanceof StructBuffer) {
     let padidng = 0;
     const maxSize = type.maxSize;
@@ -24,7 +24,7 @@ export function sizeof(type: StructType | StructBuffer): number {
   return type.isList ? type.size * type.count : type.size;
 }
 
-function byteLength(sb: StructBuffer, count?: number) {
+function byteLength(sb: StructBuffer<AnyObject>, count?: number) {
   const typeByteLength = Object.values(sb.struct).reduce((acc, type) => {
     if (type instanceof StructBuffer) acc += type.byteLength;
     else acc += sizeof(type);
@@ -33,25 +33,29 @@ function byteLength(sb: StructBuffer, count?: number) {
   return typeByteLength * (count ?? sb.count);
 }
 
-class StructBufferNext {
+export interface IStructBuffer {
+  [k: string]: StructType | StructBuffer<IStructBuffer>;
+}
+
+class StructBufferNext<T extends IStructBuffer> {
   deeps: number[] = [];
   constructor(
     i: number,
     public readonly structName: string,
-    public readonly struct: {
-      [k: string]: StructType | StructBuffer;
-    }
+    public readonly struct: T
   ) {
     this.deeps.push(i);
     return arrayNextProxy(this);
   }
 }
 
-export class StructBuffer extends Array<StructBuffer> {
+export class StructBuffer<T extends IStructBuffer> extends Array<
+  StructBuffer<T>
+> {
   deeps: number[] = [];
   textDecode = new TextDecoder();
   textEncoder = new TextEncoder();
-  structKV: [string, StructType | StructBuffer][];
+  structKV: [string, StructType | StructBuffer<AnyObject>][];
 
   /**
    *
@@ -74,12 +78,7 @@ export class StructBuffer extends Array<StructBuffer> {
     return this.deeps.reduce((acc, it) => (acc *= it), 1);
   }
 
-  constructor(
-    public readonly structName: string,
-    public readonly struct: {
-      [k: string]: StructType | StructBuffer;
-    }
-  ) {
+  constructor(public readonly structName: string, public readonly struct: T) {
     super();
     this.structKV = Object.entries(struct);
     return arrayProxy(this, (o, i) => {
@@ -93,7 +92,7 @@ export class StructBuffer extends Array<StructBuffer> {
   }
 
   get byteLength(): number {
-    return byteLength(this);
+    return byteLength(this as any);
   }
 
   get maxSize(): number {
@@ -108,7 +107,9 @@ export class StructBuffer extends Array<StructBuffer> {
     view: ArrayBufferView | number[],
     littleEndian: boolean = false,
     offset: number = 0
-  ): AnyObject {
+  ): {
+    [k in keyof T]: any;
+  } {
     view = makeDataView(view);
     const result: AnyObject[] = [];
     let i = this.count;
@@ -130,7 +131,13 @@ export class StructBuffer extends Array<StructBuffer> {
   }
 
   encode(
-    obj: AnyObject,
+    obj:
+      | {
+          [k in keyof T]: any;
+        }
+      | {
+          [k in keyof T]: any;
+        }[],
     littleEndian: boolean = false,
     offset: number = 0,
     view?: DataView
@@ -140,7 +147,13 @@ export class StructBuffer extends Array<StructBuffer> {
     if (this.isList && Array.isArray(obj)) obj = obj.flat();
 
     for (let i = 0; i < this.count; i++) {
-      const it = this.isList ? obj[i] : obj;
+      const it: any = this.isList
+        ? (obj as Array<
+            {
+              [k in keyof T]: any;
+            }
+          >)[i]
+        : obj;
       if (it === undefined) {
         const itemSize = this.byteLength / this.count;
         zeroMemory(v, itemSize, offset);

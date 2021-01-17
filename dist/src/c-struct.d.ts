@@ -1,5 +1,5 @@
 import { StructType } from "./class-type";
-import { StructBuffer } from "./struct-buffer";
+import { IStructBuffer, StructBuffer } from "./struct-buffer";
 import * as dtypes from "./types";
 export interface ExpGroups {
     typedef?: string;
@@ -20,8 +20,8 @@ export interface CStruct {
 }
 export declare const defaultTypes: typeof dtypes;
 export declare function parse(cStructTemp: string, types?: {
-    [typeName: string]: StructBuffer | StructType;
+    [typeName: string]: StructBuffer<any> | StructType;
 }): {
-    [structName: string]: StructBuffer;
+    [structName: string]: StructBuffer<any>;
 };
-export declare function from(sb: StructBuffer): string;
+export declare function from(sb: StructBuffer<IStructBuffer>): string;

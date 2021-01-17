@@ -257,6 +257,40 @@ string_t[4].decode(new Uint8Array([0x61, 0x62, 0x63, 0x64]); // abcd
 string_t[4].decode(new Uint8Array([0x61, 0x62, 0   , 0x64]); // ab
 ```
 
+## bits
+```ts
+import { DWORD, bits, StructBuffer } from "struct-buffer";
+
+const EFLAG_DATA = 0x00000246;
+const littleEndian = true;
+const EFLAG = bits(DWORD, {
+  CF: 0,
+  PF: 2,
+  AF: 4,
+  ZF: 6,
+  SF: 7,
+  TF: 8,
+  IF: 9,
+  DF: 10,
+  OF: 11,
+});
+
+// decode
+const data = EFLAG.decode(new Uint32Array([EFLAG_DATA]), littleEndian);
+// => { CF: 0, PF: 1, AF: 0, ZF: 1, SF: 0, TF: 0, IF: 1, DF: 0, OF: 0 }
+
+// encode
+const view = EFLAG.encode(
+  {
+    PF: 1,
+    ZF: 1,
+    IF: 1,
+  },
+  littleEndian
+);
+// => <44 02 00 00>
+```
+
 ## test
 > $ npm test
 

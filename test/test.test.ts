@@ -17,17 +17,12 @@ import {
 import { StructType } from "../src/class-type";
 
 describe("test decode and encode", () => {
-  let struct: StructBuffer;
-
-  beforeAll(() => {
-    struct = new StructBuffer("Player", {
+  it("test decode and encode", () => {
+    const struct = new StructBuffer("Player", {
       hp: DWORD,
       mp: uint32_t,
       name: string_t[3],
     });
-  });
-
-  it("test decode", () => {
     const buffer = new Uint8Array([
       0,
       0,
@@ -42,13 +37,9 @@ describe("test decode and encode", () => {
       0x63,
     ]);
     const data = struct.decode(buffer);
-
     expect(data.hp).toBe(0x0a);
     expect(data.mp).toBe(100);
     expect(data.name).toBe("abc");
-  });
-
-  it("test encode", () => {
     const view = struct.encode({
       hp: 10,
       mp: 100,
@@ -60,9 +51,6 @@ describe("test decode and encode", () => {
     expect(view.getUint8(8)).toBe(0x61); // a
     expect(view.getUint8(9)).toBe(0x62); // b
     expect(view.getUint8(10)).toBe(0x63); // c
-  });
-
-  it("test byteLength", () => {
     expect(struct.byteLength).toBe(11);
   });
 
@@ -84,24 +72,16 @@ describe("test decode and encode", () => {
 });
 
 describe("test string_t", () => {
-  let struct: StructBuffer;
-
-  beforeAll(() => {
-    struct = new StructBuffer("Test", {
+  it("test decode and encode", () => {
+    let struct = new StructBuffer("Test", {
       a: string_t,
       b: string_t,
       c: string_t[2],
     });
-  });
-
-  it("test decode", () => {
     const data = struct.decode([0x61, 0x62, 0x63, 0x64]);
     expect(data.a).toBe("a");
     expect(data.b).toBe("b");
     expect(data.c).toBe("cd");
-  });
-
-  it("test encode", () => {
     const view = struct.encode({
       a: "a",
       b: "b",
@@ -111,9 +91,7 @@ describe("test string_t", () => {
     expect(view.getUint8(1)).toBe(0x62); // b
     expect(view.getUint8(2)).toBe(0x63); // c
     expect(view.getUint8(3)).toBe(0x64); // d
-  });
 
-  it("test byteLength", () => {
     expect(struct.byteLength).toBe(4);
   });
 
@@ -128,25 +106,18 @@ describe("test string_t", () => {
 });
 
 describe("test char", () => {
-  let struct: StructBuffer;
-
-  beforeAll(() => {
-    struct = new StructBuffer("Test", {
+  it("test decode and encode", () => {
+    let struct = new StructBuffer("Test", {
       a: char,
       b: char[1],
       c: char[2],
     });
-  });
-
-  it("test decode", () => {
     const data = struct.decode(new Uint8Array([0x61, 0x62, 0x63, 0x64]));
 
     expect(data.a).toBe(0x61);
     expect(data.b).toEqual([0x62]);
     expect(data.c).toEqual([0x63, 0x64]);
-  });
 
-  it("test encode", () => {
     const view = struct.encode({
       a: 0x61,
       b: [0x62],
@@ -156,9 +127,7 @@ describe("test char", () => {
     expect(view.getUint8(1)).toBe(0x62); // b
     expect(view.getUint8(2)).toBe(0x63); // c
     expect(view.getUint8(3)).toBe(0x64); // d
-  });
 
-  it("test byteLength", () => {
     expect(struct.byteLength).toBe(4);
   });
 
@@ -175,7 +144,7 @@ describe("test char", () => {
 
 describe("test pos", () => {
   let view: DataView;
-  let struct: StructBuffer;
+  let struct: StructBuffer<any>;
   beforeAll(() => {
     view = new DataView(new ArrayBuffer(2 * 8 * 4));
 
@@ -231,7 +200,7 @@ describe("test pos", () => {
 
 describe("test registerType", () => {
   let short: StructType;
-  let struct: StructBuffer;
+  let struct: StructBuffer<any>;
 
   beforeAll(() => {
     short = registerType("short", 2, false);
@@ -287,8 +256,8 @@ describe("test struct nesting", () => {
     } XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
  */
 
-  let XINPUT_STATE: StructBuffer;
-  let XINPUT_GAMEPAD: StructBuffer;
+  let XINPUT_STATE: StructBuffer<any>;
+  let XINPUT_GAMEPAD: StructBuffer<any>;
   beforeAll(() => {
     XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
       wButtons: WORD,
@@ -428,8 +397,8 @@ describe("test typedef", () => {
 });
 
 describe("test struct list", () => {
-  let s_user: StructBuffer;
-  let s_users: StructBuffer;
+  let s_user: StructBuffer<any>;
+  let s_users: StructBuffer<any>;
   beforeAll(() => {
     s_user = new StructBuffer("User", {
       name: string_t[2],
@@ -472,8 +441,8 @@ describe("test struct list", () => {
 });
 
 describe("test struct Multilevel array", () => {
-  let s_player: StructBuffer;
-  let s_players: StructBuffer;
+  let s_player: StructBuffer<any>;
+  let s_players: StructBuffer<any>;
   let bytes: Uint8Array;
   beforeAll(() => {
     s_player = new StructBuffer("Player", {

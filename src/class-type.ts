@@ -68,6 +68,7 @@ class StructTypeNext {
   }
 }
 
+// D decode return type
 export class StructType extends Array<StructType> {
   names: string[];
   deeps: number[] = [];
@@ -153,7 +154,7 @@ export class StructType extends Array<StructType> {
         // 截断字符串
         if (data === 0) break;
         if (!textDecode) textDecode = new TextDecoder();
-        data = textDecode.decode(new Uint8Array([data]));
+        data = textDecode!.decode(new Uint8Array([data]));
       }
       result.push(data);
       offset += this.size;
@@ -161,7 +162,7 @@ export class StructType extends Array<StructType> {
 
     // string_t[2] => 'ab'
     // string_t[2][1] => ['a', 'b']
-    if (isString && this.deeps.length < 2) return result.join("");
+    if (isString && this.deeps.length < 2) return result.join("") as any;
 
     return this.isList
       ? unflattenDeep(result, this.deeps, isString)
@@ -193,6 +194,7 @@ export class StructType extends Array<StructType> {
     textEncoder?: TextEncoder
   ): DataView {
     const v = createDataView(this.count * this.size, view);
+
     const isString = this.isName(STRING_TYPE);
 
     if (this.isList && Array.isArray(obj)) {
@@ -215,6 +217,46 @@ export class StructType extends Array<StructType> {
       offset += this.size;
     }
 
+    return v;
+  }
+}
+
+export class BitsType<T extends AnyObject> extends StructType {
+  constructor(size: 2 | 1 | 4 | 8, public readonly bits: T) {
+    super("<bits>", size, true);
+  }
+
+  decode(
+    view: ArrayBufferView | number[],
+    littleEndian: boolean = false,
+    offset: number = 0
+  ): {
+    [key in keyof T]?: 1 | 0;
+  } {
+    view = makeDataView(view);
+    const result: { [k: string]: 0 | 1 } = {};
+    let data = (view as any)[this.get](offset, littleEndian);
+    Object.entries(this.bits).forEach(([k, i]) => {
+      result[k] = ((data & (1 << i)) >> i) as 0 | 1;
+    });
+    return result as any;
+  }
+
+  encode(
+    obj: {
+      [key: string]: 1 | 0;
+    },
+    littleEndian: boolean = false,
+    offset: number = 0,
+    view?: DataView
+  ): DataView {
+    const v = createDataView(this.count * this.size, view);
+    let flags = 0;
+    Object.entries<number>(obj).forEach(([k, v]) => {
+      const i: number = this.bits![k];
+      if (i !== undefined) flags |= v << i;
+    });
+    (v as any)[this.set](offset, flags, littleEndian);
     return v;
   }
 }
@@ -251,4 +293,15 @@ export function registerType(
 export function typedef(typeName: string | string[], type: StructType) {
   const newType = registerType(typeName, type.size, type.unsigned);
   return newType;
+}
+
+interface IBitsType {
+  [k: string]: number;
+}
+
+export function bits<T extends IBitsType>(
+  type: StructType,
+  obj: T
+): BitsType<T> {
+  return new BitsType<T>(type.size, obj);
 }

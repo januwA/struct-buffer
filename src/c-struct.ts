@@ -1,5 +1,6 @@
 import { StructType } from "./class-type";
-import { StructBuffer } from "./struct-buffer";
+import { AnyObject } from "./interfaces";
+import { IStructBuffer, StructBuffer } from "./struct-buffer";
 import * as dtypes from "./types";
 import { char, string_t } from "./types";
 
@@ -35,10 +36,10 @@ const exp = /\s*(?<typedef>typedef)?\s*(?<struct>struct)\s*(?<structName>\w+)\s*
 export function parse(
   cStructTemp: string,
   types?: {
-    [typeName: string]: StructBuffer | StructType;
+    [typeName: string]: StructBuffer<any> | StructType;
   }
 ): {
-  [structName: string]: StructBuffer;
+  [structName: string]: StructBuffer<any>;
 } {
   types = Object.assign(defaultTypes, types);
 
@@ -102,7 +103,7 @@ export function parse(
   }
 
   const structBuffers: {
-    [structName: string]: StructBuffer;
+    [structName: string]: StructBuffer<any>;
   } = Object.keys(cStructs).reduce(
     (acc, structName) =>
       Object.assign(acc, {
@@ -115,7 +116,7 @@ export function parse(
     structBuffers[structName] = new StructBuffer(
       structName,
       Object.entries(props).reduce<{
-        [k: string]: StructType | StructBuffer;
+        [k: string]: StructType | StructBuffer<any>;
       }>((acc, [propName, p]) => {
         // 如果属性的type在当前解析的cStruct当中
         if (p.type in cStructs) {
@@ -124,7 +125,7 @@ export function parse(
         }
 
         if (!types) return acc;
-        let type: StructBuffer | StructType | undefined = types[p.type];
+        let type: StructBuffer<any> | StructType | undefined = types[p.type];
 
         if (!type) {
           type = Object.values(types).find((type) => {
@@ -153,7 +154,7 @@ export function parse(
 /**
  * string_t => char
  */
-export function from(sb: StructBuffer) {
+export function from(sb: StructBuffer<IStructBuffer>) {
   let props = "";
 
   for (let [propName, type] of Object.entries(sb.struct)) {

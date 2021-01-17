@@ -1,3 +1,7 @@
+## 4.2.0 2021/1/17
+
+- Add bits
+
 ## 4.1.0 2021/1/9
 
 - When decode input array, convert to Uint8Array

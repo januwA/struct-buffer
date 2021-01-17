@@ -2,9 +2,9 @@ import { StructType } from "./class-type";
 import { DysplayResult } from "./interfaces";
 
 /**
- * 
+ *
  * ### The purpose of this function is to print some "ArrayBuffers that do not know the data structure"
- * 
+ *
  * @param view
  * @param type
  * @param isHex
