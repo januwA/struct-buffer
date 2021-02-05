@@ -90,23 +90,23 @@ HANDLE.unsigned // true
 
 ## Nested struct
 ```ts
-  /*
-    typedef struct _XINPUT_STATE {
-      DWORD          dwPacketNumber;
-      XINPUT_GAMEPAD Gamepad;
-    } XINPUT_STATE, *PXINPUT_STATE;
+/*
+typedef struct _XINPUT_STATE {
+  DWORD          dwPacketNumber;
+  XINPUT_GAMEPAD Gamepad;
+} XINPUT_STATE, *PXINPUT_STATE;
 
 
-    typedef struct _XINPUT_GAMEPAD {
-      WORD  wButtons;
-      BYTE  bLeftTrigger;
-      BYTE  bRightTrigger;
-      SHORT sThumbLX;
-      SHORT sThumbLY;
-      SHORT sThumbRX;
-      SHORT sThumbRY;
-    } XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
- */
+typedef struct _XINPUT_GAMEPAD {
+  WORD  wButtons;
+  BYTE  bLeftTrigger;
+  BYTE  bRightTrigger;
+  SHORT sThumbLX;
+  SHORT sThumbLY;
+  SHORT sThumbRX;
+  SHORT sThumbRY;
+} XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
+*/
 
 XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
   wButtons: WORD,
@@ -290,6 +290,31 @@ const view = EFLAG.encode(
 );
 // => <44 02 00 00>
 ```
+
+## [pack and unpack](https://docs.python.org/3/library/struct.html)
+```ts
+import { pack, unpack, calcsize, sbytes as b } from "struct-buffer";
+
+pack("b2xb", 2, 1)
+// => <02 00 00 01>
+
+unpack("b2xb", b("02 00 00 01"))
+// => [ 2, 1 ]
+
+calcsize("hhl")
+// => 8
+
+
+const [hp, mp, name] = unpack(
+  ">II3s",
+  sbytes("00 00 00 64 00 00 00 0A 61 62 63")
+);
+expect(hp).toBe(100);
+expect(mp).toBe(10);
+expect(name).toBe('abc');
+```
+
+Note: Without "@, =, P", the default byte order is ">"
 
 ## test
 > $ npm test

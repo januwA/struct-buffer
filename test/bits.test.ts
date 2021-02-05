@@ -47,11 +47,5 @@ describe("bits test", () => {
     const data = struct.decode(new Uint8Array([0, 1, 0x00, 0x00, 0x02, 0x46]));
     expect(data.id).toBe(1);
     expect(data.eflag.ZF).toBe(1);
-
-    // const view = struct.encode({
-    //   id: 1,
-    //   eflag: { PF: 1, ZF: 1, TF: 0, IF: 1 },
-    // });
-    // console.log(view);
   });
 });

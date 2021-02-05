@@ -68,3 +68,37 @@ export function arrayNextProxy(context: any) {
   });
   return proxy;
 }
+
+/**
+ * '00 01 0A' => <00 01 0A>
+ * @param str
+ */
+export function sbytes(str: string) {
+  return new DataView(
+    Uint8Array.from(
+      str
+        .trim()
+        .split(/\s+/)
+        .map((it) => parseInt(it, 16))
+    ).buffer
+  );
+}
+
+/**
+ * ```ts
+ * sview([2, 0, 0, 1])
+ * => 02 00 00 01
+ * 
+ * sview(new Uint8Array([0, 1, 10]))
+ * => 00 01 0a
+ * ```
+ * @param view 
+ */
+export function sview(view: ArrayBufferView | number[]): string {
+  const v = makeDataView(view);
+  const lst = [];
+  for (let i = 0; i < v.byteLength; i++) {
+    lst.push(v.getUint8(i).toString(16).padStart(2, "0"));
+  }
+  return lst.join(" ");
+}

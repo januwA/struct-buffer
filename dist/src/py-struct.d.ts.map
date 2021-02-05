@@ -1,0 +1,1 @@
+{"version":3,"file":"py-struct.d.ts","sourceRoot":"","sources":["../../src/py-struct.ts"],"names":[],"mappings":"AAuIA,wBAAgB,IAAI,CAAC,MAAM,EAAE,MAAM,EAAE,GAAG,IAAI,EAAE,GAAG,EAAE,GAAG,QAAQ,CA8B7D;AAuBD,wBAAgB,MAAM,CACpB,MAAM,EAAE,MAAM,EACd,IAAI,EAAE,eAAe,GAAG,MAAM,EAAE,GAC/B,GAAG,EAAE,CAyBP;AAeD,wBAAgB,QAAQ,CAAC,MAAM,EAAE,MAAM,GAAG,MAAM,CAI/C"}

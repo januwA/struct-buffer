@@ -42,7 +42,7 @@ describe("test display", () => {
   });
 
   it("test double", () => {
-    const data = display(double.encode([22.23456]), double, {
+    const data = display(double.encode(22.23456), double, {
       hex: false,
     });
     expect(data[0].value).toBe(22.23456);

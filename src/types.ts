@@ -1,21 +1,26 @@
 import {
+  BoolType,
   DOUBLE_TYPE,
   FLOAT_TYPE,
+  PaddingType,
   registerType,
-  STRING_TYPE,
+  StringType,
   typedef,
 } from "./class-type";
 
-export const string_t = registerType(STRING_TYPE, 1);
+export const string_t = new StringType();
+export const padding_t = new PaddingType();
 
 // c-type
 export const char = registerType(["char", "signed char"], 1, false);
+export const bool = new BoolType("bool", char);
 export const uchar = registerType("unsigned char", 1);
 export const short = registerType(
   ["short", "short int", "signed short", "signed short int"],
   2,
   false
 );
+
 export const ushort = registerType(["unsigned short", "unsigned short int"], 2);
 export const int = registerType(["int", "signed", "signed int"], 4, false);
 export const uint = registerType(["unsigned", "unsigned int"], 4);
@@ -49,7 +54,7 @@ export const uint32_t = typedef(["uint32_t", "unsigned __int32"], uint);
 export const uint64_t = typedef(["uint64_t", "unsigned __int64"], ulonglong);
 
 // windows
-export const BOOL = typedef("BOOL", int);
+export const BOOL = new BoolType("BOOL", int);
 export const BYTE = typedef("BYTE", uchar);
 export const WORD = typedef("WORD", ushort);
 export const DWORD = typedef("DWORD", ulong);

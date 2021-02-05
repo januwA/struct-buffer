@@ -1,3 +1,12 @@
+## 4.3.0 2021/2/5
+
+- fix: bits(...)[n], `EFLAG[2].decode(...) => [{...},{...}]`
+- fix: BOOl, Before:`BOOl.decode(...) => 1`, Now: `BOOl.decode(...) => true`
+- add: bool type
+- add: padding_t type
+- add: `sbytes(...)` and `sview(...)`
+- add: [py-struct](https://docs.python.org/zh-cn/3/library/struct.html), `calcsize(...)`, `unpack(...)`, `pack(...)`
+
 ## 4.2.0 2021/1/17
 
 - Add bits

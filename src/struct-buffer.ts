@@ -13,7 +13,9 @@ import {
  * Get the size after byte alignment
  * @param type Single type or Struct Buffer
  */
-export function sizeof(type: StructType | StructBuffer<AnyObject>): number {
+export function sizeof(
+  type: StructType<any, any> | StructBuffer<AnyObject>
+): number {
   if (type instanceof StructBuffer) {
     let padidng = 0;
     const maxSize = type.maxSize;
@@ -34,7 +36,7 @@ function byteLength(sb: StructBuffer<AnyObject>, count?: number) {
 }
 
 export interface IStructBuffer {
-  [k: string]: StructType | StructBuffer<IStructBuffer>;
+  [k: string]: StructType<any, any> | StructBuffer<IStructBuffer>;
 }
 
 class StructBufferNext<T extends IStructBuffer> {
@@ -55,7 +57,7 @@ export class StructBuffer<T extends IStructBuffer> extends Array<
   deeps: number[] = [];
   textDecode = new TextDecoder();
   textEncoder = new TextEncoder();
-  structKV: [string, StructType | StructBuffer<AnyObject>][];
+  structKV: [string, StructType<any, any> | StructBuffer<AnyObject>][];
 
   /**
    *
@@ -119,7 +121,12 @@ export class StructBuffer<T extends IStructBuffer> extends Array<
           acc[key] = type.decode(view, littleEndian, offset);
           offset += type.byteLength;
         } else {
-          acc[key] = type.decode(view, littleEndian, offset, this.textDecode);
+          acc[key] = (type as any).decode(
+            view,
+            littleEndian,
+            offset,
+            this.textDecode
+          );
           offset += sizeof(type);
         }
         return acc;
@@ -166,7 +173,13 @@ export class StructBuffer<T extends IStructBuffer> extends Array<
           type.encode(value, littleEndian, offset, acc);
           offset += type.byteLength;
         } else {
-          type.encode(value, littleEndian, offset, acc, this.textEncoder);
+          (type as any).encode(
+            value,
+            littleEndian,
+            offset,
+            acc,
+            this.textEncoder
+          );
           offset += sizeof(type);
         }
         return acc;

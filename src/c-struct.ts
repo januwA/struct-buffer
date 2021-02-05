@@ -36,7 +36,7 @@ const exp = /\s*(?<typedef>typedef)?\s*(?<struct>struct)\s*(?<structName>\w+)\s*
 export function parse(
   cStructTemp: string,
   types?: {
-    [typeName: string]: StructBuffer<any> | StructType;
+    [typeName: string]: StructBuffer<any> | StructType<any, any>;
   }
 ): {
   [structName: string]: StructBuffer<any>;
@@ -116,7 +116,7 @@ export function parse(
     structBuffers[structName] = new StructBuffer(
       structName,
       Object.entries(props).reduce<{
-        [k: string]: StructType | StructBuffer<any>;
+        [k: string]: StructType<any, any> | StructBuffer<any>;
       }>((acc, [propName, p]) => {
         // 如果属性的type在当前解析的cStruct当中
         if (p.type in cStructs) {
@@ -125,7 +125,8 @@ export function parse(
         }
 
         if (!types) return acc;
-        let type: StructBuffer<any> | StructType | undefined = types[p.type];
+        let type: StructBuffer<any> | StructType<any, any> | undefined =
+          types[p.type];
 
         if (!type) {
           type = Object.values(types).find((type) => {
@@ -166,7 +167,7 @@ export function from(sb: StructBuffer<IStructBuffer>) {
         : type.structName;
 
     if (type.isList) {
-      const arr = type.deeps.map((i) => `[${i}]`).join("");
+      const arr = type.deeps.map((i: number) => `[${i}]`).join("");
       propName = `${propName}${arr}`;
     }
     props += `\t${typeName} ${propName};\n`;

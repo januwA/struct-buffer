@@ -1,8 +1,8 @@
 import { StructType } from "./class-type";
 import { AnyObject } from "./interfaces";
-export declare function sizeof(type: StructType | StructBuffer<AnyObject>): number;
+export declare function sizeof(type: StructType<any, any> | StructBuffer<AnyObject>): number;
 export interface IStructBuffer {
-    [k: string]: StructType | StructBuffer<IStructBuffer>;
+    [k: string]: StructType<any, any> | StructBuffer<IStructBuffer>;
 }
 export declare class StructBuffer<T extends IStructBuffer> extends Array<StructBuffer<T>> {
     readonly structName: string;
@@ -10,7 +10,7 @@ export declare class StructBuffer<T extends IStructBuffer> extends Array<StructB
     deeps: number[];
     textDecode: TextDecoder;
     textEncoder: TextEncoder;
-    structKV: [string, StructType | StructBuffer<AnyObject>][];
+    structKV: [string, StructType<any, any> | StructBuffer<AnyObject>][];
     get isList(): boolean;
     get count(): number;
     constructor(structName: string, struct: T);
@@ -25,3 +25,4 @@ export declare class StructBuffer<T extends IStructBuffer> extends Array<StructB
         [k in keyof T]: any;
     }[], littleEndian?: boolean, offset?: number, view?: DataView): DataView;
 }
+//# sourceMappingURL=struct-buffer.d.ts.map

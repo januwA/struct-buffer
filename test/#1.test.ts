@@ -47,7 +47,7 @@ describe("debug", () => {
     //   )
     // );
 
-    expect(string_t[5].encode("abcdefghijk").byteLength).toBe(5); // <61 62 63 64 65>
-    expect(string_t[5].encode("ab").byteLength).toBe(5); // <61 62 00 00 00>
+    expect(string_t[5].encode("abcdefghijk" as any).byteLength).toBe(5); // <61 62 63 64 65>
+    expect(string_t[5].encode("ab" as any).byteLength).toBe(5); // <61 62 00 00 00>
   });
 });

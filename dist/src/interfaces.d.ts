@@ -9,3 +9,4 @@ export interface DysplayResult {
     offset: number;
     value: any;
 }
+//# sourceMappingURL=interfaces.d.ts.map

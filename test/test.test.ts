@@ -9,12 +9,10 @@ import {
   int16_t,
   double,
   StructBuffer,
-  registerType,
   uchar,
   typedef,
   CStruct,
 } from "../src";
-import { StructType } from "../src/class-type";
 
 describe("test decode and encode", () => {
   it("test decode and encode", () => {
@@ -96,7 +94,7 @@ describe("test string_t", () => {
   });
 
   it("test names", () => {
-    const view = string_t[3][4].encode(["abcd", "abce", "abcf"]);
+    const view = string_t[3][4].encode(["abcd", "abce", "abcf"] as any);
     const names = string_t[3][4].decode(view);
     expect(names.length).toBe(3);
     expect(names[0]).toBe("abcd");
@@ -195,45 +193,6 @@ describe("test pos", () => {
 
   it("test byteLength", () => {
     expect(struct.byteLength).toBe(2 * 8 * 4);
-  });
-});
-
-describe("test registerType", () => {
-  let short: StructType;
-  let struct: StructBuffer<any>;
-
-  beforeAll(() => {
-    short = registerType("short", 2, false);
-    struct = new StructBuffer("Player", {
-      hp: short,
-      mp: short,
-      pos: short[2],
-    });
-  });
-
-  it("test decode", () => {
-    const data = struct.decode(new Uint8Array([0, 0x2, 0, 0xa, 0, 1, 0, 2]));
-
-    expect(data.hp).toBe(2);
-    expect(data.mp).toBe(10);
-    expect(data.pos).toEqual([1, 2]);
-  });
-
-  it("test encode", () => {
-    const data = struct.encode({
-      hp: 2,
-      mp: 10,
-      pos: [100, 200],
-    });
-
-    expect(data.getInt16(0)).toBe(2);
-    expect(data.getInt16(2)).toBe(10);
-    expect(data.getInt16(4)).toBe(100);
-    expect(data.getInt16(6)).toBe(200);
-  });
-
-  it("test ByteLength", () => {
-    expect(struct.byteLength).toBe(8);
   });
 });
 
