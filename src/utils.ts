@@ -82,9 +82,9 @@ export function arrayNextProxy(context: any) {
  * ```
  */
 export function sbytes(str: string): DataView {
-  str = str.replace(/0x|h|\s/g, "");
+  str = str.replace(/0x|h|\\x|\s/ig, "");
   if (str.length % 2 !== 0) str = str.slice(0, -1);
-  str = str.replace(/(\w{2})(?=\w)/g, "$1 ");
+  str = str.replace(/([0-9a-f]{2})(?=[0-9a-f])/ig, "$1 ");
   return new DataView(
     Uint8Array.from(str.split(/\s+/).map((it) => parseInt(it, 16))).buffer
   );

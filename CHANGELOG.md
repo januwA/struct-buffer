@@ -1,3 +1,7 @@
+## 4.4.1 2021-2-6
+
+- fix: `sbytes()` Ignore case
+
 ## 4.4.0 2021-2-6
 
 - fix: `pack()` has a bug when processing `string_t`
