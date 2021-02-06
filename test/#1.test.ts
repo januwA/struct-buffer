@@ -1,4 +1,11 @@
-import { string_t, StructBuffer, uchar, ushort } from "../src";
+import {
+  string_t,
+  StructBuffer,
+  uchar,
+  ushort,
+  sbytes2 as b2,
+  sview,
+} from "../src";
 
 // https://github.com/januwA/struct-buffer/issues/1
 
@@ -22,23 +29,11 @@ describe("debug", () => {
   });
 
   it("string_t", () => {
-    expect(
-      string_t[5].decode(
-        new Uint8Array([0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68])
-      ).length
-    ).toBe(5); // abcde
+    expect(string_t[5].decode(b2("abcdefg")).length).toBe(5); // abcde
 
-    expect(
-      string_t[5].decode(
-        new Uint8Array([0x61, 0x62, 0, 0x64, 0x65, 0x66, 0x67, 0x68])
-      ).length
-    ).toBe(2); // ab
+    expect(string_t[5].decode(b2("ab\\x00cdefg")).length).toBe(2); // ab
 
-    expect(
-      string_t[4][2].decode(
-        new Uint8Array([0x61, 0x62, 0, 0x64, 0x65, 0x66, 0x67, 0x68])
-      ).length
-    ).toBe(1); // [ 'ab' ]
+    expect(string_t[4][2].decode(b2("ab\\x00cdefg")).length).toBe(1); // [ 'ab' ]
 
     // Error: overflow
     // console.log(
@@ -47,7 +42,9 @@ describe("debug", () => {
     //   )
     // );
 
-    expect(string_t[5].encode("abcdefghijk" as any).byteLength).toBe(5); // <61 62 63 64 65>
-    expect(string_t[5].encode("ab" as any).byteLength).toBe(5); // <61 62 00 00 00>
+    expect(sview(string_t[5].encode("abcdefghijk" as any))).toBe(
+      "61 62 63 64 65"
+    );
+    expect(sview(string_t[5].encode("ab" as any))).toBe("61 62 00 00 00");
   });
 });

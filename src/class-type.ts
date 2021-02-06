@@ -205,8 +205,16 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
 interface IBitsType {
   [k: string]: number;
 }
-export class BitsType<D, E> extends StructType<D, E> {
-  constructor(size: 2 | 1 | 4 | 8, public readonly bits: IBitsType) {
+export class BitsType<
+  T extends IBitsType,
+  D = {
+    [key in keyof T]: 1 | 0;
+  },
+  E = {
+    [key in keyof T]?: 1 | 0;
+  }
+> extends StructType<D, E> {
+  constructor(size: 2 | 1 | 4 | 8, public readonly bits: T) {
     super("<bits>", size, true, BitsType);
   }
 
@@ -505,13 +513,9 @@ export function typedef<D extends number, E extends number>(
   return newType;
 }
 
-export function bits<T extends IBitsType>(type: StructType<any, any>, obj: T) {
-  return new BitsType<
-    {
-      [key in keyof T]: 1 | 0;
-    },
-    {
-      [key in keyof T]?: 1 | 0;
-    }
-  >(type.size, obj);
+export function bits<T extends IBitsType>(
+  type: StructType<number, number>,
+  obj: T
+) {
+  return new BitsType<T>(type.size, obj);
 }

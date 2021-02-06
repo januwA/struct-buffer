@@ -11,10 +11,9 @@ import {
 
 /**
  * Get the size after byte alignment
- * @param type Single type or Struct Buffer
  */
 export function sizeof(
-  type: StructType<any, any> | StructBuffer<AnyObject>
+  type: StructType<any, any> | StructBuffer<IStructBuffer>
 ): number {
   if (type instanceof StructBuffer) {
     let padidng = 0;
@@ -26,12 +25,15 @@ export function sizeof(
   return type.isList ? type.size * type.count : type.size;
 }
 
-function byteLength(sb: StructBuffer<AnyObject>, count?: number) {
-  const typeByteLength = Object.values(sb.struct).reduce((acc, type) => {
-    if (type instanceof StructBuffer) acc += type.byteLength;
-    else acc += sizeof(type);
-    return acc;
-  }, 0);
+function byteLength(sb: StructBuffer<IStructBuffer>, count?: number) {
+  const typeByteLength: number = Object.values(sb.struct).reduce(
+    (acc: number, type) => {
+      if (type instanceof StructBuffer) acc += type.byteLength;
+      else acc += sizeof(type);
+      return acc;
+    },
+    0
+  );
   return typeByteLength * (count ?? sb.count);
 }
 
@@ -51,13 +53,19 @@ class StructBufferNext<T extends IStructBuffer> {
   }
 }
 
-export class StructBuffer<T extends IStructBuffer> extends Array<
-  StructBuffer<T>
-> {
+export class StructBuffer<
+  T extends IStructBuffer,
+  D = {
+    [k in keyof T]: any;
+  },
+  E = {
+    [k in keyof T]?: any;
+  }
+> extends Array<StructBuffer<T, D[], E[]>> {
   deeps: number[] = [];
   textDecode = new TextDecoder();
   textEncoder = new TextEncoder();
-  structKV: [string, StructType<any, any> | StructBuffer<AnyObject>][];
+  structKV: [string, StructType<any, any> | StructBuffer<IStructBuffer>][];
 
   /**
    *
@@ -109,9 +117,7 @@ export class StructBuffer<T extends IStructBuffer> extends Array<
     view: ArrayBufferView | number[],
     littleEndian: boolean = false,
     offset: number = 0
-  ): {
-    [k in keyof T]: any;
-  } {
+  ): D {
     view = makeDataView(view);
     const result: AnyObject[] = [];
     let i = this.count;
@@ -138,29 +144,17 @@ export class StructBuffer<T extends IStructBuffer> extends Array<
   }
 
   encode(
-    obj:
-      | {
-          [k in keyof T]: any;
-        }
-      | {
-          [k in keyof T]: any;
-        }[],
+    obj: E,
     littleEndian: boolean = false,
     offset: number = 0,
     view?: DataView
   ): DataView {
     const v = createDataView(this.byteLength, view);
 
-    if (this.isList && Array.isArray(obj)) obj = obj.flat();
+    if (this.isList && Array.isArray(obj)) (obj as any) = obj.flat();
 
     for (let i = 0; i < this.count; i++) {
-      const it: any = this.isList
-        ? (obj as Array<
-            {
-              [k in keyof T]: any;
-            }
-          >)[i]
-        : obj;
+      const it: any = this.isList ? (obj as any)[i] : obj;
       if (it === undefined) {
         const itemSize = this.byteLength / this.count;
         zeroMemory(v, itemSize, offset);

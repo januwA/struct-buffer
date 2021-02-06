@@ -1,5 +1,4 @@
 // https://docs.python.org/zh-cn/3/library/struct.html#byte-order-size-and-alignment
-// 并不完全一样
 
 import { StructType } from "./class-type";
 import { sizeof } from "./struct-buffer";
@@ -22,15 +21,14 @@ import {
 } from "./types";
 import { createDataView, makeDataView } from "./utils";
 
-// 没有这两个 "@", "="
+// 没有 "@", "="
 const SECTION_ORDER: ReadonlyArray<string> = [">", "<", "!"];
 
 const len_exp = /^(\d+)\w/i;
 
 function _getTypes(format: string) {
-  const next = () => {
-    format = format.substr(1);
-  };
+  const next = () => (format = format.substr(1));
+
   let m;
   const types: StructType<any, any>[] = [];
   while (format.length) {
@@ -115,7 +113,7 @@ function _getLittleEndian(str: string) {
 /**
  * https://docs.python.org/zh-cn/3/library/struct.html
  *
- * ```ts
+ * ```
  * pack("2i", -1, 2)
  * => <ff ff ff ff 00 00 00 02>
  *
@@ -154,6 +152,8 @@ export function pack(format: string, ...args: any[]): DataView {
   for (const type of types) {
     if (type.is(padding_t)) {
       type.encode(0 as any, littleEndian, offset, view);
+    } else if (type.is(string_t)) {
+      type.encode(args.shift() as any, littleEndian, offset, view);
     } else {
       const obj = [];
       for (let i = 0; i < type.count; i++) obj.push(args.shift());
@@ -168,23 +168,27 @@ export function pack(format: string, ...args: any[]): DataView {
 /**
  * https://docs.python.org/zh-cn/3/library/struct.html
  *
- * ```ts
- * unpack("2i", sbytes("ff ff ff ff 00 00 00 02"))
+ * ```
+ * unpack("2i", b("ff ff ff ff 00 00 00 02"))
  * => [ -1, 2 ]
  *
- * unpack(">2i", sbytes("ff ff ff ff 00 00 00 02"))
+ * unpack(">2i", b("ff ff ff ff 00 00 00 02"))
  * => [ -1, 2 ]
  *
- * unpack("<2i", sbytes("ff ff ff ff 02 00 00 00"))
+ * unpack("<2i", b("ff ff ff ff 02 00 00 00"))
  * => [ -1, 2 ]
  *
- * unpack("b3s", sbytes("02 61 62 63"))
+ * unpack("b3s", b("02 61 62 63"))
  * => [ 2, 'abc' ]
  *
- * unpack("b2xb", sbytes("02 00 00 01"))
+ * unpack("b2xb", b("02 00 00 01"))
  * => [ 2, 1 ]
- * ```
  *
+ *
+ * unpack('3sbb', b('616263 640a'))
+ * unpack('3sbb', b2('abc64h0ah'))
+ * => [ 'abc', 100, 10 ]
+ * ```
  */
 export function unpack(
   format: string,
@@ -220,14 +224,13 @@ export function unpack(
  * ```ts
  * calcsize("2i")
  * => 8
- * 
+ *
  * calcsize("hhl")
  * => 8
- * 
+ *
  * calcsize("bb3x")
  * => 5
  * ```
- * @param format 
  */
 export function calcsize(format: string): number {
   format = format.replace(/\s/g, "");

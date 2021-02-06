@@ -70,29 +70,79 @@ export function arrayNextProxy(context: any) {
 }
 
 /**
- * '00 01 0A' => <00 01 0A>
- * @param str
+ * ```
+ * b('61 62 63 64 0a')
+ *
+ * b('616263640a')
+ * b('0x610x620x630x640x0a')
+ * b('0x61 0x62 0x63 0x64 0x0a')
+ * b('616263 640a')
+ *
+ * // => <61 62 63 64 0a>
+ * ```
  */
-export function sbytes(str: string) {
+export function sbytes(str: string): DataView {
+  str = str.replace(/0x|h|\s/g, "");
+  if (str.length % 2 !== 0) str = str.slice(0, -1);
+  str = str.replace(/(\w{2})(?=\w)/g, "$1 ");
   return new DataView(
-    Uint8Array.from(
-      str
-        .trim()
-        .split(/\s+/)
-        .map((it) => parseInt(it, 16))
-    ).buffer
+    Uint8Array.from(str.split(/\s+/).map((it) => parseInt(it, 16))).buffer
   );
 }
 
+const HEX_EXP = /^(0x([0-9a-f]{1,2})|([0-9a-f]{1,2})h|\\x([0-9a-f]{1,2}))/i;
+const HEX_SEARCH_EXP = /0x([0-9a-f]{1,2})|([0-9a-f]{1,2})h|\\x([0-9a-f]{1,2})/i;
+
 /**
  * ```ts
- * sview([2, 0, 0, 1])
- * => 02 00 00 01
- * 
- * sview(new Uint8Array([0, 1, 10]))
- * => 00 01 0a
+ * b2('abc 0x640x0a')
+ * b2('abc 0x640ah')
+ * b2('abc \\x640ah')
+ * // => <61 62 63 20 64 0a>
+ *
+ * unpack('3sxbb3s', b2('abc \\x640ahend'))
+ * // => [ 'abc', 100, 10, 'end' ]
  * ```
- * @param view 
+ */
+export function sbytes2(str: string, te = new TextEncoder()): DataView {
+  let m;
+  const bytes = [];
+  while (str.length) {
+    m = str.match(HEX_EXP);
+    if (m && m[1]) {
+      const v = m[2] ?? m[3] ?? m[4] ?? 0;
+      bytes.push(parseInt(v, 16));
+      str = str.substr(m[1].length);
+    } else if (str.length) {
+      const i = str.search(HEX_SEARCH_EXP);
+      if (i < 0) {
+        // all string
+        bytes.push(...te.encode(str));
+        str = "";
+      } else {
+        const s = str.substr(0, i);
+        bytes.push(...te.encode(s));
+        str = str.substr(i);
+      }
+    }
+  }
+
+  return new DataView(Uint8Array.from(bytes).buffer);
+}
+
+/**
+ *
+ * ArrayBufferView or number[] to string
+ * ```ts
+ * sview([2, 0, 0, 1])
+ * // => 02 00 00 01
+ *
+ * sview(new Uint8Array([0, 1, 10]))
+ * // => 00 01 0a
+ *
+ * sview(b2('abc01h2h3h'))
+ * // => 61 62 63 01 02 03
+ * ```
  */
 export function sview(view: ArrayBufferView | number[]): string {
   const v = makeDataView(view);

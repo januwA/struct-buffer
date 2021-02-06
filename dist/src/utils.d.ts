@@ -5,5 +5,6 @@ export declare function makeDataView(view: ArrayBufferView | number[]): DataView
 export declare function arrayProxy(context: any, cb: (target: any, index: number) => any): any;
 export declare function arrayNextProxy(context: any): any;
 export declare function sbytes(str: string): DataView;
+export declare function sbytes2(str: string, te?: TextEncoder): DataView;
 export declare function sview(view: ArrayBufferView | number[]): string;
 //# sourceMappingURL=utils.d.ts.map

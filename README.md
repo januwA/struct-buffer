@@ -9,20 +9,17 @@ $ npm i struct-buffer
 
 ## how to use
 ```ts
-import { DWORD, string_t, StructBuffer, uint32_t } from "struct-buffer";
+import { float, string_t, StructBuffer, pack } from "struct-buffer";
 
-const struct = new StructBuffer("Player",{
-  hp: DWORD,
-  mp: uint32_t,
+const struct = new StructBuffer("Player", {
+  hp: float,
+  mp: float,
   name: string_t[3],
 });
 
+const buffer: DataView = pack("2f3s", 10, 100, "abc");
+
 // decode
-const buffer = new Uint8Array([ 
-  0, 0, 0, 0x0a, 
-  0, 0, 0, 0x64, 
-  0x61, 0x62, 0x63, 
-]);
 const data = struct.decode(buffer);
 // data => { hp: 10, mp: 100, name: 'abc' }
 
@@ -32,7 +29,7 @@ const view = struct.encode({
   mp: 100,
   name: "abc",
 });
-// view =>  <00 00 00 0a 00 00 00 64 61 62 63>
+// view => <41 20 00 00 42 c8 00 00 61 62 63>
 ```
 
 ## Use in browser
@@ -53,31 +50,31 @@ const view = DWORD[2].encode([1, 2]);
 // view => <00 00 00 01 00 00 00 02>
 
 // decode
-const data = DWORD[2].decode(new Uint8Array([0, 0, 0, 1, 0, 0, 0, 2]));
+const data = DWORD[2].decode(view);
 // data => [ 1, 2 ]
 ```
 
 ## register Type
 ```ts
-short = registerType("short", 2, false);
+const myShort = registerType("short", 2, false);
 
-struct = new StructBuffer("Player", {
-  hp: short,
-  mp: short,
-  pos: short[2],
+const struct = new StructBuffer("Player", {
+  hp: myShort,
+  mp: myShort,
+  pos: myShort[2],
 });
 
-// decode
-data = struct.decode( new Uint8Array([0, 0x2, 0, 0xa, 0, 1, 0, 2]) );
-// data => { hp: 2, mp: 10, pos: [ 1, 2 ] }
-
 // encode
-data = struct.encode({
+const view = struct.encode({
   hp: 2,
   mp: 10,
   pos: [100, 200],
 });
-// data =>  <00 02 00 0a 00 64 00 c8>
+// view => <00 02 00 0a 00 64 00 c8>
+
+// decode
+const data = struct.decode(view);
+// data => { hp: 2, mp: 10, pos: [ 100, 200 ] }
 ```
 
 ## typedef
@@ -199,16 +196,16 @@ sizeof(structs.XINPUT_BATTERY_INFORMATION) // 2
 
 ## struct list
 ```ts
-s_user = new StructBuffer("User", {
+const User = new StructBuffer("User", {
   name: string_t[2],
   name2: string_t[2],
 });
 
-s_users = new StructBuffer("Users", {
-  users: s_user[2],
+const Users = new StructBuffer("Users", {
+  users: User[2],
 });
 
-const data = s_users.decode(
+const data = Users.decode(
   new Uint8Array([0x61, 0x31, 0x61, 0x32, 0x62, 0x31, 0x62, 0x32])
 );
 // data.users.length => 2
@@ -217,7 +214,7 @@ const data = s_users.decode(
 
 // or
 
-const users = s_user[2].decode(
+const users = User[2].decode(
   new Uint8Array([0x61, 0x31, 0x61, 0x32, 0x62, 0x31, 0x62, 0x32])
 );
 // users => [ { name: 'a1', name2: 'a2' }, { name: 'b1', name2: 'b2' } ]
@@ -254,7 +251,7 @@ typedef struct _XINPUT_GAMEPAD
 ## "string_t" Truncate when encountering 0
 ```ts
 string_t[4].decode(new Uint8Array([0x61, 0x62, 0x63, 0x64]); // abcd
-string_t[4].decode(new Uint8Array([0x61, 0x62, 0   , 0x64]); // ab
+string_t[4].decode(new Uint8Array([0x61, 0x62, 0x00, 0x64]); // ab
 ```
 
 ## bits
@@ -307,7 +304,7 @@ calcsize("hhl")
 
 const [hp, mp, name] = unpack(
   ">II3s",
-  sbytes("00 00 00 64 00 00 00 0A 61 62 63")
+  b("00 00 00 64 00 00 00 0A 61 62 63")
 );
 expect(hp).toBe(100);
 expect(mp).toBe(10);
@@ -315,6 +312,11 @@ expect(name).toBe('abc');
 ```
 
 Note: Without "@, =, P", the default byte order is ">"
+
+## Some utility functions
+```ts
+import { createDataView, sbytes as b, sbytes2 as b2, sview } from "struct-buffer";
+```
 
 ## test
 > $ npm test

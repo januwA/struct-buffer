@@ -1,5 +1,4 @@
 import { StructType } from "./class-type";
-import { AnyObject } from "./interfaces";
 import { IStructBuffer, StructBuffer } from "./struct-buffer";
 import * as dtypes from "./types";
 import { char, string_t } from "./types";

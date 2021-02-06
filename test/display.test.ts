@@ -1,20 +1,7 @@
-import { DWORD, BYTE, WORD, QWORD, float, double, display } from "../src";
+import { DWORD, BYTE, WORD, QWORD, float, double, display, pack } from "../src";
 
 describe("test display", () => {
-  let view: DataView;
-  beforeAll(() => {
-    const buf = new Uint8Array([
-      0x01,
-      0x02,
-      0x03,
-      0x04,
-      0x05,
-      0x06,
-      0x07,
-      0x08,
-    ]);
-    view = new DataView(buf.buffer);
-  });
+  const view: DataView = pack("8B", 1, 2, 3, 4, 5, 6, 7, 8);
   it("test byte", () => {
     const data = display(view, BYTE, { hex: false });
     expect(data[0].value).toBe(1);

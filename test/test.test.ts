@@ -12,6 +12,9 @@ import {
   uchar,
   typedef,
   CStruct,
+  pack,
+  sview,
+  sbytes2 as b2,
 } from "../src";
 
 describe("test decode and encode", () => {
@@ -21,51 +24,29 @@ describe("test decode and encode", () => {
       mp: uint32_t,
       name: string_t[3],
     });
-    const buffer = new Uint8Array([
-      0,
-      0,
-      0,
-      0x0a,
-      0,
-      0,
-      0,
-      0x64,
-      0x61,
-      0x62,
-      0x63,
-    ]);
-    const data = struct.decode(buffer);
-    expect(data.hp).toBe(0x0a);
-    expect(data.mp).toBe(100);
-    expect(data.name).toBe("abc");
-    const view = struct.encode({
+    const obj = {
       hp: 10,
       mp: 100,
       name: "abc",
-    });
+    };
+    const view: DataView = pack("II3s", obj.hp, obj.mp, obj.name);
 
-    expect(view.getUint32(0)).toBe(10);
-    expect(view.getUint32(4)).toBe(100);
-    expect(view.getUint8(8)).toBe(0x61); // a
-    expect(view.getUint8(9)).toBe(0x62); // b
-    expect(view.getUint8(10)).toBe(0x63); // c
+    expect(struct.decode(view)).toEqual(obj);
+    expect(sview(struct.encode(obj))).toBe(sview(view));
     expect(struct.byteLength).toBe(11);
   });
 
   it("test dword encode", () => {
     const view = DWORD[2].encode([1, 2]);
-
     expect(view.byteLength).toBe(8);
-    expect(view.getUint32(0)).toBe(1);
-    expect(view.getUint32(4)).toBe(2);
+    expect(sview(view)).toBe(sview(pack("II", 1, 2)));
   });
 
   it("test dword decode", () => {
-    const data = DWORD[2].decode([0, 0, 0, 1, 0, 0, 0, 2]);
+    const data = DWORD[2].decode(pack("II", 1, 2));
 
     expect(data.length).toBe(2);
-    expect(data[0]).toBe(1);
-    expect(data[1]).toBe(2);
+    expect(data).toEqual([1, 2]);
   });
 });
 
@@ -76,56 +57,40 @@ describe("test string_t", () => {
       b: string_t,
       c: string_t[2],
     });
-    const data = struct.decode([0x61, 0x62, 0x63, 0x64]);
-    expect(data.a).toBe("a");
-    expect(data.b).toBe("b");
-    expect(data.c).toBe("cd");
-    const view = struct.encode({
+    const obj = {
       a: "a",
       b: "b",
       c: "cd",
-    });
-    expect(view.getUint8(0)).toBe(0x61); // a
-    expect(view.getUint8(1)).toBe(0x62); // b
-    expect(view.getUint8(2)).toBe(0x63); // c
-    expect(view.getUint8(3)).toBe(0x64); // d
-
+    };
+    const view = b2("abcd");
+    expect(struct.decode(view)).toEqual(obj);
+    expect(sview(struct.encode(obj))).toBe(sview(view));
     expect(struct.byteLength).toBe(4);
   });
 
   it("test names", () => {
-    const view = string_t[3][4].encode(["abcd", "abce", "abcf"] as any);
+    const obj = ["abcd", "abce", "abcf"] as any;
+    const view = string_t[3][4].encode(obj);
     const names = string_t[3][4].decode(view);
-    expect(names.length).toBe(3);
-    expect(names[0]).toBe("abcd");
-    expect(names[1]).toBe("abce");
-    expect(names[2]).toBe("abcf");
+    expect(names).toEqual(obj);
   });
 });
 
 describe("test char", () => {
   it("test decode and encode", () => {
+    const view = b2("abcd");
+    const obj = {
+      a: 0x61,
+      b: [0x62],
+      c: [0x63, 0x64],
+    };
     let struct = new StructBuffer("Test", {
       a: char,
       b: char[1],
       c: char[2],
     });
-    const data = struct.decode(new Uint8Array([0x61, 0x62, 0x63, 0x64]));
-
-    expect(data.a).toBe(0x61);
-    expect(data.b).toEqual([0x62]);
-    expect(data.c).toEqual([0x63, 0x64]);
-
-    const view = struct.encode({
-      a: 0x61,
-      b: [0x62],
-      c: [0x63, 0x64],
-    });
-    expect(view.getUint8(0)).toBe(0x61); // a
-    expect(view.getUint8(1)).toBe(0x62); // b
-    expect(view.getUint8(2)).toBe(0x63); // c
-    expect(view.getUint8(3)).toBe(0x64); // d
-
+    expect(struct.decode(view)).toEqual(obj);
+    expect(sview(struct.encode(obj))).toBe(sview(view));
     expect(struct.byteLength).toBe(4);
   });
 
@@ -134,29 +99,37 @@ describe("test char", () => {
       a: char,
       b: uchar,
     });
-    const data = s.decode(new Uint8Array([255, 255]));
-    expect(data.a).toBe(-1);
-    expect(data.b).toBe(255);
+    const data = s.decode(pack("bb", -1, -1));
+    expect(data).toEqual({
+      a: -1,
+      b: 255,
+    });
   });
 });
 
 describe("test pos", () => {
   let view: DataView;
   let struct: StructBuffer<any>;
+  const obj = {
+    pos: [
+      [1.23, 22.66],
+      [140.67, 742.45],
+      [123.23, 1231.23],
+      [534.23, 873.35],
+    ],
+  };
   beforeAll(() => {
-    view = new DataView(new ArrayBuffer(2 * 8 * 4));
-
-    view.setFloat64(0 * 8, 1.23);
-    view.setFloat64(1 * 8, 22.66);
-
-    view.setFloat64(2 * 8, 140.67);
-    view.setFloat64(3 * 8, 742.45);
-
-    view.setFloat64(4 * 8, 123.23);
-    view.setFloat64(5 * 8, 1231.23);
-
-    view.setFloat64(6 * 8, 534.23);
-    view.setFloat64(7 * 8, 873.35);
+    view = pack(
+      "8d",
+      1.23,
+      22.66,
+      140.67,
+      742.45,
+      123.23,
+      1231.23,
+      534.23,
+      873.35
+    );
 
     struct = new StructBuffer("Pos", {
       pos: double[4][2],
@@ -164,31 +137,11 @@ describe("test pos", () => {
   });
 
   it("test decode", () => {
-    const { pos } = struct.decode(view);
-    expect(pos.length).toBe(4);
-    expect(pos[0].length).toBe(2);
-    expect(pos[1].length).toBe(2);
-    expect(pos[2].length).toBe(2);
-    expect(pos[3].length).toBe(2);
-
-    expect(pos[0][0]).toBe(1.23);
-    expect(pos[0][1]).toBe(22.66);
-
-    expect(pos[3][0]).toBe(534.23);
-    expect(pos[3][1]).toBe(873.35);
+    expect(struct.decode(view)).toEqual(obj);
   });
 
   it("test decode", () => {
-    const view = struct.encode({
-      pos: [
-        [1.23, 22.66],
-        [140.67, 742.45],
-        [123.23, 1231.23],
-        [534.23, 873.35],
-      ],
-    });
-    expect(view.getFloat64(0 * 8)).toBe(1.23);
-    expect(view.getFloat64(7 * 8)).toBe(873.35);
+    expect(sview(struct.encode(obj))).toBe(sview(view));
   });
 
   it("test byteLength", () => {
@@ -217,6 +170,18 @@ describe("test struct nesting", () => {
 
   let XINPUT_STATE: StructBuffer<any>;
   let XINPUT_GAMEPAD: StructBuffer<any>;
+  const obj = {
+    dwPacketNumber: 0,
+    Gamepad: {
+      wButtons: 1,
+      bLeftTrigger: 0,
+      bRightTrigger: 0,
+      sThumbLX: 1,
+      sThumbLY: 2,
+      sThumbRX: 3,
+      sThumbRY: 4,
+    },
+  };
   beforeAll(() => {
     XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
       wButtons: WORD,
@@ -234,52 +199,13 @@ describe("test struct nesting", () => {
   });
 
   it("test decode", () => {
-    const data = XINPUT_STATE.decode(
-      new Uint8Array([
-        0,
-        0,
-        0,
-        0, // dwPacketNumber
-        0,
-        1, // wButtons
-        0, // bLeftTrigger
-        0, // bRightTrigger
-        0,
-        1, // sThumbLX
-        0,
-        2, // sThumbLY
-        0,
-        3, // sThumbRX
-        0,
-        4, // sThumbRY
-      ])
-    );
-    expect(data.dwPacketNumber).toBe(0);
-    expect(data.Gamepad.wButtons).toBe(1);
-    expect(data.Gamepad.bLeftTrigger).toBe(0);
-    expect(data.Gamepad.bRightTrigger).toBe(0);
-    expect(data.Gamepad.sThumbLX).toBe(1);
-    expect(data.Gamepad.sThumbLY).toBe(2);
-    expect(data.Gamepad.sThumbRX).toBe(3);
-    expect(data.Gamepad.sThumbRY).toBe(4);
+    const data = XINPUT_STATE.decode(pack("IH2B4h", 0, 1, 0, 0, 1, 2, 3, 4));
+    expect(data).toEqual(obj);
   });
 
   it("test encode", () => {
-    const data = XINPUT_STATE.encode({
-      dwPacketNumber: 0,
-      Gamepad: {
-        wButtons: 1,
-        bLeftTrigger: 0,
-        bRightTrigger: 0,
-        sThumbLX: 1,
-        sThumbLY: 2,
-        sThumbRX: 3,
-        sThumbRY: 4,
-      },
-    });
-
-    expect(data.getUint32(0)).toBe(0);
-    expect(data.getUint16(4)).toBe(1);
+    const view = XINPUT_STATE.encode(obj);
+    expect(sview(view)).toBe(sview(pack("IH2B4h", 0, 1, 0, 0, 1, 2, 3, 4)));
   });
 
   it("test byteLength", () => {
@@ -356,132 +282,79 @@ describe("test typedef", () => {
 });
 
 describe("test struct list", () => {
-  let s_user: StructBuffer<any>;
-  let s_users: StructBuffer<any>;
+  let user: StructBuffer<any>;
+  let users: StructBuffer<any>;
+  const obj = {
+    users: [
+      { name: "a1", name2: "a2" },
+      { name: "b1", name2: "b2" },
+    ],
+  };
   beforeAll(() => {
-    s_user = new StructBuffer("User", {
+    user = new StructBuffer("User", {
       name: string_t[2],
       name2: string_t[2],
     });
-    s_users = new StructBuffer("Users", {
-      users: s_user[2],
+    users = new StructBuffer("Users", {
+      users: user[2],
     });
   });
 
   it("test decode", () => {
-    const data = s_users.decode(
-      new Uint8Array([0x61, 0x31, 0x61, 0x32, 0x62, 0x31, 0x62, 0x32])
-    );
-    expect(data.users.length).toBe(2);
-    expect(data.users[0]).toEqual({ name: "a1", name2: "a2" });
-    expect(data.users[1]).toEqual({ name: "b1", name2: "b2" });
-
-    const users = s_user[2].decode(
-      new Uint8Array([0x61, 0x31, 0x61, 0x32, 0x62, 0x31, 0x62, 0x32])
-    );
-    expect(users.length).toBe(2);
+    expect(users.decode(b2("a1a2b1b2"))).toEqual(obj);
+    expect(user[2].decode(b2("a1a2b1b2")).length).toBe(2);
   });
 
   it("test encode", () => {
-    const view = s_users.encode({
-      users: [
-        { name: "a1", name2: "a2" },
-        { name: "b1", name2: "b2" },
-      ],
-    });
-    expect(view.getUint32(0)).toBe(0x61316132);
-    expect(view.getUint32(4)).toBe(0x62316232);
+    expect(sview(users.encode(obj))).toBe(sview(b2("a1a2b1b2")));
   });
 
   it("test byteLength", () => {
-    expect(s_users.byteLength).toBe(8);
-    expect(sizeof(s_users)).toBe(8);
+    expect(users.byteLength).toBe(8);
+    expect(sizeof(users)).toBe(8);
   });
 });
 
 describe("test struct Multilevel array", () => {
-  let s_player: StructBuffer<any>;
-  let s_players: StructBuffer<any>;
-  let bytes: Uint8Array;
+  let player: StructBuffer<any>;
+  let players: StructBuffer<any>;
+  let view: DataView;
+  const obj = {
+    players: [
+      [
+        { hp: 1, mp: 1 },
+        { hp: 2, mp: 2 },
+      ],
+      [
+        { hp: 3, mp: 3 },
+        { hp: 4, mp: 4 },
+      ],
+    ],
+  };
   beforeAll(() => {
-    s_player = new StructBuffer("Player", {
+    player = new StructBuffer("Player", {
       hp: DWORD,
       mp: DWORD,
     });
 
-    s_players = new StructBuffer("Players", {
-      players: s_player[2][2],
+    players = new StructBuffer("Players", {
+      players: player[2][2],
     });
 
-    bytes = new Uint8Array([
-      0,
-      0,
-      0,
-      1,
-      0,
-      0,
-      0,
-      1,
-      0,
-      0,
-      0,
-      2,
-      0,
-      0,
-      0,
-      2,
-
-      0,
-      0,
-      0,
-      3,
-      0,
-      0,
-      0,
-      3,
-      0,
-      0,
-      0,
-      4,
-      0,
-      0,
-      0,
-      4,
-    ]);
+    view = pack("8I", 1, 1, 2, 2, 3, 3, 4, 4);
   });
 
   it("test decode", () => {
-    const data = s_players.decode(bytes);
-    expect(data.players.length).toBe(2);
-
-    expect(data.players[0].length).toBe(2);
-    expect(data.players[0][0].hp).toBe(1);
-    expect(data.players[0][1].hp).toBe(2);
-    expect(data.players[1][0].hp).toBe(3);
-    expect(data.players[1][1].hp).toBe(4);
+    expect(players.decode(view)).toEqual(obj);
   });
 
   it("test encode", () => {
-    const view = s_players.encode({
-      players: [
-        [
-          { hp: 1, mp: 1 },
-          { hp: 2, mp: 2 },
-        ],
-        [
-          { hp: 3, mp: 3 },
-          { hp: 4, mp: 4 },
-        ],
-      ],
-    });
-    expect(view.getUint32(0)).toBe(1);
-    expect(view.getUint32(4)).toBe(1);
-    expect(view.getUint32(8)).toBe(2);
+    expect(sview(players.encode(obj))).toBe(sview(view));
   });
 
   it("test byteLength", () => {
-    expect(s_player.byteLength).toBe(8);
-    expect(s_players.byteLength).toBe(32);
+    expect(player.byteLength).toBe(8);
+    expect(players.byteLength).toBe(32);
   });
 
   it("test toCStruct", () => {

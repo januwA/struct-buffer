@@ -1,4 +1,4 @@
-import { BOOL, bool, uchar, uint, sizeof } from "../src";
+import { BOOL, bool, uchar, uint, sizeof, pack } from "../src";
 
 describe("bool and BOOL test", () => {
   it("encode", () => {
@@ -14,16 +14,16 @@ describe("bool and BOOL test", () => {
   });
 
   it("decode", () => {
-    expect(bool.decode([0x02])).toBe(true);
-    expect(bool.decode([0x00])).toBe(false);
+    expect(bool.decode(pack("B", 2))).toBe(true);
+    expect(bool.decode(pack("B", 0))).toBe(false);
 
-    expect(BOOL.decode([0, 0, 0, 0x02])).toBe(true);
-    expect(BOOL.decode([0, 0, 0, 0x00])).toBe(false);
+    expect(BOOL.decode(pack("I", 2))).toBe(true);
+    expect(BOOL.decode(pack("I", 0))).toBe(false);
 
-    expect(bool[2].decode([0x02, 0x00])).toEqual([true, false]);
-    expect(bool[2].decode([0x00, 0x02])).toEqual([false, true]);
-    expect(BOOL[2].decode([0, 0, 0, 0x02, 0, 0, 0, 0])).toEqual([true, false]);
-    expect(BOOL[2].decode([0, 0, 0, 0x00, 0, 0, 0, 0x02])).toEqual([
+    expect(bool[2].decode(pack("2B", 2, 0))).toEqual([true, false]);
+    expect(bool[2].decode(pack("2B", 0, 2))).toEqual([false, true]);
+    expect(BOOL[2].decode(pack("2I", 2, 0))).toEqual([true, false]);
+    expect(BOOL[2].decode(pack("2I", 0, 2))).toEqual([
       false,
       true,
     ]);
