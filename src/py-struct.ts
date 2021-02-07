@@ -24,15 +24,13 @@ import { createDataView, makeDataView } from "./utils";
 // 没有 "@", "="
 const SECTION_ORDER: ReadonlyArray<string> = [">", "<", "!"];
 
-const len_exp = /^(\d+)\w/i;
+const LEN_EXP = /^(\d+)(?=\w|\?)/i;
 
-function _getTypes(format: string) {
-  const next = () => (format = format.substr(1));
-
+function _getTypes(format: string): StructType<any, any>[] {
   let m;
   const types: StructType<any, any>[] = [];
   while (format.length) {
-    m = format.match(len_exp);
+    m = format.match(LEN_EXP);
     let len = 1;
     if (m && m[1]) {
       len = parseInt(m[1]);
@@ -93,7 +91,7 @@ function _getTypes(format: string) {
       default:
         throw new Error(`没有(${format[0]})格式!`);
     }
-    next();
+    format = format.substr(1);
   }
   return types;
 }
@@ -108,6 +106,24 @@ function _getLittleEndian(str: string) {
     default:
       throw new Error("错误的字节序");
   }
+}
+
+function _handleParams(format: string, buffer: ArrayBufferView | number[]) {
+  format = format.replace(/\s/g, "");
+
+  // 获取字节序
+  // https://docs.python.org/zh-cn/3/library/struct.html#byte-order-size-and-alignment
+  let _sr = SECTION_ORDER[0];
+  if (SECTION_ORDER.includes(format[0])) {
+    _sr = format[0];
+    format = format.substr(1);
+  }
+
+  return {
+    littleEndian: _getLittleEndian(_sr),
+    view: makeDataView(buffer),
+    types: _getTypes(format),
+  };
 }
 
 /**
@@ -132,24 +148,20 @@ function _getLittleEndian(str: string) {
  *
  */
 export function pack(format: string, ...args: any[]): DataView {
-  format = format.replace(/\s/g, "");
+  return pack_into(format, createDataView(calcsize(format)), 0, ...args);
+}
 
-  // 获取字节序
-  // https://docs.python.org/zh-cn/3/library/struct.html#byte-order-size-and-alignment
-  let _sr = SECTION_ORDER[0];
-  if (SECTION_ORDER.includes(format[0])) {
-    _sr = format[0];
-    format = format.substr(1);
-  }
+export function pack_into(
+  format: string,
+  buffer: ArrayBufferView | number[],
+  offset: number,
+  ...args: any[]
+): DataView {
+  const { littleEndian, types, view } = _handleParams(format, buffer);
+  while (types.length) {
+    const type = types.shift();
+    if (!type) break;
 
-  const littleEndian = _getLittleEndian(_sr);
-  const types = _getTypes(format);
-  let length = types.reduce((acc, it) => acc + sizeof(it), 0);
-  const view = createDataView(length);
-
-  let offset = 0;
-
-  for (const type of types) {
     if (type.is(padding_t)) {
       type.encode(0 as any, littleEndian, offset, view);
     } else if (type.is(string_t)) {
@@ -162,6 +174,7 @@ export function pack(format: string, ...args: any[]): DataView {
 
     offset += sizeof(type);
   }
+
   return view;
 }
 
@@ -192,32 +205,62 @@ export function pack(format: string, ...args: any[]): DataView {
  */
 export function unpack(
   format: string,
-  view: ArrayBufferView | number[]
+  buffer: ArrayBufferView | number[],
+  offset: number = 0
 ): any[] {
-  view = makeDataView(view);
-  format = format.replace(/\s/g, "");
-
-  // 获取字节序
-  // https://docs.python.org/zh-cn/3/library/struct.html#byte-order-size-and-alignment
-  let _sr = SECTION_ORDER[0];
-  if (SECTION_ORDER.includes(format[0])) {
-    _sr = format[0];
-    format = format.substr(1);
-  }
-
-  const littleEndian = _getLittleEndian(_sr);
-  const types = _getTypes(format);
-
-  let offset = 0;
-
+  const { littleEndian, types, view } = _handleParams(format, buffer);
   const result: any[] = [];
-  for (const type of types) {
-    if (!type.is(padding_t)) {
+  while (types.length) {
+    const type = types.shift();
+    if (!type) break;
+    if (!type.is(padding_t))
       result.push(type.decode(view, littleEndian, offset));
-    }
     offset += sizeof(type);
   }
   return result.flat();
+}
+
+export function unpack_from(
+  format: string,
+  buffer: ArrayBufferView | number[],
+  offset: number = 0
+): any[] {
+  return unpack(format, buffer, offset);
+}
+
+/**
+ * ```ts
+ * for (const i of iter_unpack("2b", b("01 02 03 04"))) {
+ *   console.log(i); // [ 1, 2 ] -> [ 3, 4 ]
+ * }
+ *
+ * const r = iter_unpack("2b", b("01 02 03 04"));
+ * r.next().value // [1, 2]
+ * r.next().value // [3, 4]
+ * ```
+ */
+export function iter_unpack(
+  format: string,
+  buffer: number[] | ArrayBufferView
+) {
+  const size = calcsize(format);
+  let offset = 0;
+  return {
+    next() {
+      try {
+        return {
+          value: unpack(format, buffer, offset),
+          done: !(offset += size),
+        };
+      } catch (error) {
+        // overflow
+        return { value: null, done: true };
+      }
+    },
+    [Symbol.iterator]() {
+      return this;
+    },
+  };
 }
 
 /**
@@ -234,6 +277,38 @@ export function unpack(
  */
 export function calcsize(format: string): number {
   format = format.replace(/\s/g, "");
+  if (SECTION_ORDER.includes(format[0])) format = format.substr(1);
   const types = _getTypes(format);
   return types.reduce((acc, it) => acc + sizeof(it), 0);
+}
+
+export class Struct {
+  size: number;
+  constructor(public readonly format: string) {
+    this.size = calcsize(format);
+  }
+
+  pack(...args: any[]) {
+    return pack_into(this.format, createDataView(this.size), 0, ...args);
+  }
+
+  pack_into(
+    buffer: ArrayBufferView | number[],
+    offset: number,
+    ...args: any[]
+  ) {
+    return pack_into(this.format, buffer, offset, ...args);
+  }
+
+  unpack(buffer: ArrayBufferView | number[], offset = 0) {
+    return unpack(this.format, buffer, offset);
+  }
+
+  unpack_from(buffer: ArrayBufferView | number[], offset = 0) {
+    return unpack(this.format, buffer, offset);
+  }
+
+  iter_unpack(buffer: ArrayBufferView | number[]) {
+    return iter_unpack(this.format, buffer);
+  }
 }

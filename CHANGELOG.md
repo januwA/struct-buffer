@@ -1,3 +1,13 @@
+## 4.5.0 2021-2-7
+
+- fix: `calcsize()` Processing format byte order
+- feat: Add `makeDataView()` tool function
+- feat: `unpack()` function adds an optional parameter of offset
+- feat: `pack_into()`,`unpack_from()`,`iter_unpack()`,`new Struct()`
+- test: Added `Struct` test
+- fix: Matching error when format is "2?"
+- build: Upgrade all dependencies
+
 ## 4.4.1 2021-2-6
 
 - fix: `sbytes()` Ignore case

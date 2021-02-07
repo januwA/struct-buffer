@@ -10,23 +10,22 @@ import {
 // https://github.com/januwA/struct-buffer/issues/1
 
 describe("debug", () => {
-  it("struct", () => {
-    const t1 = new StructBuffer("T1", {
-      name: string_t[4][2][2][16],
-      v1: ushort,
-      v2: uchar[6],
-    });
 
-    const t2 = new StructBuffer("T2", {
-      items: t1[4][18], // multi
-    });
+  // 这个测试比较消耗时间
+  // it("struct", () => {
+  //   const t1 = new StructBuffer("T1", {
+  //     name: string_t[4][2][2][16],
+  //     v1: ushort,
+  //     v2: uchar[6],
+  //   });
 
-    // console.log( t1.toCStruct() );
-    // console.log( t2.toCStruct() );
+  //   const t2 = new StructBuffer("T2", {
+  //     items: t1[4][18], // multi
+  //   });
 
-    expect(t1.byteLength).toBe(264);
-    expect(t2.byteLength).toBe(19008);
-  });
+  //   expect(t1.byteLength).toBe(264);
+  //   expect(t2.byteLength).toBe(19008);
+  // });
 
   it("string_t", () => {
     expect(string_t[5].decode(b2("abcdefg")).length).toBe(5); // abcde

@@ -290,7 +290,7 @@ const view = EFLAG.encode(
 
 ## [pack and unpack](https://docs.python.org/3/library/struct.html)
 ```ts
-import { pack, unpack, calcsize, sbytes as b } from "struct-buffer";
+import { pack, pack_into, unpack, unpack_from, iter_unpack, calcsize, Struct, sbytes as b } from "struct-buffer";
 
 pack("b2xb", 2, 1)
 // => <02 00 00 01>
@@ -315,7 +315,7 @@ Note: Without "@, =, P", the default byte order is ">"
 
 ## Some utility functions
 ```ts
-import { createDataView, sbytes as b, sbytes2 as b2, sview } from "struct-buffer";
+import { createDataView, makeDataView, sbytes as b, sbytes2 as b2, sview } from "struct-buffer";
 ```
 
 ## test
