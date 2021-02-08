@@ -1,3 +1,8 @@
+## 4.6.0 2021-2-8
+
+- feat: Added `TEXT()` utility function
+- test: Added "utils" test code
+
 ## 4.5.0 2021-2-7
 
 - fix: `calcsize()` Processing format byte order

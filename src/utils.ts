@@ -33,10 +33,25 @@ export function zeroMemory(view: DataView, length: number, offset: number) {
   while (length-- > 0) view.setUint8(offset++, 0);
 }
 
+/**
+ * ```ts
+ * createDataView(3)
+ * => <00 00 00>
+ * ```
+ * @param byteLength
+ * @param view
+ */
 export function createDataView(byteLength: number, view?: DataView) {
   return view ? view : new DataView(new ArrayBuffer(byteLength));
 }
 
+/**
+ * ```ts
+ * makeDataView([1,2,3])
+ * => <01 02 03>
+ * ```
+ * @param view
+ */
 export function makeDataView(view: ArrayBufferView | number[]): DataView {
   if (view instanceof DataView) return view;
   if (Array.isArray(view)) view = Uint8Array.from(view);
@@ -82,9 +97,9 @@ export function arrayNextProxy(context: any) {
  * ```
  */
 export function sbytes(str: string): DataView {
-  str = str.replace(/0x|h|\\x|\s/ig, "");
+  str = str.replace(/0x|h|\\x|\s/gi, "");
   if (str.length % 2 !== 0) str = str.slice(0, -1);
-  str = str.replace(/([0-9a-f]{2})(?=[0-9a-f])/ig, "$1 ");
+  str = str.replace(/([0-9a-f]{2})(?=[0-9a-f])/gi, "$1 ");
   return new DataView(
     Uint8Array.from(str.split(/\s+/).map((it) => parseInt(it, 16))).buffer
   );
@@ -151,4 +166,66 @@ export function sview(view: ArrayBufferView | number[]): string {
     lst.push(v.getUint8(i).toString(16).padStart(2, "0"));
   }
   return lst.join(" ");
+}
+
+/**
+ * ```ts
+ * const view: DataView = pack("3s2b3s2I", "abc", 1, 2, "xyz", 8, 9);
+ * TEXT(view)
+ * // => "abc..xyz........"
+ * 
+ * TEXT(view, "^")
+ * // => "abc^^xyz^^^^^^^^"
+ * ```
+ */
+export function TEXT(
+  buf: number[] | ArrayBufferView,
+  placeholder?: ((byte: number) => string) | string
+): string;
+export function TEXT(
+  buf: number[] | ArrayBufferView,
+  text?: TextDecoder,
+  placeholder?: ((byte: number) => string) | string
+): string;
+export function TEXT(
+  buf: number[] | ArrayBufferView,
+  text?: any,
+  placeholder?: any
+): string {
+  const view = makeDataView(buf);
+
+  if (!text && !placeholder) {
+    text = new TextDecoder();
+  } else if (
+    (text !== undefined && typeof text === "string") ||
+    typeof text === "function"
+  ) {
+    placeholder = text;
+    text = new TextDecoder();
+  }
+  let offset = 0;
+  let str = "";
+  let strBytes = [];
+  while (true) {
+    try {
+      const byte = view.getUint8(offset++);
+      if (byte >= 0x20) {
+        strBytes.push(byte);
+      } else {
+        if (strBytes.length) {
+          str += text.decode(Uint8Array.from(strBytes));
+          strBytes = [];
+        }
+        str += placeholder
+          ? typeof placeholder === "string"
+            ? placeholder
+            : placeholder(byte)
+          : ".";
+      }
+    } catch (error) {
+      if (strBytes.length) str += text.decode(Uint8Array.from(strBytes));
+      break;
+    }
+  }
+  return str;
 }

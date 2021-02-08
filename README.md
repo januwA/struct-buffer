@@ -315,7 +315,22 @@ Note: Without "@, =, P", the default byte order is ">"
 
 ## Some utility functions
 ```ts
-import { createDataView, makeDataView, sbytes as b, sbytes2 as b2, sview } from "struct-buffer";
+import { createDataView, makeDataView, sbytes as b, sbytes2 as b2, sview, TEXT } from "struct-buffer";
+
+createDataView(3)
+// => <00 00 00>
+
+makeDataView([1, 2, 3])
+// => <01 02 03>
+
+b("01 02 03")
+// => <01 02 03>
+
+b2("abc\\x1\\x2\\x3")
+// => <61 62 63 01 02 03>
+
+TEXT(pack("3s2b3s2I", "abc", 1, 2, "xyz", 8, 9))
+// => "abc..xyz........"
 ```
 
 ## test
