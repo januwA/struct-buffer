@@ -1,3 +1,7 @@
+## 4.6.1 2021-2-10
+
+- build: Upgrade dependencies, fix packaging errors, and the problem of not being able to find the TEXT function
+
 ## 4.6.0 2021-2-8
 
 - feat: Added `TEXT()` utility function
