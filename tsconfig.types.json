@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist/types", // .d.ts 保存目录
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true
+  }
+}

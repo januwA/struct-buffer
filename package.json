@@ -1,13 +1,15 @@
 {
   "name": "struct-buffer",
-  "version": "4.6.1",
+  "version": "4.7.0",
   "description": "Add structure to ArrayBuffer",
   "private": false,
-  "main": "./dist/struct-buffer.js",
-  "types": "./dist/src/index.d.ts",
+  "main": "./dist/umd/struct-buffer.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
   "scripts": {
-    "build": "webpack --config __config__/webpack/prod.config.js",
-    "w": "webpack --config __config__/webpack/prod.config.js -w",
+    "build:umd": "webpack -c webpack.config.js",
+    "build:esm": "tsc --project tsconfig.esm.json",
+    "build": "npm run build:umd && npm run build:esm",
     "test": "jest"
   },
   "keywords": [
@@ -16,6 +18,7 @@
     "DataView",
     "pack",
     "unpack",
+    "buffer",
     "Struct"
   ],
   "author": "Ajanuw",
@@ -26,16 +29,16 @@
     "url": "https://github.com/januwA/struct-buffer.git"
   },
   "devDependencies": {
-    "@types/jest": "^26.0.20",
+    "@types/jest": "^26.0.24",
     "clean-webpack-plugin": "^3.0.0",
-    "jest": "^26.6.3",
-    "terser-webpack-plugin": "^5.1.1",
-    "ts-jest": "^26.5.1",
-    "ts-loader": "^8.0.16",
-    "ts-node": "^9.1.1",
-    "typescript": "^4.1.4",
-    "webpack": "^5.21.2",
-    "webpack-cli": "^4.5.0"
+    "jest": "^27.0.6",
+    "node-notifier": "^10.0.0",
+    "ts-jest": "^27.0.4",
+    "ts-loader": "^9.2.4",
+    "ts-node": "^10.1.0",
+    "typescript": "^4.3.5",
+    "webpack": "^5.46.0",
+    "webpack-cli": "^4.7.2"
   },
   "dependencies": {}
 }

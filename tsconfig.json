@@ -3,8 +3,8 @@
     /* Visit https://aka.ms/tsconfig.json to read more about this file */
     /* Basic Options */
     "incremental": false, /* Enable incremental compilation */
-    "target": "ESNext", /* Specify ECMAScript target version: 'ES3' (default), 'ES5', 'ES2015', 'ES2016', 'ES2017', 'ES2018', 'ES2019', 'ES2020', or 'ESNEXT'. */
-    "module": "commonjs", /* Specify module code generation: 'none', 'commonjs', 'amd', 'system', 'umd', 'es2015', 'es2020', or 'ESNext'. */
+    "target": "ES2020", /* Specify ECMAScript target version: 'ES3' (default), 'ES5', 'ES2015', 'ES2016', 'ES2017', 'ES2018', 'ES2019', 'ES2020', or 'ESNEXT'. */
+    "module": "ESNext", /* Specify module code generation: 'none', 'commonjs', 'amd', 'system', 'umd', 'es2015', 'es2020', or 'ESNext'. */
     // "lib": [],                             /* Specify library files to be included in the compilation. */
     "allowJs": false, /* 允许编译javascript文件。 */
     // "checkJs": true,                       /* Report errors in .js files. */
@@ -14,7 +14,7 @@
     "sourceMap": false, /* 生成相应的“ .map”文件。 */
     // "outFile": "./",                       /* Concatenate and emit output to single file. */
     "outDir": "./dist/", /* Redirect output structure to the directory. */
-    "rootDir": "./", /* Specify the root directory of input files. Use to control the output directory structure with --outDir. */
+    "rootDir": "./src/", /* Specify the root directory of input files. Use to control the output directory structure with --outDir. */
     // "composite": true,                     /* Enable project compilation */
     // "tsBuildInfoFile": "./",               /* Specify file to store incremental compilation information */
     "removeComments": true, /* 不要输出注释 */
@@ -64,7 +64,6 @@
   "exclude": [
     "node_modules",
     "dist",
-    "__config__",
     "test/**/*.test.ts"
   ]
 }

@@ -1,0 +1,9 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "outDir": "./dist/esm", // 生成 esm 输出
+        "sourceMap": false,
+        "declaration": false,
+        "declarationMap": false
+    },
+}
