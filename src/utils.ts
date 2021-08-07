@@ -1,3 +1,5 @@
+import { Type } from "./interfaces";
+
 /**
  * 设置数组嵌套层数
  * @param array
@@ -65,23 +67,21 @@ export function arrayProxy(
   cb: (target: any, index: number) => any
 ) {
   return new Proxy(context, {
-    get(o: any, k: string | number | symbol) {
-      if (k in o) return o[k];
-      if (/\d+/.test(k.toString())) return cb(o, parseInt(k as string));
+    get(t: any, k: string | number | symbol) {
+      if (k in t) return t[k];
+      if (/\d+/.test(k.toString())) return cb(t, parseInt(k as string));
     },
   });
 }
 
-/**
- * 收集index到deeps，上下文不变
- * @param context
- */
-export function arrayNextProxy(context: any) {
-  const proxy = arrayProxy(context, (o, i) => {
-    o.deeps.push(i);
-    return proxy;
+export function arrayProxyNext(context: any, klass: Type<any>) {
+  return arrayProxy(context, (t, i) => {
+    const next = new klass();
+    Object.setPrototypeOf(next, context);
+    Object.assign(next, t);
+    next.deeps = [...(context.deeps ?? []), i];
+    return next;
   });
-  return proxy;
 }
 
 /**
@@ -173,7 +173,7 @@ export function sview(view: ArrayBufferView | number[]): string {
  * const view: DataView = pack("3s2b3s2I", "abc", 1, 2, "xyz", 8, 9);
  * TEXT(view)
  * // => "abc..xyz........"
- * 
+ *
  * TEXT(view, "^")
  * // => "abc^^xyz^^^^^^^^"
  * ```

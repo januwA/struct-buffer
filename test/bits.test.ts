@@ -18,9 +18,7 @@ describe("bits test", () => {
       OF: 11,
     });
     const data = EFLAG.decode(new Uint32Array([eflag_data]), littleEndian);
-    expect(data.ZF).toBe(1);
-    expect(data.PF).toBe(1);
-    expect(data.IF).toBe(1);
+    expect([data.ZF, data.PF, data.IF]).toEqual([1, 1, 1]);
 
     const view = EFLAG.encode(
       {
@@ -41,11 +39,12 @@ describe("bits test", () => {
         ZF: 6,
         TF: 8,
         IF: 9,
-      }),
+      })[2],
     });
 
-    const data = struct.decode(new Uint8Array([0, 1, 0x00, 0x00, 0x02, 0x46]));
-    expect(data.id).toBe(1);
-    expect(data.eflag.ZF).toBe(1);
+    const data = struct.decode([
+      0, 1, 0x00, 0x00, 0x02, 0x46, 0x00, 0x00, 0x02, 0x46,
+    ]);
+    expect(data.eflag.length).toBe(2);
   });
 });

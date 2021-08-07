@@ -1,4 +1,4 @@
-import { arrayNextProxy, arrayProxy, createDataView, makeDataView, unflattenDeep, zeroMemory, } from "./utils";
+import { arrayProxyNext, createDataView, makeDataView, unflattenDeep, zeroMemory, } from "./utils";
 export function sizeof(type) {
     if (type instanceof StructBuffer) {
         let padidng = 0;
@@ -21,31 +21,25 @@ function byteLength(sb, count) {
     return typeByteLength * (count ?? sb.count);
 }
 class StructBufferNext {
-    constructor(i, structName, struct) {
-        this.structName = structName;
-        this.struct = struct;
-        this.deeps = [];
-        this.deeps.push(i);
-        return arrayNextProxy(this);
+    constructor() {
+        return arrayProxyNext(this, StructBufferNext);
     }
 }
+const KStructBufferConfig = {
+    textDecode: new TextDecoder(),
+    textEncoder: new TextEncoder(),
+    littleEndian: undefined,
+};
 export class StructBuffer extends Array {
-    constructor(structName, struct) {
+    constructor(structName, struct, config) {
         super();
         this.structName = structName;
         this.struct = struct;
         this.deeps = [];
-        this.textDecode = new TextDecoder();
-        this.textEncoder = new TextEncoder();
+        this.config = Object.assign({}, KStructBufferConfig);
+        Object.assign(this.config, config);
         this.structKV = Object.entries(struct);
-        return arrayProxy(this, (o, i) => {
-            const newProxy = new StructBufferNext(i, o.structName, o.struct);
-            newProxy.textDecode = o.textDecode;
-            newProxy.textEncoder = o.textEncoder;
-            newProxy.structKV = o.structKV;
-            Object.setPrototypeOf(newProxy, StructBuffer.prototype);
-            return newProxy;
-        });
+        return arrayProxyNext(this, StructBufferNext);
     }
     get isList() {
         return !!this.deeps.length;
@@ -60,17 +54,18 @@ export class StructBuffer extends Array {
         return Math.max(...Object.values(this.struct).map((type) => type instanceof StructBuffer ? type.maxSize : type.size));
     }
     decode(view, littleEndian = false, offset = 0) {
+        littleEndian = this.config.littleEndian ?? littleEndian;
         view = makeDataView(view);
         const result = [];
         let i = this.count;
         while (i--) {
             const data = this.structKV.reduce((acc, [key, type]) => {
                 if (type instanceof StructBuffer) {
-                    acc[key] = type.decode(view, littleEndian, offset);
+                    acc[key] = type.decode(view, type.config.littleEndian ?? littleEndian, offset);
                     offset += type.byteLength;
                 }
                 else {
-                    acc[key] = type.decode(view, littleEndian, offset, this.textDecode);
+                    acc[key] = type.decode(view, littleEndian, offset, this.config.textDecode);
                     offset += sizeof(type);
                 }
                 return acc;
@@ -80,6 +75,7 @@ export class StructBuffer extends Array {
         return this.isList ? unflattenDeep(result, this.deeps) : result[0];
     }
     encode(obj, littleEndian = false, offset = 0, view) {
+        littleEndian = this.config.littleEndian ?? littleEndian;
         const v = createDataView(this.byteLength, view);
         if (this.isList && Array.isArray(obj))
             obj = obj.flat();
@@ -91,17 +87,17 @@ export class StructBuffer extends Array {
                 offset += itemSize;
                 continue;
             }
-            this.structKV.reduce((acc, [key, type]) => {
+            this.structKV.reduce((view, [key, type]) => {
                 const value = it[key];
                 if (type instanceof StructBuffer) {
-                    type.encode(value, littleEndian, offset, acc);
+                    type.encode(value, type.config.littleEndian ?? littleEndian, offset, view);
                     offset += type.byteLength;
                 }
                 else {
-                    type.encode(value, littleEndian, offset, acc, this.textEncoder);
+                    type.encode(value, littleEndian, offset, view, this.config.textEncoder);
                     offset += sizeof(type);
                 }
-                return acc;
+                return view;
             }, v);
         }
         return v;

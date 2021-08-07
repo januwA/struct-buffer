@@ -1,5 +1,5 @@
 import { StructType } from "./class-type";
-import { IStructBuffer, StructBuffer } from "./struct-buffer";
+import { StructBuffer, Type_t } from "./struct-buffer";
 import * as dtypes from "./types";
 import { char, string_t } from "./types";
 
@@ -25,7 +25,8 @@ export interface CStruct {
 
 export const defaultTypes = dtypes;
 
-const exp = /\s*(?<typedef>typedef)?\s*(?<struct>struct)\s*(?<structName>\w+)\s*{(?<props>[^}]*)}(\s*(?<aliasName1>\w+)?\s*,\s*(?<aliasName2>\*\w+)?\s*;\s*)?/gi;
+const exp =
+  /\s*(?<typedef>typedef)?\s*(?<struct>struct)\s*(?<structName>\w+)\s*{(?<props>[^}]*)}(\s*(?<aliasName1>\w+)?\s*,\s*(?<aliasName2>\*\w+)?\s*;\s*)?/gi;
 
 /**
  *
@@ -34,11 +35,9 @@ const exp = /\s*(?<typedef>typedef)?\s*(?<struct>struct)\s*(?<structName>\w+)\s*
  */
 export function parse(
   cStructTemp: string,
-  types?: {
-    [typeName: string]: StructBuffer<any> | StructType<any, any>;
-  }
+  types?: { [typeName: string]: Type_t }
 ): {
-  [structName: string]: StructBuffer<any>;
+  [structName: string]: StructBuffer;
 } {
   types = Object.assign(defaultTypes, types);
 
@@ -102,7 +101,7 @@ export function parse(
   }
 
   const structBuffers: {
-    [structName: string]: StructBuffer<any>;
+    [structName: string]: StructBuffer;
   } = Object.keys(cStructs).reduce(
     (acc, structName) =>
       Object.assign(acc, {
@@ -115,7 +114,7 @@ export function parse(
     structBuffers[structName] = new StructBuffer(
       structName,
       Object.entries(props).reduce<{
-        [k: string]: StructType<any, any> | StructBuffer<any>;
+        [k: string]: Type_t;
       }>((acc, [propName, p]) => {
         // 如果属性的type在当前解析的cStruct当中
         if (p.type in cStructs) {
@@ -124,8 +123,7 @@ export function parse(
         }
 
         if (!types) return acc;
-        let type: StructBuffer<any> | StructType<any, any> | undefined =
-          types[p.type];
+        let type: Type_t | undefined = types[p.type];
 
         if (!type) {
           type = Object.values(types).find((type) => {
@@ -154,7 +152,7 @@ export function parse(
 /**
  * string_t => char
  */
-export function from(sb: StructBuffer<IStructBuffer>) {
+export function from(sb: StructBuffer) {
   let props = "";
 
   for (let [propName, type] of Object.entries(sb.struct)) {

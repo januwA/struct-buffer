@@ -1,3 +1,9 @@
+## 5.0.0 2021-8-7
+
+- Fix errors caused by deeps
+- You can force a structure to use big-endian or little-endian
+- Add more tests
+
 ## 4.7.0 2021-7-25
 
 - Add esm module package

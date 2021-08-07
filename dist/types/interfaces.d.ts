@@ -9,4 +9,5 @@ export interface DysplayResult {
     offset: number;
     value: any;
 }
+export declare type TypeSize_t = 1 | 2 | 4 | 8;
 //# sourceMappingURL=interfaces.d.ts.map

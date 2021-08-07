@@ -1,5 +1,5 @@
 import { sizeof } from "./struct-buffer";
-import { arrayNextProxy, arrayProxy, createDataView, makeDataView, unflattenDeep, } from "./utils";
+import { arrayProxyNext, createDataView, makeDataView, unflattenDeep, } from "./utils";
 export const FLOAT_TYPE = "float";
 export const DOUBLE_TYPE = "double";
 const hData = {
@@ -36,39 +36,24 @@ function typeHandle(type) {
         h = hData[type.size][+type.unsigned];
     if (!h)
         throw new Error(`StructBuffer: Unrecognized ${type} type.`);
-    return [h, h.replace(/^(g)/, "s")];
+    return [h, h.replace(/^g/, "s")];
 }
 class StructTypeNext {
-    constructor(i, names, size, unsigned, get, set) {
-        this.names = names;
-        this.size = size;
-        this.unsigned = unsigned;
-        this.get = get;
-        this.set = set;
-        this.deeps = [];
-        this.deeps.push(i);
-        return arrayNextProxy(this);
+    constructor() {
+        return arrayProxyNext(this, StructTypeNext);
     }
 }
 export class StructType extends Array {
-    constructor(typeName, size, unsigned, KlassType) {
+    constructor(typeName, size, unsigned) {
         super();
         this.size = size;
         this.unsigned = unsigned;
-        this.KlassType = KlassType;
         this.deeps = [];
         this.names = Array.isArray(typeName) ? typeName : [typeName];
         const [get, set] = typeHandle(this);
         this.set = set;
         this.get = get;
-        return arrayProxy(this, (o, i) => {
-            const newProxy = new StructTypeNext(i, o.names, o.size, o.unsigned, o.get, o.set);
-            if (o.bits) {
-                newProxy.bits = o.bits;
-            }
-            Object.setPrototypeOf(newProxy, this.KlassType ? this.KlassType.prototype : StructType.prototype);
-            return newProxy;
-        });
+        return arrayProxyNext(this, StructTypeNext);
     }
     get isList() {
         return !!this.deeps.length;
@@ -111,7 +96,7 @@ export class StructType extends Array {
 }
 export class BitsType extends StructType {
     constructor(size, bits) {
-        super("<bits>", size, true, BitsType);
+        super("<bits>", size, true);
         this.bits = bits;
     }
     decode(view, littleEndian = false, offset = 0) {
@@ -162,7 +147,7 @@ export class BitsType extends StructType {
 }
 export class BoolType extends StructType {
     constructor(typeName, type) {
-        super(typeName, type.size, type.unsigned, BoolType);
+        super(typeName, type.size, type.unsigned);
     }
     decode(view, littleEndian = false, offset = 0) {
         let r = super.decode(view, littleEndian, offset);
@@ -187,12 +172,13 @@ export class BoolType extends StructType {
 }
 export class StringType extends StructType {
     constructor() {
-        super("string_t", 1, true, StringType);
+        super("string_t", 1, true);
+        this.textDecode = new TextDecoder();
+        this.textEncoder = new TextEncoder();
     }
     decode(view, littleEndian = false, offset = 0, textDecode) {
         view = makeDataView(view);
-        if (!textDecode)
-            textDecode = new TextDecoder();
+        textDecode ?? (textDecode = this.textDecode);
         const result = [];
         let i = this.count;
         while (i--) {
@@ -211,8 +197,7 @@ export class StringType extends StructType {
         const v = createDataView(this.count * this.size, view);
         if (Array.isArray(obj))
             obj = obj.flat().join("");
-        if (!textEncoder)
-            textEncoder = new TextEncoder();
+        textEncoder ?? (textEncoder = this.textEncoder);
         const bytes = textEncoder.encode(obj);
         for (let i = 0; i < this.count; i++) {
             const it = bytes[i] ?? 0;
@@ -229,7 +214,7 @@ export class StringType extends StructType {
 }
 export class PaddingType extends StructType {
     constructor() {
-        super("padding_t", 1, true, PaddingType);
+        super("padding_t", 1, true);
     }
     decode(view, littleEndian = false, offset = 0) {
         view = makeDataView(view);

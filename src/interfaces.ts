@@ -6,7 +6,10 @@ export interface AnyObject {
 export interface Type<T extends Object> extends Function {
   new (...args: any[]): T;
 }
+
 export interface DysplayResult {
   offset: number;
   value: any;
 }
+
+export type TypeSize_t = 1 | 2 | 4 | 8;

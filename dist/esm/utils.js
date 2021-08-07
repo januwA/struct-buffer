@@ -35,20 +35,22 @@ export function makeDataView(view) {
 }
 export function arrayProxy(context, cb) {
     return new Proxy(context, {
-        get(o, k) {
-            if (k in o)
-                return o[k];
+        get(t, k) {
+            if (k in t)
+                return t[k];
             if (/\d+/.test(k.toString()))
-                return cb(o, parseInt(k));
+                return cb(t, parseInt(k));
         },
     });
 }
-export function arrayNextProxy(context) {
-    const proxy = arrayProxy(context, (o, i) => {
-        o.deeps.push(i);
-        return proxy;
+export function arrayProxyNext(context, klass) {
+    return arrayProxy(context, (t, i) => {
+        const next = new klass();
+        Object.setPrototypeOf(next, context);
+        Object.assign(next, t);
+        next.deeps = [...(context.deeps ?? []), i];
+        return next;
     });
-    return proxy;
 }
 export function sbytes(str) {
     str = str.replace(/0x|h|\\x|\s/gi, "");

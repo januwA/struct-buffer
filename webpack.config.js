@@ -1,4 +1,3 @@
-const { CleanWebpackPlugin } = require("clean-webpack-plugin");
 const path = require("path");
 
 // umd build
@@ -14,15 +13,13 @@ module.exports = {
       type: "umd",
     },
     globalObject: "this",
+    clean: true,
   },
 
   module: {
     rules: [
       {
-        // See also: https://github.com/microsoft/TypeScript-Babel-Starter
-        // 如果你想要.d.ts文件，那么ts-loader可能来的更直接点
         test: /\.tsx?$/,
-        exclude: /(node_modules|bower_components)/,
         use: {
           loader: "ts-loader",
           options: {
@@ -35,6 +32,5 @@ module.exports = {
   resolve: {
     extensions: [".ts", ".js"],
   },
-  plugins: [new CleanWebpackPlugin()],
   experiments: { topLevelAwait: true },
 };
