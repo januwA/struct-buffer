@@ -15,3 +15,5 @@ export interface DysplayResult {
 export type TypeSize_t = 1 | 2 | 4 | 8;
 
 export type Bit_t = 0 | 1;
+
+export type DecodeBuffer_t = ArrayBufferView | number[];

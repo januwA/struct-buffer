@@ -1,7 +1,8 @@
+import { DecodeBuffer_t } from "./interfaces";
 export declare function pack(format: string, ...args: any[]): DataView;
-export declare function pack_into(format: string, buffer: ArrayBufferView | number[], offset: number, ...args: any[]): DataView;
-export declare function unpack(format: string, buffer: ArrayBufferView | number[], offset?: number): any[];
-export declare function unpack_from(format: string, buffer: ArrayBufferView | number[], offset?: number): any[];
+export declare function pack_into(format: string, buffer: DecodeBuffer_t, offset: number, ...args: any[]): DataView;
+export declare function unpack(format: string, buffer: DecodeBuffer_t, offset?: number): any[];
+export declare function unpack_from(format: string, buffer: DecodeBuffer_t, offset?: number): any[];
 export declare function iter_unpack(format: string, buffer: number[] | ArrayBufferView): {
     next(): {
         value: any[];
@@ -18,10 +19,10 @@ export declare class Struct {
     size: number;
     constructor(format: string);
     pack(...args: any[]): DataView;
-    pack_into(buffer: ArrayBufferView | number[], offset: number, ...args: any[]): DataView;
-    unpack(buffer: ArrayBufferView | number[], offset?: number): any[];
-    unpack_from(buffer: ArrayBufferView | number[], offset?: number): any[];
-    iter_unpack(buffer: ArrayBufferView | number[]): {
+    pack_into(buffer: DecodeBuffer_t, offset: number, ...args: any[]): DataView;
+    unpack(buffer: DecodeBuffer_t, offset?: number): any[];
+    unpack_from(buffer: DecodeBuffer_t, offset?: number): any[];
+    iter_unpack(buffer: DecodeBuffer_t): {
         next(): {
             value: any[];
             done: boolean;

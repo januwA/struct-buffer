@@ -1,3 +1,7 @@
+## 5.1.1 2021-9-4
+
+- 🐛 export `bitFields` function
+
 ## 5.1.0 2021-9-3
 
 - ✨add [bit-fields](https://docs.microsoft.com/en-us/cpp/cpp/cpp-bit-fields?view=msvc-160) type

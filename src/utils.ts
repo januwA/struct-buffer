@@ -1,4 +1,4 @@
-import { Type } from "./interfaces";
+import { DecodeBuffer_t, Type } from "./interfaces";
 
 /**
  * 设置数组嵌套层数
@@ -54,7 +54,7 @@ export function createDataView(byteLength: number, view?: DataView) {
  * ```
  * @param view
  */
-export function makeDataView(view: ArrayBufferView | number[]): DataView {
+export function makeDataView(view: DecodeBuffer_t): DataView {
   if (view instanceof DataView) return view;
   if (Array.isArray(view)) view = Uint8Array.from(view);
   if (!ArrayBuffer.isView(view))
@@ -159,7 +159,7 @@ export function sbytes2(str: string, te = new TextEncoder()): DataView {
  * // => 61 62 63 01 02 03
  * ```
  */
-export function sview(view: ArrayBufferView | number[]): string {
+export function sview(view: DecodeBuffer_t): string {
   const v = makeDataView(view);
   const lst = [];
   for (let i = 0; i < v.byteLength; i++) {

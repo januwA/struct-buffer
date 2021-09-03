@@ -1,4 +1,5 @@
 import { StructType } from "./class-type";
+import { DecodeBuffer_t } from "./interfaces";
 export declare type Type_t = StructType<any, any> | StructBuffer;
 export declare type StructBuffer_t = {
     [k: string]: Type_t;
@@ -22,7 +23,7 @@ export declare class StructBuffer<D = {
     get count(): number;
     get byteLength(): number;
     get maxSize(): number;
-    decode(view: ArrayBufferView | number[], littleEndian?: boolean, offset?: number): D;
+    decode(view: DecodeBuffer_t, littleEndian?: boolean, offset?: number): D;
     encode(obj: E, littleEndian?: boolean, offset?: number, view?: DataView): DataView;
 }
 export {};

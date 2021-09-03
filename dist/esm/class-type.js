@@ -145,6 +145,69 @@ export class BitsType extends StructType {
         }
     }
 }
+export class BitFieldsType extends StructType {
+    constructor(size, bitFields) {
+        super("<bit-fields>", size, true);
+        this.bitFields = bitFields;
+    }
+    decode(view, littleEndian = false, offset = 0) {
+        const data = super.decode(view, littleEndian, offset);
+        let i = 0;
+        const _getValue = (data, len) => {
+            let val = 0;
+            let count = 0;
+            while (len--) {
+                const b = (data >> i) & 1;
+                val |= b << count;
+                i++;
+                count++;
+            }
+            return val;
+        };
+        const result = {};
+        if (this.isList && Array.isArray(data)) {
+            return data.map((it) => {
+                Object.entries(this.bitFields).forEach(([k, len]) => {
+                    result[k] = _getValue(it, len);
+                });
+                return result;
+            });
+        }
+        else {
+            Object.entries(this.bitFields).forEach(([k, len]) => {
+                result[k] = _getValue(data, len);
+            });
+            return result;
+        }
+    }
+    encode(obj, littleEndian = false, offset = 0, view) {
+        const v = createDataView(this.count * this.size, view);
+        const _getValue = (obj) => {
+            let val = 0;
+            let count = 0;
+            Object.entries(obj).forEach(([k, v]) => {
+                const len = this.bitFields[k];
+                if (len !== undefined) {
+                    val |= v << count;
+                    count += len;
+                }
+            });
+            return val;
+        };
+        if (this.isList && Array.isArray(obj)) {
+            for (let i = 0; i < this.count; i++) {
+                v[this.set](offset, _getValue(obj[i]), littleEndian);
+                offset += this.size;
+            }
+            return v;
+        }
+        else {
+            const val = _getValue(obj);
+            v[this.set](offset, val, littleEndian);
+            return v;
+        }
+    }
+}
 export class BoolType extends StructType {
     constructor(typeName, type) {
         super(typeName, type.size, type.unsigned);
@@ -245,4 +308,7 @@ export function typedef(typeName, type) {
 }
 export function bits(type, obj) {
     return new BitsType(type.size, obj);
+}
+export function bitFields(type, obj) {
+    return new BitFieldsType(type.size, obj);
 }

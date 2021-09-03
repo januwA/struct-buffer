@@ -1,16 +1,8 @@
-import {
-  string_t,
-  StructBuffer,
-  uchar,
-  ushort,
-  sbytes2 as b2,
-  sview,
-} from "../src";
+import { string_t, sbytes2 as b2, sview } from "../src";
 
 // https://github.com/januwA/struct-buffer/issues/1
 
 describe("debug", () => {
-
   // 这个测试比较消耗时间
   // it("struct", () => {
   //   const t1 = new StructBuffer("T1", {

@@ -1,5 +1,4 @@
-import { StructBuffer, int32_t, uint32_t, sview, WORD } from "../src";
-import { StructBuffer_t } from "../src/struct-buffer";
+import { StructBuffer, sview, WORD } from "../src";
 
 // https://github.com/januwA/struct-buffer/issues/2
 

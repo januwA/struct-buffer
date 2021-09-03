@@ -1,5 +1,5 @@
 import { StructType } from "./class-type";
-import { AnyObject } from "./interfaces";
+import { AnyObject, DecodeBuffer_t } from "./interfaces";
 import {
   arrayProxyNext,
   createDataView,
@@ -49,7 +49,7 @@ type StructBufferConfig = {
 
   /**
    * Setting littleEndian here will cause the littleEndian parameters of `encode` and `decode` to become invalid
-   * 
+   *
    * https://github.com/januwA/struct-buffer/issues/2
    */
   littleEndian?: boolean;
@@ -116,7 +116,7 @@ export class StructBuffer<
   }
 
   decode(
-    view: ArrayBufferView | number[],
+    view: DecodeBuffer_t,
     littleEndian: boolean = false,
     offset: number = 0
   ): D {
@@ -127,7 +127,11 @@ export class StructBuffer<
     while (i--) {
       const data = this.structKV.reduce<AnyObject>((acc, [key, type]) => {
         if (type instanceof StructBuffer) {
-          acc[key] = type.decode(view, type.config.littleEndian ?? littleEndian, offset);
+          acc[key] = type.decode(
+            view,
+            type.config.littleEndian ?? littleEndian,
+            offset
+          );
           offset += type.byteLength;
         } else {
           acc[key] = (type as any).decode(
@@ -167,7 +171,12 @@ export class StructBuffer<
       this.structKV.reduce<DataView>((view: DataView, [key, type]) => {
         const value = it[key];
         if (type instanceof StructBuffer) {
-          type.encode(value, type.config.littleEndian ?? littleEndian, offset, view);
+          type.encode(
+            value,
+            type.config.littleEndian ?? littleEndian,
+            offset,
+            view
+          );
           offset += type.byteLength;
         } else {
           (type as any).encode(

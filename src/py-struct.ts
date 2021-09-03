@@ -1,6 +1,7 @@
 // https://docs.python.org/zh-cn/3/library/struct.html#byte-order-size-and-alignment
 
 import { StructType } from "./class-type";
+import { DecodeBuffer_t } from "./interfaces";
 import { sizeof } from "./struct-buffer";
 import {
   bool,
@@ -108,7 +109,7 @@ function _getLittleEndian(str: string) {
   }
 }
 
-function _handleParams(format: string, buffer: ArrayBufferView | number[]) {
+function _handleParams(format: string, buffer: DecodeBuffer_t) {
   format = format.replace(/\s/g, "");
 
   // 获取字节序
@@ -153,7 +154,7 @@ export function pack(format: string, ...args: any[]): DataView {
 
 export function pack_into(
   format: string,
-  buffer: ArrayBufferView | number[],
+  buffer: DecodeBuffer_t,
   offset: number,
   ...args: any[]
 ): DataView {
@@ -205,7 +206,7 @@ export function pack_into(
  */
 export function unpack(
   format: string,
-  buffer: ArrayBufferView | number[],
+  buffer: DecodeBuffer_t,
   offset: number = 0
 ): any[] {
   const { littleEndian, types, view } = _handleParams(format, buffer);
@@ -222,7 +223,7 @@ export function unpack(
 
 export function unpack_from(
   format: string,
-  buffer: ArrayBufferView | number[],
+  buffer: DecodeBuffer_t,
   offset: number = 0
 ): any[] {
   return unpack(format, buffer, offset);
@@ -292,23 +293,19 @@ export class Struct {
     return pack_into(this.format, createDataView(this.size), 0, ...args);
   }
 
-  pack_into(
-    buffer: ArrayBufferView | number[],
-    offset: number,
-    ...args: any[]
-  ) {
+  pack_into(buffer: DecodeBuffer_t, offset: number, ...args: any[]) {
     return pack_into(this.format, buffer, offset, ...args);
   }
 
-  unpack(buffer: ArrayBufferView | number[], offset = 0) {
+  unpack(buffer: DecodeBuffer_t, offset = 0) {
     return unpack(this.format, buffer, offset);
   }
 
-  unpack_from(buffer: ArrayBufferView | number[], offset = 0) {
+  unpack_from(buffer: DecodeBuffer_t, offset = 0) {
     return unpack(this.format, buffer, offset);
   }
 
-  iter_unpack(buffer: ArrayBufferView | number[]) {
+  iter_unpack(buffer: DecodeBuffer_t) {
     return iter_unpack(this.format, buffer);
   }
 }

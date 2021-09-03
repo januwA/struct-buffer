@@ -1,4 +1,4 @@
-import { AnyObject, Bit_t, TypeSize_t } from "./interfaces";
+import { AnyObject, Bit_t, DecodeBuffer_t, TypeSize_t } from "./interfaces";
 import { sizeof } from "./struct-buffer";
 import {
   arrayProxyNext,
@@ -115,7 +115,7 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
    * @param offset
    */
   decode(
-    view: ArrayBufferView | number[],
+    view: DecodeBuffer_t,
     littleEndian: boolean = false,
     offset: number = 0
   ): D {
@@ -182,7 +182,7 @@ export class BitsType<
   }
 
   decode(
-    view: ArrayBufferView | number[],
+    view: DecodeBuffer_t,
     littleEndian: boolean = false,
     offset: number = 0
   ): D {
@@ -285,7 +285,7 @@ export class BitFieldsType<
   }
 
   decode(
-    view: ArrayBufferView | number[],
+    view: DecodeBuffer_t,
     littleEndian: boolean = false,
     offset: number = 0
   ): D {
@@ -379,7 +379,7 @@ export class BoolType<
    * @param offset
    */
   decode(
-    view: ArrayBufferView | number[],
+    view: DecodeBuffer_t,
     littleEndian: boolean = false,
     offset: number = 0
   ): D {
@@ -436,7 +436,7 @@ export class StringType extends StructType<string, string> {
    * ```
    */
   decode(
-    view: ArrayBufferView | number[],
+    view: DecodeBuffer_t,
     littleEndian: boolean = false,
     offset: number = 0,
     textDecode?: TextDecoder
@@ -511,7 +511,7 @@ export class PaddingType extends StructType<number, number> {
    * @param offset
    */
   decode(
-    view: ArrayBufferView | number[],
+    view: DecodeBuffer_t,
     littleEndian: boolean = false,
     offset: number = 0
   ) {

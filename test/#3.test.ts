@@ -1,5 +1,11 @@
-import { StructBuffer, uint32_t, sview, uint8_t, sbytes as b } from "../src";
-import { bitFields } from "../src/class-type";
+import {
+  StructBuffer,
+  uint32_t,
+  sview,
+  uint8_t,
+  sbytes as b,
+  bitFields,
+} from "../src";
 
 // https://github.com/januwA/struct-buffer/issues/3
 
