@@ -1,4 +1,4 @@
-import { AnyObject, TypeSize_t } from "./interfaces";
+import { AnyObject, Bit_t, TypeSize_t } from "./interfaces";
 import { sizeof } from "./struct-buffer";
 import {
   arrayProxyNext,
@@ -173,7 +173,7 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
 type BitsType_t = { [k: string]: number };
 export class BitsType<
   D = {
-    [key in keyof BitsType_t]: 1 | 0;
+    [key in keyof BitsType_t]: Bit_t;
   },
   E = Partial<D>
 > extends StructType<D, E> {
@@ -193,16 +193,16 @@ export class BitsType<
     ) as any;
     if (this.isList && Array.isArray(data)) {
       return data.map((it) => {
-        const result: { [k: string]: 0 | 1 } = {};
+        const result: { [k: string]: Bit_t } = {};
         Object.entries(this.bits).forEach(([k, i]) => {
-          result[k] = ((it & (1 << i)) >> i) as 0 | 1;
+          result[k] = ((it & (1 << i)) >> i) as Bit_t;
         });
         return result;
       }) as any;
     } else {
-      const result: { [k: string]: 0 | 1 } = {};
+      const result: { [k: string]: Bit_t } = {};
       Object.entries(this.bits).forEach(([k, i]) => {
-        result[k] = (((data as number) & (1 << i)) >> i) as 0 | 1;
+        result[k] = (((data as number) & (1 << i)) >> i) as Bit_t;
       });
       return result as any;
     }
@@ -235,6 +235,124 @@ export class BitsType<
         if (i !== undefined) flags |= v << i;
       });
       (v as any)[this.set](offset, flags, littleEndian);
+      return v;
+    }
+  }
+}
+
+/**
+ * ## bit-fields
+ *
+ * ```c++
+ *struct T {
+ *  uint8_t a : 1;
+ *  uint8_t b : 2;
+ *  uint8_t c : 3;
+ *};
+ *int main()
+ *{
+ *  T t{ 1,2,3 };
+ *  printf("%p\n", &t); // *&t === `0001 1101` === `0x1D`
+ *  printf("size: %d\n", sizeof(t)); // 1
+ *  printf("%d\n", t.a); // 1
+ *  printf("%d\n", t.b); // 2
+ *  printf("%d\n", t.c); // 3
+ *  return 0;
+ *}
+ * ```
+ *
+ * ## example
+ * ```ts
+ * const bf = bitFields(uint8_t, {
+ *  a: 1,
+ *  b: 2,
+ *  c: 3,
+ * });
+ *
+ * bf.dncode( new Uint8Array([0x1D]) ); // { a:1, b:2, c:3 }
+ *
+ * bf.encode({ a:1, b:2, c:3 });// <1D>
+ * ```
+ */
+export class BitFieldsType<
+  D = {
+    [key in keyof BitsType_t]: number;
+  },
+  E = Partial<D>
+> extends StructType<D, E> {
+  constructor(size: TypeSize_t, public readonly bitFields: BitsType_t) {
+    super("<bit-fields>", size, true);
+  }
+
+  decode(
+    view: ArrayBufferView | number[],
+    littleEndian: boolean = false,
+    offset: number = 0
+  ): D {
+    const data: number[] | number = super.decode(
+      view,
+      littleEndian,
+      offset
+    ) as any;
+
+    let i = 0;
+    const _getValue = (data: number, len: number) => {
+      let val = 0;
+      let count = 0;
+      while (len--) {
+        const b = (data >> i) & 1;
+        val |= b << count;
+        i++;
+        count++;
+      }
+      return val;
+    };
+    const result: BitsType_t = {};
+    if (this.isList && Array.isArray(data)) {
+      return data.map((it) => {
+        Object.entries(this.bitFields).forEach(([k, len]) => {
+          result[k] = _getValue(it, len);
+        });
+        return result;
+      }) as any;
+    } else {
+      Object.entries(this.bitFields).forEach(([k, len]) => {
+        result[k] = _getValue(data as number, len);
+      });
+      return result as any;
+    }
+  }
+
+  encode(
+    obj: E,
+    littleEndian: boolean = false,
+    offset: number = 0,
+    view?: DataView
+  ): DataView {
+    const v = createDataView(this.count * this.size, view);
+
+    const _getValue = (obj: any): number => {
+      let val = 0;
+      let count = 0;
+      Object.entries<number>(obj).forEach(([k, v]) => {
+        const len: number = this.bitFields![k];
+        if (len !== undefined) {
+          val |= v << count;
+          count += len;
+        }
+      });
+      return val;
+    };
+
+    if (this.isList && Array.isArray(obj)) {
+      for (let i = 0; i < this.count; i++) {
+        (v as any)[this.set](offset, _getValue(obj[i]), littleEndian);
+        offset += this.size;
+      }
+      return v;
+    } else {
+      const val = _getValue(obj);
+      (v as any)[this.set](offset, val, littleEndian);
       return v;
     }
   }
@@ -472,4 +590,8 @@ export function typedef<D extends number, E extends number>(
 
 export function bits(type: StructType<number, number>, obj: BitsType_t) {
   return new BitsType(type.size, obj);
+}
+
+export function bitFields(type: StructType<number, number>, obj: BitsType_t) {
+  return new BitFieldsType(type.size, obj);
 }

@@ -1,3 +1,8 @@
+## 5.1.0 2021-9-3
+
+- ✨add [bit-fields](https://docs.microsoft.com/en-us/cpp/cpp/cpp-bit-fields?view=msvc-160) type
+- ✅✔️  add bit-fields test
+
 ## 5.0.0 2021-8-7
 
 - Fix errors caused by deeps
