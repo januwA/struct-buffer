@@ -1,3 +1,7 @@
+## 5.1.2 2021-9-25
+
+- 📚 update readme
+
 ## 5.1.1 2021-9-4
 
 - 🐛 export `bitFields` function

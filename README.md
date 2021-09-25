@@ -288,6 +288,27 @@ const view = EFLAG.encode(
 // => <44 02 00 00>
 ```
 
+## bitFields
+```ts
+import { uint8_t, bitFields, StructBuffer, sbytes as b, } from "struct-buffer";
+
+const bf = bitFields(uint8_t, {
+  a: 1,
+  b: 2,
+  c: 3,
+});
+
+const v = bf.encode({
+  a: 1,
+  b: 2,
+  c: 3,
+});
+// => <1D>
+
+const data = bf.decode(b("1D"));
+// => { a: 1, b: 2, c: 3 }
+```
+
 ## [pack and unpack](https://docs.python.org/3/library/struct.html)
 ```ts
 import { pack, pack_into, unpack, unpack_from, iter_unpack, calcsize, Struct, sbytes as b } from "struct-buffer";
@@ -344,3 +365,4 @@ TEXT(pack("3s2b3s2I", "abc", 1, 2, "xyz", 8, 9))
   - [DataView](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/DataView)
   - [C_data_types](https://en.wikipedia.org/wiki/C_data_types)
   - [Built-in types (C++)](https://docs.microsoft.com/en-us/cpp/cpp/fundamental-types-cpp?view=msvc-160)
+  - [C++ Bit Fields](https://docs.microsoft.com/en-us/cpp/cpp/cpp-bit-fields?view=msvc-160)
