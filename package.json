@@ -1,6 +1,6 @@
 {
   "name": "struct-buffer",
-  "version": "5.1.2",
+  "version": "5.1.3",
   "description": "Add structure to ArrayBuffer",
   "private": false,
   "main": "./dist/umd/struct-buffer.js",
@@ -29,15 +29,15 @@
     "url": "https://github.com/januwA/struct-buffer.git"
   },
   "devDependencies": {
-    "@types/jest": "^26.0.24",
-    "jest": "^27.0.6",
+    "@types/jest": "^27.0.2",
+    "jest": "^27.3.1",
     "node-notifier": "^10.0.0",
-    "ts-jest": "^27.0.4",
-    "ts-loader": "^9.2.4",
-    "ts-node": "^10.1.0",
-    "typescript": "^4.3.5",
-    "webpack": "^5.46.0",
-    "webpack-cli": "^4.7.2"
+    "ts-jest": "^27.0.7",
+    "ts-loader": "^9.2.6",
+    "ts-node": "^10.4.0",
+    "typescript": "^4.4.4",
+    "webpack": "^5.60.0",
+    "webpack-cli": "^4.9.1"
   },
   "dependencies": {}
 }

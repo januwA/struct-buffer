@@ -176,12 +176,12 @@ export class BitsType<
     [key in keyof BitsType_t]: Bit_t;
   },
   E = Partial<D>
-> extends StructType<D, E> {
+  > extends StructType<D, E> {
   constructor(size: TypeSize_t, public readonly bits: BitsType_t) {
     super("<bits>", size, true);
   }
 
-  decode(
+  override decode(
     view: DecodeBuffer_t,
     littleEndian: boolean = false,
     offset: number = 0
@@ -208,7 +208,7 @@ export class BitsType<
     }
   }
 
-  encode(
+  override encode(
     obj: E,
     littleEndian: boolean = false,
     offset: number = 0,
@@ -279,12 +279,12 @@ export class BitFieldsType<
     [key in keyof BitsType_t]: number;
   },
   E = Partial<D>
-> extends StructType<D, E> {
+  > extends StructType<D, E> {
   constructor(size: TypeSize_t, public readonly bitFields: BitsType_t) {
     super("<bit-fields>", size, true);
   }
 
-  decode(
+  override decode(
     view: DecodeBuffer_t,
     littleEndian: boolean = false,
     offset: number = 0
@@ -323,7 +323,7 @@ export class BitFieldsType<
     }
   }
 
-  encode(
+  override encode(
     obj: E,
     littleEndian: boolean = false,
     offset: number = 0,
@@ -361,7 +361,7 @@ export class BitFieldsType<
 export class BoolType<
   D extends boolean,
   E extends boolean | number
-> extends StructType<D, E> {
+  > extends StructType<D, E> {
   constructor(typeName: string | string[], type: StructType<number, number>) {
     super(typeName, type.size, type.unsigned);
   }
@@ -378,7 +378,7 @@ export class BoolType<
    * @param littleEndian
    * @param offset
    */
-  decode(
+  override decode(
     view: DecodeBuffer_t,
     littleEndian: boolean = false,
     offset: number = 0
@@ -406,7 +406,7 @@ export class BoolType<
    * @param offset
    * @param view
    */
-  encode(
+  override encode(
     obj: E,
     littleEndian: boolean = false,
     offset: number = 0,
@@ -435,7 +435,7 @@ export class StringType extends StructType<string, string> {
    * => ab
    * ```
    */
-  decode(
+  override decode(
     view: DecodeBuffer_t,
     littleEndian: boolean = false,
     offset: number = 0,
@@ -467,7 +467,7 @@ export class StringType extends StructType<string, string> {
    * =>  <61 62>
    * ```
    */
-  encode(
+  override encode(
     obj: string,
     littleEndian: boolean = false,
     offset: number = 0,
@@ -510,7 +510,7 @@ export class PaddingType extends StructType<number, number> {
    * @param littleEndian
    * @param offset
    */
-  decode(
+  override decode(
     view: DecodeBuffer_t,
     littleEndian: boolean = false,
     offset: number = 0
@@ -537,7 +537,7 @@ export class PaddingType extends StructType<number, number> {
    * @param offset
    * @param view
    */
-  encode(
+  override encode(
     zero: number = 0,
     littleEndian: boolean = false,
     offset: number = 0,
