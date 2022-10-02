@@ -1,5 +1,5 @@
 import { sizeof } from "./struct-buffer";
-import { arrayProxyNext, createDataView, makeDataView, unflattenDeep, } from "./utils";
+import { arrayProxyNext, createDataView, makeDataView, realloc, unflattenDeep, } from "./utils";
 export const FLOAT_TYPE = "float";
 export const DOUBLE_TYPE = "double";
 const hData = {
@@ -50,9 +50,14 @@ export class StructType extends Array {
         this.unsigned = unsigned;
         this.deeps = [];
         this.names = Array.isArray(typeName) ? typeName : [typeName];
-        const [get, set] = typeHandle(this);
-        this.set = set;
-        this.get = get;
+        if (this.size) {
+            const [get, set] = typeHandle(this);
+            this.set = set;
+            this.get = get;
+        }
+        else {
+            this.set = this.get = "";
+        }
         return arrayProxyNext(this, StructTypeNext);
     }
     get isList() {
@@ -297,6 +302,42 @@ export class PaddingType extends StructType {
         while (length-- > 0)
             v.setUint8(offset++, zero);
         return v;
+    }
+}
+export class Inject extends StructType {
+    constructor(hInjectDecode, hInjectEncode) {
+        super("inject_t", 0, true);
+        this.hInjectDecode = hInjectDecode;
+        this.hInjectEncode = hInjectEncode;
+    }
+    decode(view, littleEndian = false, offset = 0) {
+        if (!this.hInjectDecode)
+            return null;
+        this.size = 0;
+        view = makeDataView(view);
+        const result = [];
+        let i = this.count;
+        while (i--) {
+            const res = this.hInjectDecode(view, offset);
+            result.push(res.value);
+            offset += res.size;
+            this.size += res.size;
+        }
+        return this.isList ? unflattenDeep(result, this.deeps, false) : result[0];
+    }
+    encode(obj, littleEndian = false, offset = 0, view) {
+        view = createDataView(0, view);
+        if (!this.hInjectEncode)
+            return view;
+        this.size = 0;
+        for (let i = 0; i < this.count; i++) {
+            const it = this.isList ? obj[i] : obj;
+            const buf = makeDataView(this.hInjectEncode(it));
+            view = realloc(view, view.byteLength + buf.byteLength, buf, offset);
+            offset += buf.byteLength;
+            this.size += buf.byteLength;
+        }
+        return view;
     }
 }
 export function registerType(typeName, size, unsigned = true) {

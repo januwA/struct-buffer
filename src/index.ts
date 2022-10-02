@@ -1,6 +1,6 @@
 export * from "./struct-buffer";
 export * from "./types";
-export { registerType, typedef, bits, bitFields } from "./class-type";
+export { registerType, typedef, bits, bitFields, Inject } from "./class-type";
 export * as CStruct from "./c-struct";
 export { display } from "./display";
 export {
@@ -10,6 +10,7 @@ export {
   sbytes2,
   sview,
   TEXT,
+  realloc,
 } from "./utils";
 export {
   pack,

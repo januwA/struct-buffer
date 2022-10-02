@@ -1,4 +1,4 @@
-import { StructType } from "./class-type";
+import { Inject, StructType } from "./class-type";
 import { AnyObject, DecodeBuffer_t } from "./interfaces";
 import {
   arrayProxyNext,
@@ -22,6 +22,8 @@ export function sizeof(type: Type_t): number {
     while ((size + padidng++) % maxSize);
     return (size + padidng - 1) * type.count;
   }
+  if (type instanceof Inject) return type.size;
+  
   return type.isList ? type.size * type.count : type.size;
 }
 
@@ -157,7 +159,7 @@ export class StructBuffer<
     view?: DataView
   ): DataView {
     littleEndian = this.config.littleEndian ?? littleEndian;
-    const v = createDataView(this.byteLength, view);
+    let v = createDataView(this.byteLength, view);
     if (this.isList && Array.isArray(obj)) (obj as any) = obj.flat();
 
     for (let i = 0; i < this.count; i++) {
@@ -168,10 +170,10 @@ export class StructBuffer<
         offset += itemSize;
         continue;
       }
-      this.structKV.reduce<DataView>((view: DataView, [key, type]) => {
+      v = this.structKV.reduce<DataView>((view: DataView, [key, type]) => {
         const value = it[key];
         if (type instanceof StructBuffer) {
-          type.encode(
+          view = type.encode(
             value,
             type.config.littleEndian ?? littleEndian,
             offset,
@@ -179,7 +181,7 @@ export class StructBuffer<
           );
           offset += type.byteLength;
         } else {
-          (type as any).encode(
+          view = (type as any).encode(
             value,
             littleEndian,
             offset,

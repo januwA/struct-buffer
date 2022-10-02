@@ -1,9 +1,16 @@
-import { AnyObject, Bit_t, DecodeBuffer_t, TypeSize_t } from "./interfaces";
+import {
+  AnyObject,
+  Bit_t,
+  DecodeBuffer_t,
+  InjectNext,
+  TypeSize_t,
+} from "./interfaces";
 import { sizeof } from "./struct-buffer";
 import {
   arrayProxyNext,
   createDataView,
   makeDataView,
+  realloc,
   unflattenDeep,
 } from "./utils";
 
@@ -91,14 +98,19 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
 
   constructor(
     typeName: string | string[],
-    public readonly size: TypeSize_t,
+    public size: TypeSize_t,
     public readonly unsigned: boolean
   ) {
     super();
     this.names = Array.isArray(typeName) ? typeName : [typeName];
-    const [get, set] = typeHandle(this);
-    this.set = set;
-    this.get = get;
+
+    if (this.size) {
+      const [get, set] = typeHandle(this);
+      this.set = set;
+      this.get = get;
+    } else {
+      this.set = this.get = "";
+    }
     return arrayProxyNext(this, StructTypeNext);
   }
 
@@ -176,7 +188,7 @@ export class BitsType<
     [key in keyof BitsType_t]: Bit_t;
   },
   E = Partial<D>
-  > extends StructType<D, E> {
+> extends StructType<D, E> {
   constructor(size: TypeSize_t, public readonly bits: BitsType_t) {
     super("<bits>", size, true);
   }
@@ -279,7 +291,7 @@ export class BitFieldsType<
     [key in keyof BitsType_t]: number;
   },
   E = Partial<D>
-  > extends StructType<D, E> {
+> extends StructType<D, E> {
   constructor(size: TypeSize_t, public readonly bitFields: BitsType_t) {
     super("<bit-fields>", size, true);
   }
@@ -361,7 +373,7 @@ export class BitFieldsType<
 export class BoolType<
   D extends boolean,
   E extends boolean | number
-  > extends StructType<D, E> {
+> extends StructType<D, E> {
   constructor(typeName: string | string[], type: StructType<number, number>) {
     super(typeName, type.size, type.unsigned);
   }
@@ -548,6 +560,66 @@ export class PaddingType extends StructType<number, number> {
     let length = sizeof(this);
     while (length-- > 0) v.setUint8(offset++, zero);
     return v;
+  }
+}
+
+type HInjectDecode = (view: DataView, offset: number) => InjectNext;
+type HInjectEncode = (value: any) => DecodeBuffer_t;
+
+export class Inject extends StructType<any, any> {
+  /**
+   * Customize the working content of decode and encode
+   */
+  constructor(
+    private hInjectDecode?: HInjectDecode,
+    private hInjectEncode?: HInjectEncode
+  ) {
+    super("inject_t", 0, true);
+  }
+
+  override decode(
+    view: DecodeBuffer_t,
+    littleEndian: boolean = false,
+    offset: number = 0
+  ) {
+    if (!this.hInjectDecode) return null;
+
+    this.size = 0;
+    view = makeDataView(view);
+
+    const result: AnyObject[] = [];
+    let i = this.count;
+    while (i--) {
+      const res = this.hInjectDecode(view as DataView, offset);
+
+      result.push(res.value);
+      offset += res.size;
+      this.size += res.size;
+    }
+
+    return this.isList ? unflattenDeep(result, this.deeps, false) : result[0];
+  }
+
+  override encode(
+    obj: any,
+    littleEndian: boolean = false,
+    offset: number = 0,
+    view?: DataView
+  ): DataView {
+    view = createDataView(0, view);
+    if (!this.hInjectEncode) return view;
+
+    this.size = 0;
+    for (let i = 0; i < this.count; i++) {
+      const it = this.isList ? (obj as any)[i] : obj;
+      const buf = makeDataView(this.hInjectEncode(it));
+
+      view = realloc(view!, view!.byteLength + buf.byteLength, buf, offset);
+      offset += buf.byteLength;
+      this.size += buf.byteLength;
+    }
+
+    return view;
   }
 }
 

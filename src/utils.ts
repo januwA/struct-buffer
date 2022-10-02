@@ -229,3 +229,28 @@ export function TEXT(
   }
   return str;
 }
+
+export function realloc(
+  mem: DecodeBuffer_t,
+  size: number,
+  pushMem?: DecodeBuffer_t,
+  pushOffset?: number
+) {
+  const nmem = makeDataView(mem);
+  const v = createDataView(size);
+
+  // copy
+  for (let i = 0; i < nmem.byteLength; i++) {
+    v.setUint8(i, nmem.getUint8(i));
+  }
+
+  // push
+  if (pushMem && pushOffset !== undefined) {
+    const pmem = makeDataView(pushMem);
+    for (let i = 0; i < pmem.byteLength; i++) {
+      v.setUint8(pushOffset++, pmem.getUint8(i));
+    }
+  }
+
+  return v;
+}

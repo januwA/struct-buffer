@@ -1,3 +1,11 @@
+## 5.2.0 2022-9-28
+
+- 📦 update packages
+- ✨ add `Inject` type
+- ✅✔️ add `Inject` test
+- realloc
+
+
 ## 5.1.3 2021-10-27
 
 - 📦 update packages

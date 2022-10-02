@@ -12,7 +12,19 @@ export interface DysplayResult {
   value: any;
 }
 
-export type TypeSize_t = 1 | 2 | 4 | 8;
+export interface InjectNext {
+  /**
+   * how many bytes are consumed
+   */
+  size: number;
+
+  /**
+   * parsed result
+   */
+  value: any;
+}
+
+export type TypeSize_t = number;
 
 export type Bit_t = 0 | 1;
 

@@ -133,3 +133,17 @@ export function TEXT(buf, text, placeholder) {
     }
     return str;
 }
+export function realloc(mem, size, pushMem, pushOffset) {
+    const nmem = makeDataView(mem);
+    const v = createDataView(size);
+    for (let i = 0; i < nmem.byteLength; i++) {
+        v.setUint8(i, nmem.getUint8(i));
+    }
+    if (pushMem && pushOffset !== undefined) {
+        const pmem = makeDataView(pushMem);
+        for (let i = 0; i < pmem.byteLength; i++) {
+            v.setUint8(pushOffset++, pmem.getUint8(i));
+        }
+    }
+    return v;
+}

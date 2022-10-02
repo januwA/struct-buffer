@@ -1,3 +1,4 @@
+import { Inject } from "./class-type";
 import { arrayProxyNext, createDataView, makeDataView, unflattenDeep, zeroMemory, } from "./utils";
 export function sizeof(type) {
     if (type instanceof StructBuffer) {
@@ -8,6 +9,8 @@ export function sizeof(type) {
             ;
         return (size + padidng - 1) * type.count;
     }
+    if (type instanceof Inject)
+        return type.size;
     return type.isList ? type.size * type.count : type.size;
 }
 function byteLength(sb, count) {
@@ -76,7 +79,7 @@ export class StructBuffer extends Array {
     }
     encode(obj, littleEndian = false, offset = 0, view) {
         littleEndian = this.config.littleEndian ?? littleEndian;
-        const v = createDataView(this.byteLength, view);
+        let v = createDataView(this.byteLength, view);
         if (this.isList && Array.isArray(obj))
             obj = obj.flat();
         for (let i = 0; i < this.count; i++) {
@@ -87,14 +90,14 @@ export class StructBuffer extends Array {
                 offset += itemSize;
                 continue;
             }
-            this.structKV.reduce((view, [key, type]) => {
+            v = this.structKV.reduce((view, [key, type]) => {
                 const value = it[key];
                 if (type instanceof StructBuffer) {
-                    type.encode(value, type.config.littleEndian ?? littleEndian, offset, view);
+                    view = type.encode(value, type.config.littleEndian ?? littleEndian, offset, view);
                     offset += type.byteLength;
                 }
                 else {
-                    type.encode(value, littleEndian, offset, view, this.config.textEncoder);
+                    view = type.encode(value, littleEndian, offset, view, this.config.textEncoder);
                     offset += sizeof(type);
                 }
                 return view;

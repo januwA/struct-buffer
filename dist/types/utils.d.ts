@@ -10,4 +10,5 @@ export declare function sbytes2(str: string, te?: TextEncoder): DataView;
 export declare function sview(view: DecodeBuffer_t): string;
 export declare function TEXT(buf: number[] | ArrayBufferView, placeholder?: ((byte: number) => string) | string): string;
 export declare function TEXT(buf: number[] | ArrayBufferView, text?: TextDecoder, placeholder?: ((byte: number) => string) | string): string;
+export declare function realloc(mem: DecodeBuffer_t, size: number, pushMem?: DecodeBuffer_t, pushOffset?: number): DataView;
 //# sourceMappingURL=utils.d.ts.map

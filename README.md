@@ -309,6 +309,39 @@ const data = bf.decode(b("1D"));
 // => { a: 1, b: 2, c: 3 }
 ```
 
+## Inject
+
+Customize the working content of decode and encode
+
+```ts
+const c_str = new Inject(
+  // decode
+  (view: DataView, offset: number) => {
+    const buf: number[] = [];
+    let size = offset + 0;
+    while (true) {
+      let data = view.getUint8(size++);
+      if (data === 0) break;
+      buf.push(data);
+    }
+
+    return {
+      size: size - offset,
+      value: new TextDecoder().decode(new Uint8Array(buf)),
+    };
+  },
+
+  // encode
+  (value: string) => {
+    const bytes: Uint8Array = new TextEncoder().encode(value);
+    const res = realloc(bytes, bytes.byteLength + 1);
+    return res;
+  }
+);
+```
+
+See `Inject.test.ts` file.
+
 ## [pack and unpack](https://docs.python.org/3/library/struct.html)
 ```ts
 import { pack, pack_into, unpack, unpack_from, iter_unpack, calcsize, Struct, sbytes as b } from "struct-buffer";
