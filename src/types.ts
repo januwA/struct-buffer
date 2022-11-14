@@ -1,12 +1,11 @@
 import {
   BoolType,
-  DOUBLE_TYPE,
-  FLOAT_TYPE,
   PaddingType,
   registerType,
   StringType,
   typedef,
 } from "./class-type";
+import { DOUBLE_TYPE, FLOAT_TYPE } from "./const";
 
 export const string_t = new StringType();
 export const padding_t = new PaddingType();

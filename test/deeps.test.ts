@@ -13,9 +13,9 @@ describe("deeps test", () => {
     let a = int32_t;
     let b = a[2];
     let c = b[3];
-    expect(a.deeps).toEqual([]);
-    expect(b.deeps).toEqual([2]);
-    expect(c.deeps).toEqual([2, 3]);
+    expect((a as any).deeps).toEqual([]);
+    expect((b as any).deeps).toEqual([2]);
+    expect((c as any).deeps).toEqual([2, 3]);
 
     expect(a instanceof StructType).toEqual(true);
     expect(b instanceof StructType).toEqual(true);
@@ -32,9 +32,9 @@ describe("deeps test", () => {
     let a = new StructBuffer("a", {});
     let b = a[2];
     let c = b[3];
-    expect(a.deeps).toEqual([]);
-    expect(b.deeps).toEqual([2]);
-    expect(c.deeps).toEqual([2, 3]);
+    expect((a as any).deeps).toEqual([]);
+    expect((b as any).deeps).toEqual([2]);
+    expect((c as any).deeps).toEqual([2, 3]);
 
     expect(a instanceof StructBuffer).toEqual(true);
     expect(b instanceof StructBuffer).toEqual(true);

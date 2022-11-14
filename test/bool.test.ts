@@ -1,4 +1,4 @@
-import { BOOL, bool, uchar, uint, sizeof, pack } from "../src";
+import { BOOL, bool, uchar, uint, pack } from "../src";
 
 describe("bool and BOOL test", () => {
   it("encode", () => {
@@ -23,16 +23,27 @@ describe("bool and BOOL test", () => {
     expect(bool[2].decode(pack("2B", 2, 0))).toEqual([true, false]);
     expect(bool[2].decode(pack("2B", 0, 2))).toEqual([false, true]);
     expect(BOOL[2].decode(pack("2I", 2, 0))).toEqual([true, false]);
-    expect(BOOL[2].decode(pack("2I", 0, 2))).toEqual([
-      false,
-      true,
-    ]);
+    expect(BOOL[2].decode(pack("2I", 0, 2))).toEqual([false, true]);
   });
 
-  it("sizeof", () => {
-    expect(sizeof(bool)).toBe(1);
-    expect(sizeof(bool[2])).toBe(2);
-    expect(sizeof(BOOL)).toBe(4);
-    expect(sizeof(BOOL[2])).toBe(8);
+  it("byteLength", () => {
+    expect(bool.byteLength).toBe(1);
+    expect(bool[2].byteLength).toBe(2);
+    expect(BOOL.byteLength).toBe(4);
+    expect(BOOL[2].byteLength).toBe(8);
+  });
+
+  it("count", () => {
+    // [0]
+    expect(bool.count).toBe(1);
+
+    // [0,0]
+    expect(bool[2].count).toBe(2);
+
+    // [[0,0], [0,0]]
+    expect(BOOL[2][2].count).toBe(4);
+
+    // [[[0,0], [0,0], [0,0]], [[0,0],[0,0],[0,0]]]
+    expect(BOOL[2][3][2].count).toBe(12);
   });
 });

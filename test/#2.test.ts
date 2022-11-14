@@ -4,36 +4,34 @@ import { StructBuffer, sview, WORD } from "../src";
 
 describe("debug", () => {
   it("string_t", () => {
-    const s = new StructBuffer(
-      "test",
-      {
-        a: WORD,
-        b: WORD,
-        c: new StructBuffer(
-          "test2",
-          {
-            ip: WORD,
-            port: WORD,
-          },
-          {
-            littleEndian: false,
-          }
-        ),
-      },
-      {
-        littleEndian: true,
-      }
-    );
+    const s = new StructBuffer("test", {
+      a: WORD,
+      b: WORD,
+      c: new StructBuffer("test2", {
+        ip: WORD,
+        port: WORD,
+      }),
+    });
 
-    const v = s.encode({
+    const obj = {
       a: 1,
       b: 2,
       c: {
         ip: 10,
         port: 100,
       },
+    };
+
+    const v1 = s.encode(obj, {
+      littleEndian: false,
     });
-    expect(sview(v)).toBe("01 00 02 00 00 0a 00 64");
+    expect(sview(v1)).toBe("00 01 00 02 00 0a 00 64");
+
+    const v2 = s.encode(obj, {
+      littleEndian: true,
+    });
+    expect(sview(v2)).toBe("01 00 02 00 0a 00 64 00");
+
   });
 
   it("test extends", () => {

@@ -1,5 +1,7 @@
+import { AbstractDeep } from "./abstract";
 import { StructType } from "./class-type";
-import { StructBuffer, Type_t } from "./struct-buffer";
+import { BufferLike_t } from "./interfaces";
+import { StructBuffer } from "./struct-buffer";
 import * as dtypes from "./types";
 import { char, string_t } from "./types";
 
@@ -35,7 +37,7 @@ const exp =
  */
 export function parse(
   cStructTemp: string,
-  types?: { [typeName: string]: Type_t }
+  types?: { [typeName: string]: BufferLike_t }
 ): {
   [structName: string]: StructBuffer;
 } {
@@ -114,7 +116,7 @@ export function parse(
     structBuffers[structName] = new StructBuffer(
       structName,
       Object.entries(props).reduce<{
-        [k: string]: Type_t;
+        [k: string]: BufferLike_t;
       }>((acc, [propName, p]) => {
         // 如果属性的type在当前解析的cStruct当中
         if (p.type in cStructs) {
@@ -123,7 +125,7 @@ export function parse(
         }
 
         if (!types) return acc;
-        let type: Type_t | undefined = types[p.type];
+        let type: BufferLike_t | undefined = types[p.type];
 
         if (!type) {
           type = Object.values(types).find((type) => {
@@ -155,16 +157,16 @@ export function parse(
 export function from(sb: StructBuffer) {
   let props = "";
 
-  for (let [propName, type] of Object.entries(sb.struct)) {
+  for (let [propName, type] of Object.entries((sb as any).struct)) {
     const typeName =
       type instanceof StructType
         ? string_t.is(type)
           ? char.names[0]
           : type.names[0]
-        : type.structName;
+        : (type as any).structName;
 
-    if (type.isList) {
-      const arr = type.deeps.map((i: number) => `[${i}]`).join("");
+    if ((type as AbstractDeep<any>).isList) {
+      const arr = (type as any).deeps.map((i: number) => `[${i}]`).join("");
       propName = `${propName}${arr}`;
     }
     props += `\t${typeName} ${propName};\n`;

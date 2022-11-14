@@ -1,4 +1,4 @@
-import { StructBuffer, Inject, float, realloc, sizeof } from "../src";
+import { StructBuffer, Inject, float, realloc } from "../src";
 
 describe("Inject test", () => {
   let c_str: Inject;
@@ -30,8 +30,8 @@ describe("Inject test", () => {
     );
   });
 
-  it("sizeof", () => {
-    expect(sizeof(c_str)).toBe(0);
+  it("byteLength", () => {
+    expect(c_str.byteLength).toBe(0);
   });
 
   it("decode and encode", () => {

@@ -188,10 +188,10 @@ typedef struct _XINPUT_BATTERY_INFORMATION
 `;
 
 const structs = CStruct.parse(cStruct);
-sizeof(structs.XINPUT_GAMEPAD) // 12
-sizeof(structs.XINPUT_STATE) // 16
-sizeof(structs.XINPUT_VIBRATION) // 4
-sizeof(structs.XINPUT_BATTERY_INFORMATION) // 2
+structs.XINPUT_GAMEPAD
+structs.XINPUT_STATE
+structs.XINPUT_VIBRATION
+structs.XINPUT_BATTERY_INFORMATION
 ```
 
 ## struct list

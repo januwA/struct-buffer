@@ -2,7 +2,6 @@ import {
   DWORD,
   string_t,
   uint32_t,
-  sizeof,
   char,
   BYTE,
   WORD,
@@ -250,10 +249,10 @@ typedef struct _XINPUT_BATTERY_INFORMATION
 
 `;
     const structs = CStruct.parse(cStruct);
-    expect(sizeof(structs.XINPUT_GAMEPAD)).toBe(12);
-    expect(sizeof(structs.XINPUT_STATE)).toBe(16);
-    expect(sizeof(structs.XINPUT_VIBRATION)).toBe(4);
-    expect(sizeof(structs.XINPUT_BATTERY_INFORMATION)).toBe(2);
+    expect(structs.XINPUT_GAMEPAD.byteLength).toBe(12);
+    expect(structs.XINPUT_STATE.byteLength).toBe(16);
+    expect(structs.XINPUT_VIBRATION.byteLength).toBe(4);
+    expect(structs.XINPUT_BATTERY_INFORMATION.byteLength).toBe(2);
   });
 
   it("test parse 2", () => {
@@ -268,7 +267,6 @@ typedef struct _XINPUT_BATTERY_INFORMATION
   };
 `);
 
-    expect(sizeof(structs.Player)).toBe(32);
     expect(structs.Player.byteLength).toBe(30);
   });
 });
@@ -311,7 +309,12 @@ describe("test struct list", () => {
 
   it("test byteLength", () => {
     expect(users.byteLength).toBe(8);
-    expect(sizeof(users)).toBe(8);
+  });
+
+  it("test length", () => {
+    expect(user.length).toBe(0);
+    expect(user[2].length).toBe(2);
+    expect(user[2][4].length).toBe(4);
   });
 });
 

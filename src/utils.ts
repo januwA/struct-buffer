@@ -1,4 +1,11 @@
-import { DecodeBuffer_t, Type } from "./interfaces";
+import { DOUBLE_TYPE, FLOAT_TYPE, hData } from "./const";
+import {
+  DataViewGet_t,
+  DataViewSetExcludeBig_t,
+  DecodeBuffer_t,
+  IType,
+  Type,
+} from "./interfaces";
 
 /**
  * 设置数组嵌套层数
@@ -253,4 +260,34 @@ export function realloc(
   }
 
   return v;
+}
+
+export function typeHandle<T extends IType>(
+  type: T
+): [get: DataViewGet_t, set: DataViewSetExcludeBig_t] {
+  if (!type.size) return ["getUint8", "setUint8"];
+
+  let h: DataViewGet_t | undefined = undefined;
+
+  const isFloat =
+    type.isName(FLOAT_TYPE.toLowerCase()) ||
+    type.isName(FLOAT_TYPE.toUpperCase());
+
+  const isDouble =
+    type.isName(DOUBLE_TYPE.toLowerCase()) ||
+    type.isName(DOUBLE_TYPE.toUpperCase());
+
+  if (isFloat) h = hData["f"] as DataViewGet_t;
+  if (isDouble) h = hData["d"] as DataViewGet_t;
+
+  if (!h) h = hData[type.size][+type.unsigned] as DataViewGet_t;
+  if (!h) throw new Error(`StructBuffer: Unrecognized ${type} type.`);
+
+  return [h, h.replace(/^g/, "s") as DataViewSetExcludeBig_t];
+}
+
+export class BufferLikeNext {
+  constructor() {
+    return arrayProxyNext(this, BufferLikeNext);
+  }
 }

@@ -2,7 +2,6 @@
 
 import { StructType } from "./class-type";
 import { DecodeBuffer_t } from "./interfaces";
-import { sizeof } from "./struct-buffer";
 import {
   bool,
   string_t,
@@ -164,16 +163,16 @@ export function pack_into(
     if (!type) break;
 
     if (type.is(padding_t)) {
-      type.encode(0 as any, littleEndian, offset, view);
+      type.encode(0 as any, { littleEndian, offset, view });
     } else if (type.is(string_t)) {
-      type.encode(args.shift() as any, littleEndian, offset, view);
+      type.encode(args.shift() as any, { littleEndian, offset, view });
     } else {
       const obj = [];
       for (let i = 0; i < type.count; i++) obj.push(args.shift());
-      type.encode(obj as any, littleEndian, offset, view);
+      type.encode(obj as any, { littleEndian, offset, view });
     }
 
-    offset += sizeof(type);
+    offset += type.byteLength;
   }
 
   return view;
@@ -215,8 +214,8 @@ export function unpack(
     const type = types.shift();
     if (!type) break;
     if (!type.is(padding_t))
-      result.push(type.decode(view, littleEndian, offset));
-    offset += sizeof(type);
+      result.push(type.decode(view, { littleEndian, offset }));
+    offset += type.byteLength;
   }
   return result.flat();
 }
@@ -280,7 +279,7 @@ export function calcsize(format: string): number {
   format = format.replace(/\s/g, "");
   if (SECTION_ORDER.includes(format[0])) format = format.substr(1);
   const types = _getTypes(format);
-  return types.reduce((acc, it) => acc + sizeof(it), 0);
+  return types.reduce((acc, it) => acc + it.byteLength, 0);
 }
 
 export class Struct {
