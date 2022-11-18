@@ -11,7 +11,7 @@ $ npm i struct-buffer
 ```ts
 import { float, string_t, StructBuffer, pack } from "struct-buffer";
 
-const struct = new StructBuffer("Player", {
+const struct = new StructBuffer({
   hp: float,
   mp: float,
   name: string_t[3],
@@ -56,9 +56,9 @@ const data = DWORD[2].decode(view);
 
 ## register Type
 ```ts
-const myShort = registerType("short", 2, false);
+const myShort = registerType(2, false);
 
-const struct = new StructBuffer("Player", {
+const struct = new StructBuffer({
   hp: myShort,
   mp: myShort,
   pos: myShort[2],
@@ -79,7 +79,7 @@ const data = struct.decode(view);
 
 ## typedef
 ```ts
-const HANDLE = typedef("HANDLE", DWORD);
+const HANDLE = typedef(DWORD);
 HANDLE.size // 4
 HANDLE.unsigned // true
 ```
@@ -105,7 +105,7 @@ typedef struct _XINPUT_GAMEPAD {
 } XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
 */
 
-XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
+XINPUT_GAMEPAD = new StructBuffer({
   wButtons: WORD,
   bLeftTrigger: BYTE,
   bRightTrigger: BYTE,
@@ -115,7 +115,7 @@ XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
   sThumbRY: int16_t,
 });
 
-XINPUT_STATE = new StructBuffer("XINPUT_STATE", {
+XINPUT_STATE = new StructBuffer({
   dwPacketNumber: DWORD,
   Gamepad: XINPUT_GAMEPAD,
 });
@@ -149,59 +149,14 @@ XINPUT_STATE.encode({
 });
 ```
 
-## parse c-struct
-```ts
-import { CStruct } from "struct-buffer";
-
-const cStruct = `
-//
-// Structures used by XInput APIs
-//
-typedef struct _XINPUT_GAMEPAD
-{
-    WORD                                wButtons;
-    BYTE                                bLeftTrigger;
-    BYTE                                bRightTrigger;
-    SHORT                               sThumbLX;
-    SHORT                               sThumbLY;
-    SHORT                               sThumbRX;
-    SHORT                               sThumbRY;
-} XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
-
-typedef struct _XINPUT_STATE
-{
-    DWORD                               dwPacketNumber;
-    XINPUT_GAMEPAD                      Gamepad;
-} XINPUT_STATE, *PXINPUT_STATE;
-
-typedef struct _XINPUT_VIBRATION
-{
-    WORD                                wLeftMotorSpeed;
-    WORD                                wRightMotorSpeed;
-} XINPUT_VIBRATION, *PXINPUT_VIBRATION;
-
-typedef struct _XINPUT_BATTERY_INFORMATION
-{
-    BYTE BatteryType;
-    BYTE BatteryLevel;
-} XINPUT_BATTERY_INFORMATION, *PXINPUT_BATTERY_INFORMATION;
-`;
-
-const structs = CStruct.parse(cStruct);
-structs.XINPUT_GAMEPAD
-structs.XINPUT_STATE
-structs.XINPUT_VIBRATION
-structs.XINPUT_BATTERY_INFORMATION
-```
-
 ## struct list
 ```ts
-const User = new StructBuffer("User", {
+const User = new StructBuffer({
   name: string_t[2],
   name2: string_t[2],
 });
 
-const Users = new StructBuffer("Users", {
+const Users = new StructBuffer({
   users: User[2],
 });
 
@@ -218,34 +173,6 @@ const users = User[2].decode(
   new Uint8Array([0x61, 0x31, 0x61, 0x32, 0x62, 0x31, 0x62, 0x32])
 );
 // users => [ { name: 'a1', name2: 'a2' }, { name: 'b1', name2: 'b2' } ]
-```
-
-## StructBuffer to c-struct
-```ts
-import { CStruct } from "struct-buffer";
-
-const XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
-  wButtons: WORD,
-  bLeftTrigger: BYTE,
-  bRightTrigger: BYTE,
-  sThumbLX: int16_t,
-  sThumbLY: int16_t,
-  sThumbRX: int16_t,
-  sThumbRY: int16_t[2],
-});
-const cStruct = CStruct.from(XINPUT_GAMEPAD);
-
-// console.log(cStruct) => 
-typedef struct _XINPUT_GAMEPAD
-{
-    WORD wButtons;
-    BYTE bLeftTrigger;
-    BYTE bRightTrigger;
-    int16_t sThumbLX;
-    int16_t sThumbLY;
-    int16_t sThumbRX;
-    int16_t sThumbRY[2];
-} XINPUT_GAMEPAD, *XINPUT_GAMEPAD;
 ```
 
 ## "string_t" Truncate when encountering 0

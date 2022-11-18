@@ -1,5 +1,10 @@
 import { DataViewGet_t, DataViewSetExcludeBig_t, IType } from "./interfaces";
-import { typeHandle, unflattenDeep } from "./utils";
+import {
+  arrayProxyNext,
+  BufferLikeNext,
+  typeHandle,
+  unflattenDeep,
+} from "./utils";
 
 /**
  * 结构可以是嵌套的
@@ -10,6 +15,10 @@ export abstract class AbstractDeep<T> implements ArrayLike<T> {
   readonly [n: number]: T;
   get length() {
     return this.isList ? this.deeps[this.deeps.length - 1] : 0;
+  }
+
+  constructor() {
+    return arrayProxyNext(this, BufferLikeNext);
   }
 
   /**
@@ -53,27 +62,19 @@ export abstract class AbstractDeep<T> implements ArrayLike<T> {
 }
 
 export abstract class AbstractType<T> extends AbstractDeep<T> implements IType {
-  get: DataViewGet_t;
-  set: DataViewSetExcludeBig_t;
-  names: string[] = [];
+  protected readonly get: DataViewGet_t;
+  protected readonly set: DataViewSetExcludeBig_t;
 
-  constructor(
-    typeName: string | string[],
-    public size: number,
-    public readonly unsigned: boolean
-  ) {
+  constructor(public size: number, public readonly unsigned: boolean) {
     super();
-    this.names = Array.isArray(typeName) ? typeName : [typeName];
     const [get, set] = typeHandle(this);
     this.set = set;
     this.get = get;
   }
-
-  is(type: AbstractType<T>): boolean {
-    return type.names.some((name) => this.names.includes(name));
+  get isFloat(): boolean {
+    return false;
   }
-
-  isName(typeName: string) {
-    return this.names.includes(typeName);
+  get isDouble(): boolean {
+    return false;
   }
 }

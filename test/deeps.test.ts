@@ -29,7 +29,7 @@ describe("deeps test", () => {
   });
 
   it("struct", () => {
-    let a = new StructBuffer("a", {});
+    let a = new StructBuffer({});
     let b = a[2];
     let c = b[3];
     expect((a as any).deeps).toEqual([]);

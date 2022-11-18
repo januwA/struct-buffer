@@ -269,16 +269,8 @@ export function typeHandle<T extends IType>(
 
   let h: DataViewGet_t | undefined = undefined;
 
-  const isFloat =
-    type.isName(FLOAT_TYPE.toLowerCase()) ||
-    type.isName(FLOAT_TYPE.toUpperCase());
-
-  const isDouble =
-    type.isName(DOUBLE_TYPE.toLowerCase()) ||
-    type.isName(DOUBLE_TYPE.toUpperCase());
-
-  if (isFloat) h = hData["f"] as DataViewGet_t;
-  if (isDouble) h = hData["d"] as DataViewGet_t;
+  if (type.isFloat) h = hData["f"] as DataViewGet_t;
+  if (type.isDouble) h = hData["d"] as DataViewGet_t;
 
   if (!h) h = hData[type.size][+type.unsigned] as DataViewGet_t;
   if (!h) throw new Error(`StructBuffer: Unrecognized ${type} type.`);

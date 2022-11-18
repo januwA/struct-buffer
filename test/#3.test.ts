@@ -11,7 +11,7 @@ import {
 
 describe("test bitFields", () => {
   it("test 1", () => {
-    const s = new StructBuffer("test", {
+    const s = new StructBuffer({
       a: bitFields(uint8_t, {
         alpha: 2,
         beta: 4,

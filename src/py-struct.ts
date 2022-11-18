@@ -1,6 +1,6 @@
 // https://docs.python.org/zh-cn/3/library/struct.html#byte-order-size-and-alignment
 
-import { StructType } from "./class-type";
+import { PaddingType, StringType, StructType } from "./class-type";
 import { DecodeBuffer_t } from "./interfaces";
 import {
   bool,
@@ -162,9 +162,9 @@ export function pack_into(
     const type = types.shift();
     if (!type) break;
 
-    if (type.is(padding_t)) {
+    if (type instanceof PaddingType) {
       type.encode(0 as any, { littleEndian, offset, view });
-    } else if (type.is(string_t)) {
+    } else if (type instanceof StringType) {
       type.encode(args.shift() as any, { littleEndian, offset, view });
     } else {
       const obj = [];
@@ -213,7 +213,7 @@ export function unpack(
   while (types.length) {
     const type = types.shift();
     if (!type) break;
-    if (!type.is(padding_t))
+    if (!(type instanceof PaddingType))
       result.push(type.decode(view, { littleEndian, offset }));
     offset += type.byteLength;
   }

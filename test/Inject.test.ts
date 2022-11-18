@@ -35,7 +35,7 @@ describe("Inject test", () => {
   });
 
   it("decode and encode", () => {
-    const player = new StructBuffer("Player", {
+    const player = new StructBuffer({
       hp: float,
       name: c_str,
       mp: float,

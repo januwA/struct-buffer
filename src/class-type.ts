@@ -13,13 +13,7 @@ import {
   HInjectDecode,
   HInjectEncode,
 } from "./interfaces";
-import {
-  arrayProxyNext,
-  BufferLikeNext,
-  createDataView,
-  makeDataView,
-  realloc,
-} from "./utils";
+import { createDataView, makeDataView, realloc } from "./utils";
 
 // D decode return type
 // E encode obj type
@@ -27,9 +21,8 @@ export class StructType<D, E>
   extends AbstractType<StructType<D[], E[]>>
   implements IByteLength, IDecode<D>, IEncode<E>
 {
-  constructor(typeName: string | string[], size: number, unsigned: boolean) {
-    super(typeName, size, unsigned);
-    return arrayProxyNext(this, BufferLikeNext);
+  constructor(size: number, unsigned: boolean) {
+    super(size, unsigned);
   }
 
   get byteLength(): number {
@@ -100,7 +93,7 @@ export class BitsType<
   E = Partial<D>
 > extends StructType<D, E> {
   constructor(size: number, public readonly bits: BitsType_t) {
-    super("<bits>", size, true);
+    super(size, true);
   }
 
   override decode(view: DecodeBuffer_t, options?: IDecodeOptions): D {
@@ -187,7 +180,7 @@ export class BitFieldsType<
   E = Partial<D>
 > extends StructType<D, E> {
   constructor(size: number, public readonly bitFields: BitsType_t) {
-    super("<bit-fields>", size, true);
+    super(size, true);
   }
 
   override decode(view: DecodeBuffer_t, options?: IDecodeOptions): D {
@@ -257,8 +250,8 @@ export class BoolType<
   D extends boolean,
   E extends boolean | number
 > extends StructType<D, E> {
-  constructor(typeName: string | string[], type: StructType<number, number>) {
-    super(typeName, type.size, type.unsigned);
+  constructor(type: StructType<number, number>) {
+    super(type.size, type.unsigned);
   }
 
   /**
@@ -305,7 +298,7 @@ export class StringType extends StructType<string, string> {
     private readonly textDecode = new TextDecoder(),
     private readonly textEncoder = new TextEncoder()
   ) {
-    super("string_t", 1, true);
+    super(1, true);
   }
 
   /**
@@ -370,7 +363,7 @@ export class StringType extends StructType<string, string> {
 
 export class PaddingType extends StructType<number, number> {
   constructor() {
-    super("padding_t", 1, true);
+    super(1, true);
   }
 
   /**
@@ -418,7 +411,7 @@ export class Inject extends StructType<any, any> {
     private readonly hInjectDecode?: HInjectDecode,
     private readonly hInjectEncode?: HInjectEncode
   ) {
-    super("inject_t", 0, true);
+    super(0, true);
   }
 
   override get byteLength(): number {
@@ -466,35 +459,47 @@ export class Inject extends StructType<any, any> {
   }
 }
 
+export class FloatType extends StructType<number, number> {
+  override get isFloat(): boolean {
+    return true;
+  }
+
+  constructor() {
+    super(4, true);
+  }
+}
+
+export class DoubleType extends StructType<number, number> {
+  override get isDouble(): boolean {
+    return true;
+  }
+
+  constructor() {
+    super(8, true);
+  }
+}
+
 /**
  *
  * Register a new type
  *
- * ```ts
- * const int = registerType(["int", "signed", "signed int"], 4, false);
- * ```
  */
 export function registerType<D extends number, E extends number>(
-  typeName: string | string[],
   size: number,
   unsigned = true
 ) {
-  return new StructType<D, E>(typeName, size, unsigned);
+  return new StructType<D, E>(size, unsigned);
 }
 
 /**
  *
  * Inherit the "size" and "unsigned" attributes
  *
- * ```ts
- * const int8_t = typedef("int8_t", char);
- * ```
  */
 export function typedef<D extends number, E extends number>(
-  typeName: string | string[],
   type: StructType<any, any>
 ) {
-  const newType = registerType<D, E>(typeName, type.size, type.unsigned);
+  const newType = registerType<D, E>(type.size, type.unsigned);
   return newType;
 }
 

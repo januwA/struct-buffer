@@ -32,7 +32,7 @@ describe("bits test", () => {
   });
 
   it("test struct", () => {
-    const struct = new StructBuffer("Test", {
+    const struct = new StructBuffer({
       id: WORD,
       eflag: bits(DWORD, {
         PF: 2,

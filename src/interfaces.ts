@@ -1,5 +1,3 @@
-import { AbstractDeep } from "./abstract";
-
 export interface AnyObject {
   [key: string]: any;
   [index: number]: any;
@@ -7,11 +5,6 @@ export interface AnyObject {
 
 export interface Type<T extends Object> extends Function {
   new (...args: any[]): T;
-}
-
-export interface DysplayResult {
-  offset: number;
-  value: any;
 }
 
 export interface InjectNext {
@@ -64,7 +57,8 @@ export interface IEncode<E extends any> {
 export interface IType {
   size: number;
   unsigned: boolean;
-  isName(typeName: string): boolean;
+  get isFloat(): boolean;
+  get isDouble(): boolean;
 }
 
 export type DataViewGet_t = Extract<keyof DataView, `get${string}`>;
@@ -72,12 +66,9 @@ export type DataViewSet_t = Extract<keyof DataView, `set${string}`>;
 export type DataViewSetExcludeBig_t = Exclude<DataViewSet_t, `setBig${string}`>;
 export type DataViewSetBig_t = Extract<DataViewSet_t, `setBig${string}`>;
 
-export type BufferLike_t = AbstractDeep<any> &
-  IByteLength &
-  IDecode<any> &
-  IEncode<any>;
+export type BufferLike_t<D, E> = IByteLength & IDecode<D> & IEncode<E>;
 
-export type StructBuffer_t = { [k: string]: BufferLike_t };
+export type StructBuffer_t = { [k: string]: BufferLike_t<any, any> };
 
 export type BitsType_t = { [k: string]: number };
 

@@ -10,13 +10,7 @@ import {
   BufferLike_t,
   StructBuffer_t,
 } from "./interfaces";
-import {
-  arrayProxyNext,
-  BufferLikeNext,
-  createDataView,
-  makeDataView,
-  zeroMemory,
-} from "./utils";
+import { createDataView, makeDataView, zeroMemory } from "./utils";
 
 export class StructBuffer<
     D = {
@@ -27,15 +21,11 @@ export class StructBuffer<
   extends AbstractDeep<StructBuffer<D[], E[]>>
   implements IByteLength, IDecode<D>, IEncode<E>
 {
-  private readonly structKV: [string, BufferLike_t][];
+  private readonly structKV: [string, BufferLike_t<any, any>][];
 
-  constructor(
-    public readonly structName: string,
-    private readonly struct: StructBuffer_t
-  ) {
+  constructor(private readonly struct: StructBuffer_t) {
     super();
     this.structKV = Object.entries(struct);
-    return arrayProxyNext(this, BufferLikeNext);
   }
 
   get byteLength(): number {

@@ -4,10 +4,10 @@ import { StructBuffer, sview, WORD } from "../src";
 
 describe("debug", () => {
   it("string_t", () => {
-    const s = new StructBuffer("test", {
+    const s = new StructBuffer({
       a: WORD,
       b: WORD,
-      c: new StructBuffer("test2", {
+      c: new StructBuffer({
         ip: WORD,
         port: WORD,
       }),
@@ -31,7 +31,6 @@ describe("debug", () => {
       littleEndian: true,
     });
     expect(sview(v2)).toBe("01 00 02 00 0a 00 64 00");
-
   });
 
   it("test extends", () => {
@@ -39,7 +38,7 @@ describe("debug", () => {
       a = 10;
     }
 
-    let s = new X("s", {})[2][2] as any;
+    let s = new X({})[2][2] as any;
     expect(s.a).toBe(10);
   });
 });
