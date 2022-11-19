@@ -1,10 +1,8 @@
 import {
-  DWORD,
   string_t,
   uint32_t,
+  uint64_t,
   char,
-  BYTE,
-  WORD,
   int16_t,
   double,
   StructBuffer,
@@ -13,12 +11,14 @@ import {
   pack,
   sview,
   sbytes2 as b2,
+  uint16_t,
+  uint8_t,
 } from "../src";
 
 describe("test decode and encode", () => {
   it("test decode and encode", () => {
     const struct = new StructBuffer({
-      hp: DWORD,
+      hp: uint32_t,
       mp: uint32_t,
       name: string_t[3],
     });
@@ -34,17 +34,26 @@ describe("test decode and encode", () => {
     expect(struct.byteLength).toBe(11);
   });
 
-  it("test dword encode", () => {
-    const view = DWORD[2].encode([1, 2]);
+  it("test uint32_t encode", () => {
+    const view = uint32_t[2].encode([1, 2]);
     expect(view.byteLength).toBe(8);
     expect(sview(view)).toBe(sview(pack("II", 1, 2)));
-  });
 
-  it("test dword decode", () => {
-    const data = DWORD[2].decode(pack("II", 1, 2));
+    const data = uint32_t[2].decode(view);
 
     expect(data.length).toBe(2);
     expect(data).toEqual([1, 2]);
+  });
+
+  it("test uint64_t encode", () => {
+    const view = uint64_t[2].encode([1n, 2n]);
+    expect(view.byteLength).toBe(16);
+    expect(sview(view)).toBe(sview(pack("QQ", 1, 2)));
+
+    const data = uint64_t[2].decode(view);
+
+    expect(data.length).toBe(2);
+    expect(data).toEqual([1n, 2n]);
   });
 });
 
@@ -182,16 +191,16 @@ describe("test struct nesting", () => {
   };
   beforeAll(() => {
     XINPUT_GAMEPAD = new StructBuffer({
-      wButtons: WORD,
-      bLeftTrigger: BYTE,
-      bRightTrigger: BYTE,
+      wButtons: uint16_t,
+      bLeftTrigger: uint8_t,
+      bRightTrigger: uint8_t,
       sThumbLX: int16_t,
       sThumbLY: int16_t,
       sThumbRX: int16_t,
       sThumbRY: int16_t,
     });
     XINPUT_STATE = new StructBuffer({
-      dwPacketNumber: DWORD,
+      dwPacketNumber: uint32_t,
       Gamepad: XINPUT_GAMEPAD,
     });
   });
@@ -213,7 +222,7 @@ describe("test struct nesting", () => {
 
 describe("test typedef", () => {
   it("test typedef", () => {
-    const HANDLE = typedef(DWORD);
+    const HANDLE = typedef(uint32_t);
     expect(HANDLE.size).toBe(4);
     expect(HANDLE.unsigned).toBe(true);
   });
@@ -250,12 +259,6 @@ describe("test struct list", () => {
   it("test byteLength", () => {
     expect(users.byteLength).toBe(8);
   });
-
-  it("test length", () => {
-    expect(user.length).toBe(0);
-    expect(user[2].length).toBe(2);
-    expect(user[2][4].length).toBe(4);
-  });
 });
 
 describe("test struct Multilevel array", () => {
@@ -276,8 +279,8 @@ describe("test struct Multilevel array", () => {
   };
   beforeAll(() => {
     player = new StructBuffer({
-      hp: DWORD,
-      mp: DWORD,
+      hp: uint32_t,
+      mp: uint32_t,
     });
 
     players = new StructBuffer({
@@ -298,10 +301,5 @@ describe("test struct Multilevel array", () => {
   it("test byteLength", () => {
     expect(player.byteLength).toBe(8);
     expect(players.byteLength).toBe(32);
-  });
-
-  it("test toCStruct", () => {
-    // console.log(s_player.toCStruct());
-    // console.log(s_players.toCStruct());
   });
 });

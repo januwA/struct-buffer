@@ -1,10 +1,9 @@
-import { DOUBLE_TYPE, FLOAT_TYPE, hData } from "./const";
+import { hData } from "./const";
 import {
   DataViewGet_t,
   DataViewSetExcludeBig_t,
   DecodeBuffer_t,
   IType,
-  Type,
 } from "./interfaces";
 
 /**
@@ -67,28 +66,6 @@ export function makeDataView(view: DecodeBuffer_t): DataView {
   if (!ArrayBuffer.isView(view))
     throw new Error(`Type Error: (${view}) is not an ArrayBuffer!!!`);
   return new DataView(view.buffer);
-}
-
-export function arrayProxy(
-  context: any,
-  cb: (target: any, index: number) => any
-) {
-  return new Proxy(context, {
-    get(t: any, k: string | number | symbol) {
-      if (k in t) return t[k];
-      if (/\d+/.test(k.toString())) return cb(t, parseInt(k as string));
-    },
-  });
-}
-
-export function arrayProxyNext(context: any, klass: Type<any>) {
-  return arrayProxy(context, (t, i) => {
-    const next = new klass();
-    Object.setPrototypeOf(next, context);
-    Object.assign(next, t);
-    next.deeps = [...(context.deeps ?? []), i];
-    return next;
-  });
 }
 
 /**
@@ -276,10 +253,4 @@ export function typeHandle<T extends IType>(
   if (!h) throw new Error(`StructBuffer: Unrecognized ${type} type.`);
 
   return [h, h.replace(/^g/, "s") as DataViewSetExcludeBig_t];
-}
-
-export class BufferLikeNext {
-  constructor() {
-    return arrayProxyNext(this, BufferLikeNext);
-  }
 }

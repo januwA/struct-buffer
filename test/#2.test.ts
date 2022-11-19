@@ -1,15 +1,15 @@
-import { StructBuffer, sview, WORD } from "../src";
+import { StructBuffer, sview, uint16_t } from "../src";
 
 // https://github.com/januwA/struct-buffer/issues/2
 
 describe("debug", () => {
   it("string_t", () => {
     const s = new StructBuffer({
-      a: WORD,
-      b: WORD,
+      a: uint16_t,
+      b: uint16_t,
       c: new StructBuffer({
-        ip: WORD,
-        port: WORD,
+        ip: uint16_t,
+        port: uint16_t,
       }),
     });
 

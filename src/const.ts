@@ -1,10 +1,7 @@
 import { DataViewGet_t } from "./interfaces";
 
-export const FLOAT_TYPE = "float";
-export const DOUBLE_TYPE = "double";
-
 export const hData: {
-  [size: number | string]:
+  readonly [size: number | string]:
     | {
         [unsigned: number]: DataViewGet_t;
       }

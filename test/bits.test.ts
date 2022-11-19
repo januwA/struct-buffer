@@ -1,4 +1,4 @@
-import { DWORD, bits, StructBuffer, WORD } from "../src";
+import { uint32_t, bits, StructBuffer, uint16_t } from "../src";
 
 describe("bits test", () => {
   it("decode and encode", () => {
@@ -6,7 +6,7 @@ describe("bits test", () => {
     const eflag_data = 0x00000246;
     const littleEndian = true;
 
-    const EFLAG = bits(DWORD, {
+    const EFLAG = bits(uint32_t, {
       CF: 0,
       PF: 2,
       AF: 4,
@@ -33,8 +33,8 @@ describe("bits test", () => {
 
   it("test struct", () => {
     const struct = new StructBuffer({
-      id: WORD,
-      eflag: bits(DWORD, {
+      id: uint16_t,
+      eflag: bits(uint32_t, {
         PF: 2,
         ZF: 6,
         TF: 8,

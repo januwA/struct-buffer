@@ -1,20 +1,27 @@
 import {
   DecodeBuffer_t,
-  IByteLength,
-  IDecode,
   IDecodeOptions,
-  IEncode,
   IEncodeOptions,
-  BufferLike_t,
+  IBufferLike,
 } from "./interfaces";
+import { TypeDeep } from "./type-deep";
 
 export class LittleEndianDecorator<D, E>
-  implements IByteLength, IDecode<D>, IEncode<E>
+  extends TypeDeep<IBufferLike<D[], E[]>>
+  implements IBufferLike<D, E>
 {
+  override next(i: number) {
+    const next = super.next(i);
+    (next as any).src = this.src[i];
+    return next;
+  }
+
   constructor(
-    private readonly src: BufferLike_t<D, E>,
+    private readonly src: IBufferLike<D, E>,
     private readonly littleEndian = true
-  ) {}
+  ) {
+    super();
+  }
 
   private optionsWithLittleEndian(options?: IEncodeOptions): IEncodeOptions {
     return Object.assign({}, options, {

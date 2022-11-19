@@ -36,21 +36,21 @@ const view = struct.encode({
 ```html
 <script src="struct-buffer.js"></script>
 <script>
-  const { DWORD, string_t, StructBuffer, uint32_t } = window.StructBuffer;
+  const { string_t, StructBuffer, uint32_t } = window.StructBuffer;
 </script>
 ```
 
 ## Use ["type"](https://github.com/januwA/struct-buffer/blob/main/src/types.ts) for conversion
 
 ```ts
-import { DWORD } from "struct-buffer";
+import { uint64_t } from "struct-buffer";
 
 // encode
-const view = DWORD[2].encode([1, 2]); 
+const view = uint64_t[2].encode([1, 2]); 
 // view => <00 00 00 01 00 00 00 02>
 
 // decode
-const data = DWORD[2].decode(view);
+const data = uint64_t[2].decode(view);
 // data => [ 1, 2 ]
 ```
 
@@ -79,7 +79,7 @@ const data = struct.decode(view);
 
 ## typedef
 ```ts
-const HANDLE = typedef(DWORD);
+const HANDLE = typedef(uint64_t);
 HANDLE.size // 4
 HANDLE.unsigned // true
 ```
@@ -106,9 +106,9 @@ typedef struct _XINPUT_GAMEPAD {
 */
 
 XINPUT_GAMEPAD = new StructBuffer({
-  wButtons: WORD,
-  bLeftTrigger: BYTE,
-  bRightTrigger: BYTE,
+  wButtons: uint16_t,
+  bLeftTrigger: uint8_t,
+  bRightTrigger: uint8_t,
   sThumbLX: int16_t,
   sThumbLY: int16_t,
   sThumbRX: int16_t,
@@ -116,7 +116,7 @@ XINPUT_GAMEPAD = new StructBuffer({
 });
 
 XINPUT_STATE = new StructBuffer({
-  dwPacketNumber: DWORD,
+  dwPacketNumber: uint32_t,
   Gamepad: XINPUT_GAMEPAD,
 });
 
@@ -183,11 +183,11 @@ string_t[4].decode(new Uint8Array([0x61, 0x62, 0x00, 0x64]); // ab
 
 ## bits
 ```ts
-import { DWORD, bits, StructBuffer } from "struct-buffer";
+import { uint32_t, bits, StructBuffer } from "struct-buffer";
 
 const EFLAG_DATA = 0x00000246;
 const littleEndian = true;
-const EFLAG = bits(DWORD, {
+const EFLAG = bits(uint32_t, {
   CF: 0,
   PF: 2,
   AF: 4,

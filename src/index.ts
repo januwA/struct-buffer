@@ -1,6 +1,7 @@
 export * from "./struct-buffer";
 export * from "./types";
-export { registerType, typedef, bits, bitFields, Inject } from "./class-type";
+export * from "./class-type";
+export * from "./helper";
 export {
   createDataView,
   makeDataView,
@@ -20,4 +21,3 @@ export {
   Struct,
 } from "./py-struct";
 
-export { LittleEndianDecorator } from "./helper";

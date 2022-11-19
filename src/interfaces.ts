@@ -3,10 +3,6 @@ export interface AnyObject {
   [index: number]: any;
 }
 
-export interface Type<T extends Object> extends Function {
-  new (...args: any[]): T;
-}
-
 export interface InjectNext {
   /**
    * how many bytes are consumed
@@ -24,7 +20,7 @@ export type Bit_t = 0 | 1;
 export type DecodeBuffer_t = ArrayBufferView | number[];
 
 export interface IByteLength {
-  get byteLength(): number;
+  byteLength: number;
 }
 
 export interface IDecodeOptions {
@@ -66,11 +62,15 @@ export type DataViewSet_t = Extract<keyof DataView, `set${string}`>;
 export type DataViewSetExcludeBig_t = Exclude<DataViewSet_t, `setBig${string}`>;
 export type DataViewSetBig_t = Extract<DataViewSet_t, `setBig${string}`>;
 
-export type BufferLike_t<D, E> = IByteLength & IDecode<D> & IEncode<E>;
+export interface IBufferLike<D, E>
+  extends ArrayLike<any>,
+    IByteLength,
+    IDecode<D>,
+    IEncode<E> {}
 
-export type StructBuffer_t = { [k: string]: BufferLike_t<any, any> };
+export type StructBuffer_t = { [k: string]: IBufferLike<any, any> };
 
-export type BitsType_t = { [k: string]: number };
+export type NumberMap_t = { [k: string]: number };
 
 export type HInjectDecode = (view: DataView, offset: number) => InjectNext;
 export type HInjectEncode = (value: any) => DecodeBuffer_t;

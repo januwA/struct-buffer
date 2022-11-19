@@ -1,13 +1,10 @@
-import { AbstractDeep } from "./abstract";
+import { TypeDeep } from "./type-deep";
 import {
   AnyObject,
   DecodeBuffer_t,
-  IDecode,
-  IEncode,
-  IByteLength,
   IDecodeOptions,
   IEncodeOptions,
-  BufferLike_t,
+  IBufferLike,
   StructBuffer_t,
 } from "./interfaces";
 import { createDataView, makeDataView, zeroMemory } from "./utils";
@@ -18,10 +15,10 @@ export class StructBuffer<
     },
     E = Partial<D>
   >
-  extends AbstractDeep<StructBuffer<D[], E[]>>
-  implements IByteLength, IDecode<D>, IEncode<E>
+  extends TypeDeep<StructBuffer<D[], E[]>>
+  implements IBufferLike<D, E>
 {
-  private readonly structKV: [string, BufferLike_t<any, any>][];
+  private readonly structKV: [string, IBufferLike<any, any>][];
 
   constructor(private readonly struct: StructBuffer_t) {
     super();
@@ -33,7 +30,7 @@ export class StructBuffer<
       (acc, type) => (acc += type.byteLength),
       0
     );
-    return typeByteLength * this.count;
+    return typeByteLength * this.length;
   }
 
   decode(view: DecodeBuffer_t, options?: IDecodeOptions): D {
@@ -42,7 +39,7 @@ export class StructBuffer<
 
     view = makeDataView(view);
     const result: AnyObject[] = [];
-    let i = this.count;
+    let i = this.length;
     while (i--) {
       const data = this.structKV.reduce<AnyObject>((acc, [key, type]) => {
         acc[key] = type.decode(view, { offset, littleEndian });
@@ -58,7 +55,7 @@ export class StructBuffer<
   encode(obj: E, options?: IEncodeOptions): DataView {
     const byteLength = this.byteLength,
       isList = this.isList,
-      count = this.count,
+      count = this.length,
       littleEndian = options?.littleEndian;
 
     let v = createDataView(byteLength, options?.view);
