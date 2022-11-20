@@ -1,11 +1,15 @@
-import { int32_t, padding_t, string_t, StructBuffer, uint8_t } from "../src";
 import {
+  int32_t,
+  padding_t,
+  string_t,
+  StructBuffer,
+  uint8_t,
   bits,
   BitsType,
   PaddingType,
   StringType,
   StructType,
-} from "../src/class-type";
+} from "../../src";
 
 describe("deeps test", () => {
   it("type", () => {

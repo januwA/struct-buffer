@@ -3,8 +3,8 @@ import {
   IDecodeOptions,
   IEncodeOptions,
   IBufferLike,
-} from "./interfaces";
-import { TypeDeep } from "./type-deep";
+} from "../interfaces";
+import { TypeDeep } from "../base/type-deep";
 
 export class LittleEndianDecorator<D, E>
   extends TypeDeep<IBufferLike<D[], E[]>>

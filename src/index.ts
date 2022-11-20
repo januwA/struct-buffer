@@ -1,7 +1,7 @@
 export * from "./struct-buffer";
 export * from "./types";
 export * from "./class-type";
-export * from "./helper";
+export * from "./decorator";
 export {
   createDataView,
   makeDataView,
@@ -20,4 +20,3 @@ export {
   calcsize,
   Struct,
 } from "./py-struct";
-

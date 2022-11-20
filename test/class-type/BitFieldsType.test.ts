@@ -5,7 +5,7 @@ import {
   uint8_t,
   sbytes as b,
   bitFields,
-} from "../src";
+} from "../../src";
 
 // https://github.com/januwA/struct-buffer/issues/3
 
@@ -49,11 +49,37 @@ describe("test bitFields", () => {
       b: 2,
       c: 3,
     });
-    expect(sview(v).toUpperCase()).toBe("1D");
+    expect(sview(v)).toBe("1d");
 
-    const data = bf.decode(b("1D"));
-    expect(data.a).toBe(1);
-    expect(data.b).toBe(2);
-    expect(data.c).toBe(3);
+    const data = bf.decode(v);
+    expect([data.a, data.b, data.c]).toEqual([1, 2, 3]);
+  });
+
+  it("test list", () => {
+    const bf = bitFields(uint8_t, {
+      a: 1,
+      b: 2,
+      c: 3,
+    })[2];
+
+    const v = bf.encode([
+      {
+        a: 1,
+        b: 2,
+        c: 3,
+      },
+      {
+        a: 1,
+        b: 2,
+        c: 3,
+      },
+    ]);
+    expect(sview(v)).toBe("1d 1d");
+
+    const data = bf.decode(v);
+
+    expect(data.length).toBe(2);
+    expect([data[0].a, data[0].b, data[0].c]).toEqual([1, 2, 3]);
+    expect([data[1].a, data[1].b, data[1].c]).toEqual([1, 2, 3]);
   });
 });

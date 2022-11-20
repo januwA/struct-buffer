@@ -11,24 +11,16 @@ export class BoolType<
 
   override decode(view: DecodeBuffer_t, options?: IDecodeOptions): D {
     let r = super.decode(view, options) as any;
-    if (Array.isArray(r)) {
-      r = r.flat().map((it) => Boolean(it));
-      r = this.unflattenDeep(r);
-    } else {
-      r = Boolean(r);
-    }
-    return r;
+    return this.resultEach(r, (it) => {
+      return Boolean(it);
+    }) as any;
   }
 
   /**
    * 将obj转换为0或1来储存
    */
   override encode(obj: E, options?: IEncodeOptions): DataView {
-    if (obj && Array.isArray(obj)) {
-      obj = obj.flat().map((it) => Number(Boolean(it))) as any;
-    } else if (obj) {
-      obj = Number(Boolean(obj)) as any;
-    }
-    return super.encode(obj, options);
+    const convertObj = this.each(obj, (it) => Number(Boolean(it))) as number[];
+    return super.encode(convertObj as any, options);
   }
 }

@@ -6,7 +6,14 @@ import {
   sbytes2 as b2,
   sview,
   TEXT,
+  realloc,
+  uint8_t,
+  uint64_t,
+  float,
+  double,
 } from "../src";
+
+import { zeroMemory, typeHandle } from "../src/utils";
 
 describe("utils test", () => {
   it("createDataView", () => {
@@ -14,6 +21,7 @@ describe("utils test", () => {
   });
 
   it("makeDataView", () => {
+    expect(sview(makeDataView(pack("3B", 1, 2, 3)))).toBe("01 02 03");
     expect(sview(makeDataView([1, 2, 3]))).toBe("01 02 03");
     expect(sview(makeDataView(Uint8Array.from([1, 2, 3])))).toBe("01 02 03");
   });
@@ -37,5 +45,35 @@ describe("utils test", () => {
       })
     ).toBe("abc 01 02xyz 00 00 00 08 00 00 00 09");
     expect(TEXT(view, "^")).toBe("abc^^xyz^^^^^^^^");
+  });
+
+  it("zeroMemory", () => {
+    const v: DataView = pack("4B", 1, 2, 3, 4);
+    zeroMemory(v, 4, 0);
+
+    expect(sview(v)).toBe("00 00 00 00");
+  });
+
+  it("realloc", () => {
+    // copy
+    let mem = pack("3B", 1, 2, 3);
+    const newMemSize = 6;
+    let newMem = realloc(mem, newMemSize);
+    expect(sview(newMem)).toBe("01 02 03 00 00 00");
+    expect(mem !== newMem).toBe(true);
+
+    // copy and push
+    const pushMem = pack("3B", 3, 2, 1);
+    const pushOffset = 3;
+    newMem = realloc(mem, newMemSize, pushMem, pushOffset);
+    expect(sview(newMem)).toBe("01 02 03 03 02 01");
+    expect(mem !== newMem).toBe(true);
+  });
+
+  it("typeHandle", () => {
+    expect(typeHandle(uint8_t)).toEqual(["getUint8", "setUint8"]);
+    expect(typeHandle(uint64_t)).toEqual(["getBigUint64", "setBigUint64"]);
+    expect(typeHandle(float)).toEqual(["getFloat32", "setFloat32"]);
+    expect(typeHandle(double)).toEqual(["getFloat64", "setFloat64"]);
   });
 });

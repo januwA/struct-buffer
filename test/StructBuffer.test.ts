@@ -2,11 +2,9 @@ import {
   string_t,
   uint32_t,
   uint64_t,
-  char,
   int16_t,
   double,
   StructBuffer,
-  uchar,
   typedef,
   pack,
   sview,
@@ -57,63 +55,6 @@ describe("test decode and encode", () => {
   });
 });
 
-describe("test string_t", () => {
-  it("test decode and encode", () => {
-    let struct = new StructBuffer({
-      a: string_t,
-      b: string_t,
-      c: string_t[2],
-    });
-    const obj = {
-      a: "a",
-      b: "b",
-      c: "cd",
-    };
-    const view = b2("abcd");
-    expect(struct.decode(view)).toEqual(obj);
-    expect(sview(struct.encode(obj))).toBe(sview(view));
-    expect(struct.byteLength).toBe(4);
-  });
-
-  it("test names", () => {
-    const obj = ["abcd", "abce", "abcf"] as any;
-    const view = string_t[3][4].encode(obj);
-    const names = string_t[3][4].decode(view);
-    expect(names).toEqual(obj);
-  });
-});
-
-describe("test char", () => {
-  it("test decode and encode", () => {
-    const view = b2("abcd");
-    const obj = {
-      a: 0x61,
-      b: [0x62],
-      c: [0x63, 0x64],
-    };
-    let struct = new StructBuffer({
-      a: char,
-      b: char[1],
-      c: char[2],
-    });
-    expect(struct.decode(view)).toEqual(obj);
-    expect(sview(struct.encode(obj))).toBe(sview(view));
-    expect(struct.byteLength).toBe(4);
-  });
-
-  it("test char and uchar", () => {
-    const s = new StructBuffer({
-      a: char,
-      b: uchar,
-    });
-    const data = s.decode(pack("bb", -1, -1));
-    expect(data).toEqual({
-      a: -1,
-      b: 255,
-    });
-  });
-});
-
 describe("test pos", () => {
   let view: DataView;
   let struct: StructBuffer<any>;
@@ -152,7 +93,7 @@ describe("test pos", () => {
   });
 
   it("test byteLength", () => {
-    expect(struct.byteLength).toBe(2 * 8 * 4);
+    expect(struct.byteLength).toBe(8 * 4 * 2);
   });
 });
 

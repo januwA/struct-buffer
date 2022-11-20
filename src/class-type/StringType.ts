@@ -53,20 +53,17 @@ export class StringType extends StructType<string, string> {
 
     if (Array.isArray(obj)) (obj as any) = obj.flat().join("");
 
-    let offset = options?.offset ?? 0;
+    let offset = options?.offset ?? 0,
+      littleEndian = options?.littleEndian;
 
     const bytes: Uint8Array = this.textEncoder.encode(obj);
 
     for (let i = 0; i < this.length; i++) {
       const it = bytes[i] ?? 0;
       try {
-        v[this.set](offset, it, options?.littleEndian);
-      } catch (error) {
-        v[this.set as DataViewSetBig_t](
-          offset,
-          BigInt(it),
-          options?.littleEndian
-        );
+        v[this.set](offset, it, littleEndian);
+      } catch (_) {
+        v[this.set as DataViewSetBig_t](offset, BigInt(it), littleEndian);
       }
       offset += this.size;
     }

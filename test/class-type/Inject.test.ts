@@ -1,4 +1,4 @@
-import { StructBuffer, Inject, float, realloc } from "../src";
+import { StructBuffer, Inject, float, realloc } from "../../src";
 
 describe("Inject test", () => {
   let c_str: Inject;

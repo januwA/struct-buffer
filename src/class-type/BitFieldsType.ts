@@ -67,21 +67,13 @@ export class BitFieldsType<
       return val;
     };
 
-    const result: NumberMap_t = {};
-
-    const handle = (num: number) => {
-      Object.entries(this.bitFields).forEach(([k, len]) => {
-        result[k] = _getValue(num, len);
-      });
-    };
-
-    if (this.isList && Array.isArray(data)) {
-      return data.map((it) => {
-        return handle(it), result;
-      }) as any;
-    } else {
-      return handle(data as number), result as any;
-    }
+    return this.resultEach(data, (num: number) => {
+      i = 0;
+      return Object.entries(this.bitFields).reduce((acc, [k, len]) => {
+        acc[k] = _getValue(num, len);
+        return acc;
+      }, {} as NumberMap_t);
+    }) as any;
   }
 
   override encode(obj: E, options?: IEncodeOptions): DataView {
@@ -102,14 +94,11 @@ export class BitFieldsType<
 
     let offset = options?.offset ?? 0;
 
-    if (this.isList && Array.isArray(obj)) {
-      for (let i = 0; i < this.length; i++) {
-        v[this.set](offset, _getValue(obj[i]), options?.littleEndian);
-        offset += this.size;
-      }
-    } else {
-      v[this.set](offset, _getValue(obj), options?.littleEndian);
-    }
+    this.each(obj, (it) => {
+      v[this.set](offset, _getValue(it), options?.littleEndian);
+      offset += this.size;
+    });
+
     return v;
   }
 }

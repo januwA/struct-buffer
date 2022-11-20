@@ -214,6 +214,14 @@ export function TEXT(
   return str;
 }
 
+/**
+ * 
+ * @param mem src memory
+ * @param size new memory size
+ * @param pushMem this will push to new memory
+ * @param pushOffset this parameter is required if pushMem is set
+ * @returns new memory
+ */
 export function realloc(
   mem: DecodeBuffer_t,
   size: number,

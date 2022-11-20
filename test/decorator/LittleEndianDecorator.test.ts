@@ -1,4 +1,9 @@
-import { StructBuffer, uint16_t, sview, LittleEndianDecorator } from "../src";
+import {
+  StructBuffer,
+  uint16_t,
+  sview,
+  LittleEndianDecorator,
+} from "../../src";
 
 describe("LittleEndianDecorator", () => {
   it("struct", () => {

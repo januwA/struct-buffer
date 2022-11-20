@@ -1,7 +1,7 @@
 // https://docs.python.org/zh-cn/3/library/struct.html#byte-order-size-and-alignment
 
-import { StructType, PaddingType, StringType } from "./class-type";
-import { DecodeBuffer_t } from "./interfaces";
+import { PaddingType, StringType } from "./class-type";
+import { DecodeBuffer_t, IBufferLike } from "./interfaces";
 import {
   bool,
   string_t,
@@ -26,9 +26,9 @@ const SECTION_ORDER: ReadonlyArray<string> = [">", "<", "!"];
 
 const LEN_EXP = /^(\d+)(?=\w|\?)/i;
 
-function _getTypes(format: string): StructType<any, any>[] {
+function _getTypes(format: string): IBufferLike<any, any>[] {
   let m;
-  const types: StructType<any, any>[] = [];
+  const types: IBufferLike<any, any>[] = [];
   while (format.length) {
     m = format.match(LEN_EXP);
     let len = 1;
@@ -89,9 +89,9 @@ function _getTypes(format: string): StructType<any, any>[] {
         types.push(string_t[len]);
         break;
       default:
-        throw new Error(`没有(${format[0]})格式!`);
+        throw new Error(`no (${format[0]}) format!`);
     }
-    format = format.substr(1);
+    format = format.substring(1);
   }
   return types;
 }
@@ -104,7 +104,8 @@ function _getLittleEndian(str: string) {
     case "<":
       return true;
     default:
-      throw new Error("错误的字节序");
+      // 错误的字节序
+      throw new Error("wrong byte order");
   }
 }
 
@@ -162,14 +163,16 @@ export function pack_into(
     const type = types.shift();
     if (!type) break;
 
+    const opt = { littleEndian, offset, view };
+
     if (type instanceof PaddingType) {
-      type.encode(0 as any, { littleEndian, offset, view });
+      type.encode(0 as any, opt);
     } else if (type instanceof StringType) {
-      type.encode(args.shift() as any, { littleEndian, offset, view });
+      type.encode(args.shift() as any, opt);
     } else {
-      const obj = [];
+      const obj: any[] = [];
       for (let i = 0; i < type.length; i++) obj.push(args.shift());
-      type.encode(obj as any, { littleEndian, offset, view });
+      type.encode(obj, opt);
     }
 
     offset += type.byteLength;

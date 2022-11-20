@@ -8,7 +8,7 @@ import {
   DataViewGet_t,
   DataViewSetExcludeBig_t,
 } from "../interfaces";
-import { TypeDeep } from "../type-deep";
+import { TypeDeep } from "../base/type-deep";
 import { createDataView, makeDataView, typeHandle } from "../utils";
 
 abstract class AbstractType<T> extends TypeDeep<T> implements IType {
@@ -47,9 +47,9 @@ export class StructType<D, E>
   /**
    *
    * ```ts
-   * DWORD.decode( new Uint8Array([0,0,0,1]) ) => 1
+   * uint32_t.decode( new Uint8Array([0,0,0,1]) ) => 1
    *
-   * DWORD[2].decode( new Uint8Array([0,0,0,1, 0,0,0,2]) ) => [1, 2]
+   * uint32_t[2].decode( new Uint8Array([0,0,0,1, 0,0,0,2]) ) => [1, 2]
    * ```
    */
   decode(view: DecodeBuffer_t, options?: IDecodeOptions): D {
@@ -67,24 +67,22 @@ export class StructType<D, E>
   /**
    *
    * ```ts
-   * DWORD.encode(4)         => <00 00 00 02>
+   * uint32_t.encode(4)         => <00 00 00 02>
    *
-   * DWORD[2].encode([1,2])  => <00 00 00 01 00 00 00 02>
+   * uint32_t[2].encode([1,2])  => <00 00 00 01 00 00 00 02>
    *
    * // padding zero
-   * DWORD[2].encode([1])    => <00 00 00 01 00 00 00 00>
+   * uint32_t[2].encode([1])    => <00 00 00 01 00 00 00 00>
    * ```
    */
   encode(obj: E, options?: IEncodeOptions): DataView {
     const v = createDataView(this.length * this.size, options?.view);
 
-    if (this.isList && Array.isArray(obj)) (obj as any) = obj.flat();
-
     let offset = options?.offset ?? 0,
       littleEndian = options?.littleEndian;
 
-    for (let i = 0; i < this.length; i++) {
-      const it: number = (this.isList ? (obj as any)[i] : obj) ?? 0;
+    this.each(obj, (it: number) => {
+      if (!it) it = 0;
 
       try {
         v[this.set](offset, it, littleEndian);
@@ -93,7 +91,7 @@ export class StructType<D, E>
         v[this.set as DataViewSetBig_t](offset, BigInt(it), littleEndian);
       }
       offset += this.size;
-    }
+    });
 
     return v;
   }

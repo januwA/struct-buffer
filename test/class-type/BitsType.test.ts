@@ -1,10 +1,10 @@
-import { uint32_t, bits, StructBuffer, uint16_t } from "../src";
+import { uint32_t, bits, StructBuffer, uint16_t } from "../../src";
 
 describe("bits test", () => {
   it("decode and encode", () => {
     // zf,pf,if
     const eflag_data = 0x00000246;
-    const littleEndian = true;
+    const opt = { littleEndian: true };
 
     const EFLAG = bits(uint32_t, {
       CF: 0,
@@ -17,7 +17,7 @@ describe("bits test", () => {
       DF: 10,
       OF: 11,
     });
-    const data = EFLAG.decode(new Uint32Array([eflag_data]), { littleEndian });
+    const data = EFLAG.decode(new Uint32Array([eflag_data]), opt);
     expect([data.ZF, data.PF, data.IF]).toEqual([1, 1, 1]);
 
     const view = EFLAG.encode(
@@ -26,7 +26,7 @@ describe("bits test", () => {
         ZF: 1,
         IF: 1,
       },
-      { littleEndian }
+      opt
     );
     expect(view.getUint8(0)).toBe(0x44);
   });

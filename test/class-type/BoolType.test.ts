@@ -1,4 +1,4 @@
-import { bool, BoolType, pack, sview, uint64_t } from "../src";
+import { bool, BoolType, pack, sview, uint64_t } from "../../src";
 
 describe("BoolType test", () => {
   const bool64 = new BoolType(uint64_t)[3];
@@ -19,11 +19,11 @@ describe("BoolType test", () => {
   });
 
   it("decode", () => {
-    expect(bool.decode(pack("B", 2))).toBe(true);
-    expect(bool.decode(pack("B", 0))).toBe(false);
+    expect(bool.decode([2])).toBe(true);
+    expect(bool.decode([0])).toBe(false);
 
-    expect(bool[2].decode(pack("2B", 2, 0))).toEqual([true, false]);
-    expect(bool[2].decode(pack("2B", 0, 2))).toEqual([false, true]);
+    expect(bool[2].decode([2, 0])).toEqual([true, false]);
+    expect(bool[2].decode([0, 2])).toEqual([false, true]);
 
     expect(bool64.decode(pack("3Q", 0n, 1n, 2n))).toEqual([false, true, true]);
   });
@@ -32,5 +32,17 @@ describe("BoolType test", () => {
     expect(bool64.byteLength).toBe(24);
     expect(bool.byteLength).toBe(1);
     expect(bool[2].byteLength).toBe(2);
+  });
+
+  it("list", () => {
+    const t = bool[2][3];
+
+    const v = t.encode([0, 1, 1, 1, 1, 0] as any);
+    const data = t.decode(v);
+
+    expect(data).toEqual([
+      [false, true, true],
+      [true, true, false],
+    ]);
   });
 });

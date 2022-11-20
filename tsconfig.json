@@ -75,8 +75,8 @@
     // "noImplicitThis": true,                           /* Enable error reporting when `this` is given the type `any`. */
     // "useUnknownInCatchVariables": true,               /* Type catch clause variables as 'unknown' instead of 'any'. */
     // "alwaysStrict": true,                             /* Ensure 'use strict' is always emitted. */
-    "noUnusedLocals": true, /* 报告未使用的本地错误。 */
-    "noUnusedParameters": true, /* 报告未使用参数的错误。 */
+    "noUnusedLocals": false, /* 报告未使用的本地错误。 */
+    "noUnusedParameters": false, /* 报告未使用参数的错误。 */
     // "exactOptionalPropertyTypes": true,               /* Interpret optional property types as written, rather than adding 'undefined'. */
     "noImplicitReturns": false, /* 当函数中的所有代码路径均未返回值时，报告错误。 */
     "noFallthroughCasesInSwitch": false, /* 在switch语句中报告失败案例的错误. */

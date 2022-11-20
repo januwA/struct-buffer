@@ -1,5 +1,5 @@
 import { DecodeBuffer_t, IDecodeOptions, IEncodeOptions } from "../interfaces";
-import { createDataView, makeDataView } from "../utils";
+import { createDataView } from "../utils";
 import { StructType } from "./StructType";
 
 export class PaddingType extends StructType<number, number> {
@@ -14,16 +14,7 @@ export class PaddingType extends StructType<number, number> {
    * ```
 s   */
   override decode(view: DecodeBuffer_t, options?: IDecodeOptions) {
-    const v = (view = makeDataView(view));
-    let offset = options?.offset ?? 0;
-
-    let i = this.byteLength;
-    const r: (number | bigint)[] = [];
-    while (i--) {
-      r.push(v[this.get](offset, options?.littleEndian));
-      offset++;
-    }
-    return r as any;
+    return super.decode(view, options) as any;
   }
 
   /**

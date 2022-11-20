@@ -1,4 +1,4 @@
-import { TypeDeep } from "./type-deep";
+import { TypeDeep } from "./base/type-deep";
 import {
   AnyObject,
   DecodeBuffer_t,

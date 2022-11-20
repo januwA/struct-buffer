@@ -1,8 +1,10 @@
 const path = require("path");
+const { Configuration } = require("webpack");
 
 // umd build
 
-module.exports = {
+/** @type Configuration */
+const config = {
   mode: "production",
   entry: path.resolve(__dirname, "src/index.ts"),
   output: {
@@ -34,3 +36,5 @@ module.exports = {
   },
   experiments: { topLevelAwait: true },
 };
+
+module.exports = config;

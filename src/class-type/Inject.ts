@@ -1,5 +1,4 @@
 import {
-  AnyObject,
   DecodeBuffer_t,
   IDecodeOptions,
   IEncodeOptions,
@@ -32,17 +31,15 @@ export class Inject extends StructType<any, any> {
 
     let offset = options?.offset ?? 0;
 
-    const result: AnyObject[] = [];
+    const result: any[] = [];
     let i = this.length;
     while (i--) {
       const res = this.hInjectDecode(view as DataView, offset);
-
       result.push(res.value);
       offset += res.size;
       this.size += res.size;
     }
-
-    return this.unflattenDeep(result, false);
+    return this.unflattenDeep(result);
   }
 
   override encode(obj: any, options?: IEncodeOptions): DataView {
@@ -52,15 +49,12 @@ export class Inject extends StructType<any, any> {
     let offset = options?.offset ?? 0;
 
     this.size = 0;
-    for (let i = 0; i < this.length; i++) {
-      const it = this.isList ? (obj as any)[i] : obj;
-      const buf = makeDataView(this.hInjectEncode(it));
-
+    this.each(obj, (it) => {
+      const buf = makeDataView(this.hInjectEncode!(it));
       view = realloc(view!, view!.byteLength + buf.byteLength, buf, offset);
       offset += buf.byteLength;
       this.size += buf.byteLength;
-    }
-
+    });
     return view;
   }
 }
