@@ -76,7 +76,7 @@ export class StructType<D, E>
    * ```
    */
   encode(obj: E, options?: IEncodeOptions): DataView {
-    const v = createDataView(this.length * this.size, options?.view);
+    const v = createDataView(this.byteLength, options?.view);
 
     let offset = options?.offset ?? 0,
       littleEndian = options?.littleEndian;

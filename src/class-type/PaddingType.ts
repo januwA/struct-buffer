@@ -25,7 +25,7 @@ s   */
    * ```
    */
   override encode(zero: number = 0, options?: IEncodeOptions): DataView {
-    const v = createDataView(this.length * this.size, options?.view);
+    const v = createDataView(this.byteLength, options?.view);
     let offset = options?.offset ?? 0;
 
     if (typeof zero !== "number") zero = 0;

@@ -77,7 +77,7 @@ export class BitFieldsType<
   }
 
   override encode(obj: E, options?: IEncodeOptions): DataView {
-    const v = createDataView(this.length * this.size, options?.view);
+    const v = createDataView(this.byteLength, options?.view);
 
     const _getValue = (obj: any): number => {
       let val = 0;

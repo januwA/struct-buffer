@@ -1,10 +1,10 @@
+import { TypeDeep } from "../base/type-deep";
 import {
   DecodeBuffer_t,
   IDecodeOptions,
   IEncodeOptions,
   IBufferLike,
 } from "../interfaces";
-import { TypeDeep } from "../base/type-deep";
 
 export class LittleEndianDecorator<D, E>
   extends TypeDeep<IBufferLike<D[], E[]>>
@@ -17,7 +17,7 @@ export class LittleEndianDecorator<D, E>
   }
 
   constructor(
-    private readonly src: IBufferLike<D, E>,
+    protected readonly src: IBufferLike<D, E>,
     private readonly littleEndian = true
   ) {
     super();

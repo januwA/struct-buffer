@@ -49,7 +49,7 @@ export class StringType extends StructType<string, string> {
    * ```
    */
   override encode(obj: string, options?: IEncodeOptions): DataView {
-    const v = createDataView(this.length * this.size, options?.view);
+    const v = createDataView(this.byteLength, options?.view);
 
     if (Array.isArray(obj)) (obj as any) = obj.flat().join("");
 
