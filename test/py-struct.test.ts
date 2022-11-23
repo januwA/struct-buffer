@@ -93,7 +93,7 @@ describe("Struct test", () => {
   });
 
   it("iter_unpack", () => {
-    const r = strct.iter_unpack(pack("4i", 1, 2, 3, 4));
+    const r = strct.iter_unpack(pack("5i", 1, 2, 3, 4, 5));
     expect(r.next().value).toEqual([1, 2]);
     expect(r.next().value).toEqual([3, 4]);
     expect(r.next().done).toBe(true);

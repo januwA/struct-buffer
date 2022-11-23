@@ -72,5 +72,5 @@ export type StructBuffer_t = { [k: string]: IBufferLike<any, any> };
 
 export type NumberMap_t = { [k: string]: number };
 
-export type HInjectDecode = (view: DataView, offset: number) => InjectNext;
-export type HInjectEncode = (value: any) => DecodeBuffer_t;
+export type InjectDecode_t = (view: DataView, offset: number) => InjectNext;
+export type InjectEncode_t = (value: any) => DecodeBuffer_t;

@@ -8,15 +8,16 @@ describe("Inject test", () => {
       // decode
       (view: DataView, offset: number) => {
         const buf: number[] = [];
-        let size = offset + 0;
+        let readOffset = offset + 0,
+          data = 0;
+
         while (true) {
-          let data = view.getUint8(size++);
-          if (data === 0) break;
+          if ((data = view.getUint8(readOffset++)) === 0) break;
           buf.push(data);
         }
 
         return {
-          size: size - offset,
+          size: readOffset - offset,
           value: new TextDecoder().decode(new Uint8Array(buf)),
         };
       },
@@ -41,39 +42,35 @@ describe("Inject test", () => {
       mp: float,
     });
 
-    expect(player.byteLength).toBe(8);
+    expect(player.byteLength).toBe(float.byteLength * 2);
 
-    // <42 c8 00 00 50 6c 61 79 65 72 31 42 c8 00 00>
-    const view = player.encode({
+    const data = {
       hp: 100.0,
       name: "Player1",
       mp: 100.0,
-    });
-
+    };
+    // <42 c8 00 00 50 6c 61 79 65 72 31 42 c8 00 00>
+    const view = player.encode(data);
     const obj = player.decode(view);
 
-    expect(obj.hp).toBe(100);
-    expect(obj.name).toBe("Player1");
-    expect(obj.mp).toBe(100);
-    expect(player.byteLength).not.toBe(8);
+    expect(obj).toEqual(data);
+    expect(player.byteLength).not.toBe(float.byteLength * 2);
   });
 
   it("single Inject", () => {
     const view = c_str.encode("hello world");
     expect(view.getUint8(view.byteLength - 1)).toBe(0);
 
-    const data = c_str.decode(view);
-    expect(data).toBe("hello world");
+    const str = c_str.decode(view);
+    expect(str).toBe("hello world");
   });
 
   it("array Inject", () => {
     const c_str_list = c_str[3];
+    const data = ["a ", "bb", "c"];
 
-    const view = c_str_list.encode(["a ", "bb", "c"]);
-    const data = c_str_list.decode(view);
-    expect(data.length).toBe(3);
-    expect(data[0]).toBe("a ");
-    expect(data[1]).toBe("bb");
-    expect(data[2]).toBe("c");
+    const view = c_str_list.encode(data);
+    const obj = c_str_list.decode(view);
+    expect(obj).toEqual(data);
   });
 });

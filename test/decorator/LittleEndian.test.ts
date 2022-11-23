@@ -1,11 +1,6 @@
-import {
-  StructBuffer,
-  uint16_t,
-  sview,
-  LittleEndianDecorator,
-} from "../../src";
+import { StructBuffer, uint16_t, sview, LittleEndian } from "../../src";
 
-describe("LittleEndianDecorator", () => {
+describe("LittleEndian", () => {
   it("struct", () => {
     const s = new StructBuffer({
       a: uint16_t,
@@ -14,7 +9,7 @@ describe("LittleEndianDecorator", () => {
       //   d: uint16_t,
       // }),
 
-      b: new LittleEndianDecorator(
+      b: new LittleEndian(
         new StructBuffer({
           c: uint16_t,
           d: uint16_t,
@@ -46,7 +41,7 @@ describe("LittleEndianDecorator", () => {
       a: uint16_t,
       // b: uint16_t[2],
       // b: new LittleEndianDecorator(uint16_t[2], true),
-      b: new LittleEndianDecorator(uint16_t, true)[2],
+      b: new LittleEndian(uint16_t, true)[2],
     });
 
     const view = s.encode(
@@ -64,7 +59,7 @@ describe("LittleEndianDecorator", () => {
   it("type 2", () => {
     const s = new StructBuffer({
       a: uint16_t,
-      b: new LittleEndianDecorator(uint16_t, false)[2],
+      b: new LittleEndian(uint16_t, false)[2],
     });
 
     const opt = {
@@ -79,7 +74,7 @@ describe("LittleEndianDecorator", () => {
   });
 
   it("array", () => {
-    const any_t = new LittleEndianDecorator(uint16_t, true);
+    const any_t = new LittleEndian(uint16_t, true);
     const view = any_t[2].encode([1, 2]);
     expect(sview(view)).toBe("01 00 02 00");
   });

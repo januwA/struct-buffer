@@ -2,34 +2,31 @@ import {
   StructBuffer,
   uint16_t,
   sview,
-  RelativeOffsetDecorator,
+  RelativeOffset,
   uint8_t,
 } from "../../src";
 
-describe("RelativeOffsetDecorator", () => {
+describe("RelativeOffset", () => {
   it("byteLength", () => {
     let t: any;
 
-    t = new RelativeOffsetDecorator(uint16_t, 2);
+    t = new RelativeOffset(uint16_t, 2);
     expect(t.byteLength).toBe(uint16_t.byteLength + 2);
 
-    t = new RelativeOffsetDecorator(uint16_t[2], 2);
+    t = new RelativeOffset(uint16_t[2], 2);
     expect(t.byteLength).toBe(uint16_t[2].byteLength + 2);
 
-    t = new RelativeOffsetDecorator(uint16_t, 2)[2];
+    t = new RelativeOffset(uint16_t, 2)[2];
     expect(t.byteLength).toBe((uint16_t.byteLength + 2) * 2);
 
-    t = new RelativeOffsetDecorator(
-      new RelativeOffsetDecorator(uint16_t, 2),
-      2
-    )[3];
+    t = new RelativeOffset(new RelativeOffset(uint16_t, 2), 2)[3];
     expect(t.byteLength).toBe((uint16_t.byteLength + 2 + 2) * 3);
   });
 
   it("struct", () => {
     const s = new StructBuffer({
       a: uint16_t,
-      b: new RelativeOffsetDecorator(
+      b: new RelativeOffset(
         new StructBuffer({
           c: uint16_t,
           d: uint16_t,
@@ -54,8 +51,8 @@ describe("RelativeOffsetDecorator", () => {
   it("type", () => {
     const s = new StructBuffer({
       a: uint16_t,
-      b: new RelativeOffsetDecorator(uint16_t[2], 2),
-      c: new RelativeOffsetDecorator(uint16_t, 2)[2],
+      b: new RelativeOffset(uint16_t[2], 2),
+      c: new RelativeOffset(uint16_t, 2)[2],
     });
 
     expect(s.byteLength).toBe(
@@ -79,7 +76,7 @@ describe("RelativeOffsetDecorator", () => {
   });
 
   it("array", () => {
-    const any_t = new RelativeOffsetDecorator(uint8_t, 1)[2][3];
+    const any_t = new RelativeOffset(uint8_t, 1)[2][3];
     const data = [
       [1, 2, 3],
       [4, 5, 6],

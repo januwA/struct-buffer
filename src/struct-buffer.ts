@@ -26,58 +26,52 @@ export class StructBuffer<
   }
 
   get byteLength(): number {
-    const typeByteLength = Object.values(this.struct).reduce(
+    // 每次获取 byteLength 都需要重新计算，因为 AbstractType.size 是可变的
+    const _byteLength = Object.values(this.struct).reduce(
       (acc, type) => (acc += type.byteLength),
       0
     );
-    return typeByteLength * this.length;
+    return _byteLength * this.length;
   }
 
   decode(view: DecodeBuffer_t, options?: IDecodeOptions): D {
-    const littleEndian = options?.littleEndian;
+    const littleEndian = options?.littleEndian,
+      _view = makeDataView(view);
+
     let offset = options?.offset ?? 0;
 
-    view = makeDataView(view);
-    const result: AnyObject[] = [];
-    let i = this.length;
-    while (i--) {
-      const data = this.structKV.reduce<AnyObject>((acc, [key, type]) => {
-        acc[key] = type.decode(view, { offset, littleEndian });
+    return this.resultEach([], () => {
+      const res = this.structKV.reduce<AnyObject>((acc, [key, type]) => {
+        acc[key] = type.decode(_view, { offset, littleEndian });
         offset += type.byteLength;
         return acc;
       }, {});
-      result.push(data);
-    }
 
-    return this.unflattenDeep(result);
+      return res;
+    });
   }
 
   encode(obj: E, options?: IEncodeOptions): DataView {
     const byteLength = this.byteLength,
-      isList = this.isList,
       count = this.length,
       littleEndian = options?.littleEndian;
 
-    let v = createDataView(byteLength, options?.view);
-    if (isList && Array.isArray(obj)) (obj as any) = obj.flat();
+    let view = createDataView(byteLength, options?.view),
+      offset = options?.offset ?? 0;
 
-    let offset = options?.offset ?? 0;
-
-    for (let i = 0; i < count; i++) {
-      const it: any = isList ? (obj as any)[i] : obj;
+    this.each(obj, (it: any) => {
       if (it === undefined) {
         const itemSize = byteLength / count;
-        zeroMemory(v, itemSize, offset);
+        zeroMemory(view, itemSize, offset);
         offset += itemSize;
-        continue;
+      } else {
+        this.structKV.forEach(([key, type]) => {
+          view = type.encode(it[key], { offset, littleEndian, view });
+          offset += type.byteLength;
+        });
       }
-      v = this.structKV.reduce<DataView>((view: DataView, [key, type]) => {
-        view = type.encode(it[key], { offset, littleEndian, view });
-        offset += type.byteLength;
-        return view;
-      }, v);
-    }
+    });
 
-    return v;
+    return view;
   }
 }

@@ -242,23 +242,21 @@ export function unpack_from(
  * r.next().value // [3, 4]
  * ```
  */
-export function iter_unpack(
-  format: string,
-  buffer: number[] | ArrayBufferView
-) {
-  const size = calcsize(format);
-  let offset = 0;
+export function iter_unpack(format: string, buffer: DecodeBuffer_t) {
+  const size = calcsize(format),
+    view = makeDataView(buffer);
+  let offset = 0,
+    isDone = false;
+
   return {
     next() {
-      try {
-        return {
-          value: unpack(format, buffer, offset),
-          done: !(offset += size),
-        };
-      } catch (error) {
-        // overflow
-        return { value: null, done: true };
-      }
+      isDone = offset + size > view.byteLength;
+      return isDone
+        ? { value: null, done: isDone }
+        : {
+            value: unpack(format, view, offset),
+            done: ((offset += size), isDone),
+          };
     },
     [Symbol.iterator]() {
       return this;

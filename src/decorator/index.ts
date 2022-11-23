@@ -1,2 +1,2 @@
-export * from "./LittleEndianDecorator";
-export * from "./RelativeOffsetDecorator";
+export * from "./LittleEndian";
+export * from "./RelativeOffset";

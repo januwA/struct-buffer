@@ -2,8 +2,8 @@ import {
   DecodeBuffer_t,
   IDecodeOptions,
   IEncodeOptions,
-  HInjectDecode,
-  HInjectEncode,
+  InjectDecode_t,
+  InjectEncode_t,
 } from "../interfaces";
 import { createDataView, makeDataView, realloc } from "../utils";
 import { StructType } from "./StructType";
@@ -13,44 +13,37 @@ export class Inject extends StructType<any, any> {
    * Customize the working content of decode and encode
    */
   constructor(
-    private readonly hInjectDecode?: HInjectDecode,
-    private readonly hInjectEncode?: HInjectEncode
+    private readonly injectDecode?: InjectDecode_t,
+    private readonly injectEncode?: InjectEncode_t
   ) {
     super(0, true);
   }
 
-  override get byteLength(): number {
-    return this.size;
-  }
-
   override decode(view: DecodeBuffer_t, options?: IDecodeOptions) {
-    if (!this.hInjectDecode) return null;
+    if (!this.injectDecode) return null;
 
     this.size = 0;
-    view = makeDataView(view);
+    const _view = makeDataView(view);
 
     let offset = options?.offset ?? 0;
 
-    const result: any[] = [];
-    let i = this.length;
-    while (i--) {
-      const res = this.hInjectDecode(view as DataView, offset);
-      result.push(res.value);
+    return this.resultEach([], () => {
+      const res = this.injectDecode!(_view, offset);
       offset += res.size;
       this.size += res.size;
-    }
-    return this.unflattenDeep(result);
+      return res.value;
+    });
   }
 
   override encode(obj: any, options?: IEncodeOptions): DataView {
     let view = createDataView(0, options?.view);
-    if (!this.hInjectEncode) return view;
+    if (!this.injectEncode) return view;
 
     let offset = options?.offset ?? 0;
 
     this.size = 0;
     this.each(obj, (it) => {
-      const buf = makeDataView(this.hInjectEncode!(it));
+      const buf = makeDataView(this.injectEncode!(it));
       view = realloc(view!, view!.byteLength + buf.byteLength, buf, offset);
       offset += buf.byteLength;
       this.size += buf.byteLength;

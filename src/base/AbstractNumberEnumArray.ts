@@ -1,14 +1,8 @@
-/**
- * 监听数字枚举事件的数组
- */
 export abstract class AbstractNumberEnumArray<T> implements ArrayLike<T> {
   readonly [n: number]: T;
 
   abstract length: number;
 
-  /**
-   * 每次使用数字枚举时，都会触发这个函数
-   */
   abstract next(i: number): any;
 
   constructor() {

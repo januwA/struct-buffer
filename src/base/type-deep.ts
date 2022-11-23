@@ -17,11 +17,6 @@ export class TypeDeep<T> extends AbstractNumberEnumArray<T> {
    */
   protected deeps: number[] = [];
 
-  /**
-   * 这会影响到decode的返回值，和encode的解析值类型。
-   *
-   * 如果返回true，decode将返回数组，encode的解析值也会当作数组处理。反之则会作为单个对象处理
-   */
   protected isList: boolean = false;
 
   next(i: number) {
