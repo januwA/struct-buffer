@@ -1,3 +1,12 @@
+## 6.0.0 2022-11-24
+
+- 💥 remove `sizeof`, `display`, `c-struct`, `windows type`
+- 🔨 remove `StructBuffer.structName` attribute
+- 🔨 remove `StructType.names` attribute
+- ✨ add `LittleEndian` and `RelativeOffset`, how to use can look at the test file.
+- ✅ ✔️ add test
+- 🎨 improve code
+
 ## 5.2.0 2022-9-28
 
 - 📦 update packages
