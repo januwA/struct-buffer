@@ -4,11 +4,6 @@ describe("LittleEndian", () => {
   it("struct", () => {
     const s = new StructBuffer({
       a: uint16_t,
-      // b: new StructBuffer({
-      //   c: uint16_t,
-      //   d: uint16_t,
-      // }),
-
       b: new LittleEndian(
         new StructBuffer({
           c: uint16_t,
@@ -39,9 +34,7 @@ describe("LittleEndian", () => {
   it("type", () => {
     const s = new StructBuffer({
       a: uint16_t,
-      // b: uint16_t[2],
-      // b: new LittleEndianDecorator(uint16_t[2], true),
-      b: new LittleEndian(uint16_t, true)[2],
+      b: new LittleEndian(uint16_t, true)[2], // like: new LittleEndian(uint16_t[2], true)
     });
 
     const view = s.encode(

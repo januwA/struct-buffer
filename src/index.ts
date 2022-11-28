@@ -1,6 +1,6 @@
 export * from "./struct-buffer";
-export * from "./types";
-export * from "./class-type";
+export * from "./type";
+export * from "./runtime";
 export * from "./decorator";
 export {
   createDataView,

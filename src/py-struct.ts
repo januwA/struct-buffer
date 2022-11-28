@@ -1,6 +1,6 @@
 // https://docs.python.org/zh-cn/3/library/struct.html#byte-order-size-and-alignment
 
-import { PaddingType, StringType } from "./class-type";
+import { PaddingType, StringType } from "./type";
 import { LikeBuffer_t, IBufferLike } from "./interfaces";
 import {
   bool,
@@ -18,7 +18,7 @@ import {
   ulonglong,
   float,
   double,
-} from "./types";
+} from "./type/types";
 import { createDataView, makeDataView } from "./utils";
 
 // 没有 "@", "="

@@ -3,7 +3,7 @@ export * from "./BitsType";
 export * from "./BoolType";
 export * from "./DoubleType";
 export * from "./FloatType";
-export * from "./Inject";
 export * from "./PaddingType";
 export * from "./StringType";
 export * from "./StructType";
+export * from "./types";

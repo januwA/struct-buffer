@@ -1,7 +1,7 @@
 import { StructBuffer, Inject, float, realloc } from "../../src";
 
 describe("Inject test", () => {
-  let c_str: Inject;
+  let c_str: Inject<string, string>;
 
   beforeAll(() => {
     c_str = new Inject(

@@ -20,7 +20,7 @@ export type Bit_t = 0 | 1;
 export type LikeBuffer_t = ArrayBufferView | number[];
 
 export interface IByteLength {
-  byteLength: number;
+  get byteLength(): number;
 }
 
 export interface IDecodeOptions {

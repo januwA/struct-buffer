@@ -26,7 +26,6 @@ export class StructBuffer<
   }
 
   get byteLength(): number {
-    // 每次获取 byteLength 都需要重新计算，因为 AbstractType.size 是可变的
     const _byteLength = Object.values(this.struct).reduce(
       (acc, type) => (acc += type.byteLength),
       0
