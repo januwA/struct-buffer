@@ -1,10 +1,10 @@
-import { AbstractNumberEnumArray } from "./AbstractNumberEnumArray";
+import { AbstractIntAccessArray } from "./AbstractIntAccessArray";
 import { unflattenDeep } from "../utils";
 
 /**
  * 结构可以是嵌套的
  */
-export class TypeDeep<T> extends AbstractNumberEnumArray<T> {
+export class TypeDeep<T> extends AbstractIntAccessArray<T> {
   /**
    * 最少返回 1
    */
@@ -19,7 +19,7 @@ export class TypeDeep<T> extends AbstractNumberEnumArray<T> {
 
   protected isList: boolean = false;
 
-  next(i: number) {
+  intAccess(i: number) {
     const _next = new TypeDeep<T>();
     Object.setPrototypeOf(_next, this);
 

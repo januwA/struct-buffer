@@ -1,5 +1,5 @@
 import {
-  DecodeBuffer_t,
+  LikeBuffer_t,
   IDecodeOptions,
   IEncodeOptions,
   InjectDecode_t,
@@ -19,7 +19,7 @@ export class Inject extends StructType<any, any> {
     super(0, true);
   }
 
-  override decode(view: DecodeBuffer_t, options?: IDecodeOptions) {
+  override decode(view: LikeBuffer_t, options?: IDecodeOptions) {
     if (!this.injectDecode) return null;
 
     this.size = 0;

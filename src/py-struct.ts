@@ -1,7 +1,7 @@
 // https://docs.python.org/zh-cn/3/library/struct.html#byte-order-size-and-alignment
 
 import { PaddingType, StringType } from "./class-type";
-import { DecodeBuffer_t, IBufferLike } from "./interfaces";
+import { LikeBuffer_t, IBufferLike } from "./interfaces";
 import {
   bool,
   string_t,
@@ -34,7 +34,7 @@ function _getTypes(format: string): IBufferLike<any, any>[] {
     let len = 1;
     if (m && m[1]) {
       len = parseInt(m[1]);
-      format = format.substr(m[1].length);
+      format = format.substring(m[1].length);
     }
 
     switch (format[0]) {
@@ -109,7 +109,7 @@ function _getLittleEndian(str: string) {
   }
 }
 
-function _handleParams(format: string, buffer: DecodeBuffer_t) {
+function _handleParams(format: string, buffer: LikeBuffer_t) {
   format = format.replace(/\s/g, "");
 
   // 获取字节序
@@ -117,7 +117,7 @@ function _handleParams(format: string, buffer: DecodeBuffer_t) {
   let _sr = SECTION_ORDER[0];
   if (SECTION_ORDER.includes(format[0])) {
     _sr = format[0];
-    format = format.substr(1);
+    format = format.substring(1);
   }
 
   return {
@@ -154,7 +154,7 @@ export function pack(format: string, ...args: any[]): DataView {
 
 export function pack_into(
   format: string,
-  buffer: DecodeBuffer_t,
+  buffer: LikeBuffer_t,
   offset: number,
   ...args: any[]
 ): DataView {
@@ -208,7 +208,7 @@ export function pack_into(
  */
 export function unpack(
   format: string,
-  buffer: DecodeBuffer_t,
+  buffer: LikeBuffer_t,
   offset: number = 0
 ): any[] {
   const { littleEndian, types, view } = _handleParams(format, buffer);
@@ -225,7 +225,7 @@ export function unpack(
 
 export function unpack_from(
   format: string,
-  buffer: DecodeBuffer_t,
+  buffer: LikeBuffer_t,
   offset: number = 0
 ): any[] {
   return unpack(format, buffer, offset);
@@ -242,7 +242,7 @@ export function unpack_from(
  * r.next().value // [3, 4]
  * ```
  */
-export function iter_unpack(format: string, buffer: DecodeBuffer_t) {
+export function iter_unpack(format: string, buffer: LikeBuffer_t) {
   const size = calcsize(format),
     view = makeDataView(buffer);
   let offset = 0,
@@ -293,19 +293,19 @@ export class Struct {
     return pack_into(this.format, createDataView(this.size), 0, ...args);
   }
 
-  pack_into(buffer: DecodeBuffer_t, offset: number, ...args: any[]) {
+  pack_into(buffer: LikeBuffer_t, offset: number, ...args: any[]) {
     return pack_into(this.format, buffer, offset, ...args);
   }
 
-  unpack(buffer: DecodeBuffer_t, offset = 0) {
+  unpack(buffer: LikeBuffer_t, offset = 0) {
     return unpack(this.format, buffer, offset);
   }
 
-  unpack_from(buffer: DecodeBuffer_t, offset = 0) {
+  unpack_from(buffer: LikeBuffer_t, offset = 0) {
     return unpack(this.format, buffer, offset);
   }
 
-  iter_unpack(buffer: DecodeBuffer_t) {
+  iter_unpack(buffer: LikeBuffer_t) {
     return iter_unpack(this.format, buffer);
   }
 }

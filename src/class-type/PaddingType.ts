@@ -1,4 +1,4 @@
-import { DecodeBuffer_t, IDecodeOptions, IEncodeOptions } from "../interfaces";
+import { LikeBuffer_t, IDecodeOptions, IEncodeOptions } from "../interfaces";
 import { createDataView } from "../utils";
 import { StructType } from "./StructType";
 
@@ -13,7 +13,7 @@ export class PaddingType extends StructType<number, number> {
    * => [ 1, 2 ]
    * ```
 s   */
-  override decode(view: DecodeBuffer_t, options?: IDecodeOptions) {
+  override decode(view: LikeBuffer_t, options?: IDecodeOptions) {
     return super.decode(view, options) as any;
   }
 

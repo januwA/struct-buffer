@@ -1,5 +1,5 @@
 import {
-  DecodeBuffer_t,
+  LikeBuffer_t,
   IDecodeOptions,
   IEncodeOptions,
   IBufferLike,
@@ -7,8 +7,8 @@ import {
 import BufferLikeDecorator from "./BufferLikeDecorator";
 
 export class LittleEndian<D, E> extends BufferLikeDecorator<D, E> {
-  override next(i: number) {
-    const next = super.next(i);
+  override intAccess(i: number) {
+    const next = super.intAccess(i);
     (next as any).src = this.src[i];
     return next;
   }
@@ -26,7 +26,7 @@ export class LittleEndian<D, E> extends BufferLikeDecorator<D, E> {
   override encode(obj: E, options?: IEncodeOptions): DataView {
     return super.encode(obj, this.optionsWithLittleEndian(options));
   }
-  override decode(view: DecodeBuffer_t, options?: IDecodeOptions): D {
+  override decode(view: LikeBuffer_t, options?: IDecodeOptions): D {
     return super.decode(view, this.optionsWithLittleEndian(options));
   }
 }

@@ -1,6 +1,6 @@
 import { TypeDeep } from "../base/type-deep";
 import {
-  DecodeBuffer_t,
+  LikeBuffer_t,
   IBufferLike,
   IDecodeOptions,
   IEncodeOptions,
@@ -14,7 +14,7 @@ export default class BufferLikeDecorator<D, E>
     super();
   }
 
-  decode(view: DecodeBuffer_t, options?: IDecodeOptions | undefined): D {
+  decode(view: LikeBuffer_t, options?: IDecodeOptions | undefined): D {
     return this.src.decode(view, options);
   }
   encode(obj: E, options?: IEncodeOptions | undefined): DataView {

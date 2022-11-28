@@ -1,6 +1,6 @@
 import {
   Bit_t,
-  DecodeBuffer_t,
+  LikeBuffer_t,
   IDecodeOptions,
   IEncodeOptions,
   NumberMap_t,
@@ -18,7 +18,7 @@ export class BitsType<
     super(size, true);
   }
 
-  override decode(view: DecodeBuffer_t, options?: IDecodeOptions): D {
+  override decode(view: LikeBuffer_t, options?: IDecodeOptions): D {
     const data: number[] | number = super.decode(view, options) as any;
 
     return this.resultEach(data, (num: number) => {

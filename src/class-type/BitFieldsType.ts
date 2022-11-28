@@ -1,6 +1,6 @@
 import { createDataView } from "../utils";
 import {
-  DecodeBuffer_t,
+  LikeBuffer_t,
   IDecodeOptions,
   IEncodeOptions,
   NumberMap_t,
@@ -51,7 +51,7 @@ export class BitFieldsType<
     super(size, true);
   }
 
-  override decode(view: DecodeBuffer_t, options?: IDecodeOptions): D {
+  override decode(view: LikeBuffer_t, options?: IDecodeOptions): D {
     const data: number[] | number = super.decode(view, options) as any;
 
     let i = 0;

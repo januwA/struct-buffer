@@ -1,6 +1,6 @@
 import { createDataView } from "../utils";
 import {
-  DecodeBuffer_t,
+  LikeBuffer_t,
   IDecodeOptions,
   IEncodeOptions,
   IBufferLike,
@@ -27,7 +27,7 @@ export class RelativeOffset<D, E> extends BufferLikeDecorator<D, E> {
     return newOptions.view!;
   }
 
-  override decode(view: DecodeBuffer_t, options?: IDecodeOptions): D {
+  override decode(view: LikeBuffer_t, options?: IDecodeOptions): D {
     const newOptions = Object.assign({}, options, {
       offset: options?.offset ?? 0,
     });

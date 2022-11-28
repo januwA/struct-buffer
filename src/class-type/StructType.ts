@@ -1,5 +1,5 @@
 import {
-  DecodeBuffer_t,
+  LikeBuffer_t,
   IDecodeOptions,
   IEncodeOptions,
   DataViewSetBig_t,
@@ -52,7 +52,7 @@ export class StructType<D, E>
    * uint32_t[2].decode( new Uint8Array([0,0,0,1, 0,0,0,2]) ) => [1, 2]
    * ```
    */
-  decode(view: DecodeBuffer_t, options?: IDecodeOptions): D {
+  decode(view: LikeBuffer_t, options?: IDecodeOptions): D {
     const v = makeDataView(view);
     let offset = options?.offset ?? 0;
     const result: (number | bigint)[] = [];

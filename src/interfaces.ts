@@ -17,7 +17,7 @@ export interface InjectNext {
 
 export type Bit_t = 0 | 1;
 
-export type DecodeBuffer_t = ArrayBufferView | number[];
+export type LikeBuffer_t = ArrayBufferView | number[];
 
 export interface IByteLength {
   byteLength: number;
@@ -29,7 +29,7 @@ export interface IDecodeOptions {
 }
 
 export interface IDecode<D> {
-  decode(view: DecodeBuffer_t, options?: IDecodeOptions): D;
+  decode(view: LikeBuffer_t, options?: IDecodeOptions): D;
 }
 
 export interface IEncodeOptions {
@@ -73,4 +73,4 @@ export type StructBuffer_t = { [k: string]: IBufferLike<any, any> };
 export type NumberMap_t = { [k: string]: number };
 
 export type InjectDecode_t = (view: DataView, offset: number) => InjectNext;
-export type InjectEncode_t = (value: any) => DecodeBuffer_t;
+export type InjectEncode_t = (value: any) => LikeBuffer_t;

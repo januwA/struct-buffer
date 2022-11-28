@@ -1,5 +1,5 @@
 import {
-  DecodeBuffer_t,
+  LikeBuffer_t,
   IDecodeOptions,
   IEncodeOptions,
   DataViewSetBig_t,
@@ -21,7 +21,7 @@ export class StringType extends StructType<string, string> {
    * => ab
    * ```
    */
-  override decode(view: DecodeBuffer_t, options?: IDecodeOptions) {
+  override decode(view: LikeBuffer_t, options?: IDecodeOptions) {
     const v = makeDataView(view);
 
     let offset = options?.offset ?? 0;

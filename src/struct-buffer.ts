@@ -1,7 +1,7 @@
 import { TypeDeep } from "./base/type-deep";
 import {
   AnyObject,
-  DecodeBuffer_t,
+  LikeBuffer_t,
   IDecodeOptions,
   IEncodeOptions,
   IBufferLike,
@@ -34,7 +34,7 @@ export class StructBuffer<
     return _byteLength * this.length;
   }
 
-  decode(view: DecodeBuffer_t, options?: IDecodeOptions): D {
+  decode(view: LikeBuffer_t, options?: IDecodeOptions): D {
     const littleEndian = options?.littleEndian,
       _view = makeDataView(view);
 

@@ -1,4 +1,4 @@
-import { DecodeBuffer_t, IDecodeOptions, IEncodeOptions } from "../interfaces";
+import { LikeBuffer_t, IDecodeOptions, IEncodeOptions } from "../interfaces";
 import { StructType } from "./StructType";
 
 export class BoolType<
@@ -9,7 +9,7 @@ export class BoolType<
     super(type.size, type.unsigned);
   }
 
-  override decode(view: DecodeBuffer_t, options?: IDecodeOptions): D {
+  override decode(view: LikeBuffer_t, options?: IDecodeOptions): D {
     let r = super.decode(view, options) as any;
     return this.resultEach(r, (it) => {
       return Boolean(it);

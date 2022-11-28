@@ -29,6 +29,7 @@ describe("utils test", () => {
   it("sbytes", () => {
     expect(sview(b("01 02 03"))).toBe("01 02 03");
     expect(sview(b("010203"))).toBe("01 02 03");
+    expect(sview(b("010  20   34"))).toBe("01 02 03");
     expect(sview(b("0x01\\x02 03h"))).toBe("01 02 03");
   });
 
