@@ -123,3 +123,4 @@ export function dynamicByteLength(type) {
         return type.byteLength;
     return type.def.fixedSize;
 }
+//# sourceMappingURL=dynamic-struct-buffer.js.map

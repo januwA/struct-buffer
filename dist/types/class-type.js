@@ -394,3 +394,4 @@ export function bits(type, obj) {
 export function bitFields(type, obj) {
     return new BitFieldsType(type.size, obj);
 }
+//# sourceMappingURL=class-type.js.map

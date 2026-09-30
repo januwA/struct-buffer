@@ -1,8 +1,14 @@
 export * from "./struct-buffer";
 export * from "./dynamic-struct-buffer";
+export * from "./field";
+export * from "./builders";
+export * from "./infer";
 export * from "./types";
+export { DecodeError, EncodeError } from "./errors";
+export { Cursor } from "./cursor";
+export { Writer } from "./writer";
 export { registerType, typedef, bits, bitFields, Inject } from "./class-type";
 export * as CStruct from "./c-struct";
 export { display } from "./display";
-export { createDataView, makeDataView, sbytes, sbytes2, sview, TEXT, realloc, ref, Ref, isRef, } from "./utils";
+export { COUNT, createDataView, makeDataView, sbytes, sbytes2, sview, TEXT, realloc, ref, Ref, isRef, } from "./utils";
 export { pack, pack_into, unpack, unpack_from, iter_unpack, calcsize, Struct, } from "./py-struct";

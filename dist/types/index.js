@@ -4,7 +4,7 @@ export * from "./field";
 export * from "./builders";
 export * from "./infer";
 export * from "./types";
-export { DecodeError, EncodeError, LenientResult } from "./errors";
+export { DecodeError, EncodeError } from "./errors";
 export { Cursor } from "./cursor";
 export { Writer } from "./writer";
 export { registerType, typedef, bits, bitFields, Inject } from "./class-type";
@@ -12,4 +12,4 @@ export * as CStruct from "./c-struct";
 export { display } from "./display";
 export { COUNT, createDataView, makeDataView, sbytes, sbytes2, sview, TEXT, realloc, ref, Ref, isRef, } from "./utils";
 export { pack, pack_into, unpack, unpack_from, iter_unpack, calcsize, Struct, } from "./py-struct";
-//# sourceMappingURL=index.d.ts.map
+//# sourceMappingURL=index.js.map
