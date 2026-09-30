@@ -61,7 +61,57 @@ export function sbytes(str) {
 }
 const HEX_EXP = /^(0x([0-9a-f]{1,2})|([0-9a-f]{1,2})h|\\x([0-9a-f]{1,2}))/i;
 const HEX_SEARCH_EXP = /0x([0-9a-f]{1,2})|([0-9a-f]{1,2})h|\\x([0-9a-f]{1,2})/i;
-export function sbytes2(str, te = new TextEncoder()) {
+class FallbackTextDecoder {
+    decode(buf) {
+        if (!buf)
+            return "";
+        const u8 = ArrayBuffer.isView(buf)
+            ? new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength)
+            : new Uint8Array(buf);
+        let s = "";
+        for (let i = 0; i < u8.length; i++) {
+            s += "%" + u8[i].toString(16).padStart(2, "0");
+        }
+        try {
+            return decodeURIComponent(s);
+        }
+        catch {
+            let out = "";
+            for (let i = 0; i < u8.length; i++)
+                out += String.fromCharCode(u8[i]);
+            return out;
+        }
+    }
+}
+class FallbackTextEncoder {
+    encode(str) {
+        let s = "";
+        try {
+            s = unescape(encodeURIComponent(str));
+        }
+        catch {
+            s = str;
+        }
+        const arr = new Uint8Array(s.length);
+        for (let i = 0; i < s.length; i++) {
+            arr[i] = s.charCodeAt(i) & 0xff;
+        }
+        return arr;
+    }
+}
+export function createTextDecoder() {
+    if (typeof TextDecoder !== "undefined") {
+        return new TextDecoder();
+    }
+    return new FallbackTextDecoder();
+}
+export function createTextEncoder() {
+    if (typeof TextEncoder !== "undefined") {
+        return new TextEncoder();
+    }
+    return new FallbackTextEncoder();
+}
+export function sbytes2(str, te = createTextEncoder()) {
     let m;
     const bytes = [];
     while (str.length) {
@@ -97,12 +147,12 @@ export function sview(view) {
 export function TEXT(buf, text, placeholder) {
     const view = makeDataView(buf);
     if (!text && !placeholder) {
-        text = new TextDecoder();
+        text = createTextDecoder();
     }
     else if ((text !== undefined && typeof text === "string") ||
         typeof text === "function") {
         placeholder = text;
-        text = new TextDecoder();
+        text = createTextDecoder();
     }
     let offset = 0;
     let str = "";

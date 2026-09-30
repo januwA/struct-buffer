@@ -16,7 +16,7 @@ export declare class StructType<D, E> extends Array<StructType<D[], E[]>> {
     decode(view: DecodeBuffer_t, littleEndian?: boolean, offset?: number): D;
     encode(obj: E, littleEndian?: boolean, offset?: number, view?: DataView): DataView;
 }
-declare type BitsType_t = {
+type BitsType_t = {
     [k: string]: number;
 };
 export declare class BitsType<D = {
@@ -52,8 +52,8 @@ export declare class PaddingType extends StructType<number, number> {
     decode(view: DecodeBuffer_t, littleEndian?: boolean, offset?: number): any;
     encode(zero?: number, littleEndian?: boolean, offset?: number, view?: DataView): DataView;
 }
-declare type HInjectDecode = (view: DataView, offset: number) => InjectNext;
-declare type HInjectEncode = (value: any) => DecodeBuffer_t;
+type HInjectDecode = (view: DataView, offset: number) => InjectNext;
+type HInjectEncode = (value: any) => DecodeBuffer_t;
 export declare class Inject extends StructType<any, any> {
     private hInjectDecode?;
     private hInjectEncode?;

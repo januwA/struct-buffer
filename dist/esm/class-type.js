@@ -1,5 +1,5 @@
 import { sizeof } from "./struct-buffer";
-import { arrayProxyNext, createDataView, makeDataView, realloc, unflattenDeep, } from "./utils";
+import { arrayProxyNext, createDataView, createTextDecoder, createTextEncoder, makeDataView, realloc, unflattenDeep, } from "./utils";
 export const FLOAT_TYPE = "float";
 export const DOUBLE_TYPE = "double";
 const hData = {
@@ -44,6 +44,18 @@ class StructTypeNext {
     }
 }
 export class StructType extends Array {
+    get isList() {
+        return !!this.deeps.length;
+    }
+    get count() {
+        return this.deeps.reduce((acc, it) => (acc *= it), 1);
+    }
+    is(type) {
+        return type.names.some((name) => this.names.includes(name));
+    }
+    isName(typeName) {
+        return this.names.includes(typeName);
+    }
     constructor(typeName, size, unsigned) {
         super();
         this.size = size;
@@ -59,18 +71,6 @@ export class StructType extends Array {
             this.set = this.get = "";
         }
         return arrayProxyNext(this, StructTypeNext);
-    }
-    get isList() {
-        return !!this.deeps.length;
-    }
-    get count() {
-        return this.deeps.reduce((acc, it) => (acc *= it), 1);
-    }
-    is(type) {
-        return type.names.some((name) => this.names.includes(name));
-    }
-    isName(typeName) {
-        return this.names.includes(typeName);
     }
     decode(view, littleEndian = false, offset = 0) {
         view = makeDataView(view);
@@ -241,8 +241,8 @@ export class BoolType extends StructType {
 export class StringType extends StructType {
     constructor() {
         super("string_t", 1, true);
-        this.textDecode = new TextDecoder();
-        this.textEncoder = new TextEncoder();
+        this.textDecode = createTextDecoder();
+        this.textEncoder = createTextEncoder();
     }
     decode(view, littleEndian = false, offset = 0, textDecode) {
         view = makeDataView(view);

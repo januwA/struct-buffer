@@ -1,5 +1,5 @@
 import { Inject } from "./class-type";
-import { arrayProxyNext, createDataView, makeDataView, unflattenDeep, zeroMemory, } from "./utils";
+import { arrayProxyNext, createDataView, createTextDecoder, createTextEncoder, makeDataView, unflattenDeep, zeroMemory, } from "./utils";
 export function sizeof(type) {
     if (type instanceof StructBuffer) {
         let padidng = 0;
@@ -29,8 +29,8 @@ class StructBufferNext {
     }
 }
 const KStructBufferConfig = {
-    textDecode: new TextDecoder(),
-    textEncoder: new TextEncoder(),
+    textDecode: createTextDecoder(),
+    textEncoder: createTextEncoder(),
     littleEndian: undefined,
 };
 export class StructBuffer extends Array {

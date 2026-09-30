@@ -1,11 +1,11 @@
 import { StructType } from "./class-type";
 import { DecodeBuffer_t } from "./interfaces";
-export declare type Type_t = StructType<any, any> | StructBuffer;
-export declare type StructBuffer_t = {
+export type Type_t = StructType<any, any> | StructBuffer;
+export type StructBuffer_t = {
     [k: string]: Type_t;
 };
 export declare function sizeof(type: Type_t): number;
-declare type StructBufferConfig = {
+type StructBufferConfig = {
     textDecode?: TextDecoder;
     textEncoder?: TextEncoder;
     littleEndian?: boolean;

@@ -3,6 +3,8 @@ import { AnyObject, DecodeBuffer_t } from "./interfaces";
 import {
   arrayProxyNext,
   createDataView,
+  createTextDecoder,
+  createTextEncoder,
   makeDataView,
   unflattenDeep,
   zeroMemory,
@@ -58,8 +60,8 @@ type StructBufferConfig = {
 };
 
 const KStructBufferConfig = {
-  textDecode: new TextDecoder(),
-  textEncoder: new TextEncoder(),
+  textDecode: createTextDecoder(),
+  textEncoder: createTextEncoder(),
   littleEndian: undefined,
 };
 

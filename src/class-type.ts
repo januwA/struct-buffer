@@ -9,6 +9,8 @@ import { sizeof } from "./struct-buffer";
 import {
   arrayProxyNext,
   createDataView,
+  createTextDecoder,
+  createTextEncoder,
   makeDataView,
   realloc,
   unflattenDeep,
@@ -438,8 +440,8 @@ export class StringType extends StructType<string, string> {
     super("string_t", 1, true);
   }
 
-  textDecode = new TextDecoder();
-  textEncoder = new TextEncoder();
+  textDecode = createTextDecoder();
+  textEncoder = createTextEncoder();
 
   /**
    * ```
