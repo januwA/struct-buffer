@@ -1,10 +1,17 @@
 export * from "./struct-buffer";
 export * from "./dynamic-struct-buffer";
+export * from "./field";
+export * from "./builders";
+export * from "./infer";
 export * from "./types";
+export { DecodeError, EncodeError, LenientResult } from "./errors";
+export { Cursor } from "./cursor";
+export { Writer } from "./writer";
 export { registerType, typedef, bits, bitFields, Inject } from "./class-type";
 export * as CStruct from "./c-struct";
 export { display } from "./display";
 export {
+  COUNT,
   createDataView,
   makeDataView,
   sbytes,

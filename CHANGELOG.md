@@ -1,3 +1,24 @@
+## 5.3.0
+
+- ✨ `DynamicStructBuffer`: decode 结果与 encode 入参类型全部自动推出来, 字段名拼错编译期就报错
+- ✨ `InferType` / `InferDef` / `InferEncodeDef` 导出, 可以单独拿来推任意字段表
+- ✨ `blob` / `rest` / `records` / `framed` / `variant` 声明式字段工厂
+- ✨ `decodeLenient`: 坏字段变 `undefined` 并收集错误, 而不是整帧丢掉
+- 🐛 定宽文本字段(`string_t[n]`)encode 现在写满 n 字节(短补 NUL / 长截断), decode 在第一个
+  NUL 处截断 —— 之前短字符串会把后面所有字段整体前移, 而 `sizeof()` 报的仍是 n
+- 🐛 `frameReader.read` 类型允许返回 `null`(文档一直是这么说的)
+- 🐛 判别字段没有对应分支 / `ref` 指向非法值时, 错误消息不再被塞进 `hex:` 槽位
+- 📚 README 补 `DynamicStructBuffer` 与类型推导章节
+
+**破坏性变更**
+
+- `DynamicStructBuffer` 泛型顺序变成 `<S, D, E>`(`S` 是字段表). 类的类型参数默认值不能引用
+  后声明的参数(TS2744), 而 `D` 的默认值就是 `InferDef<S>`, 想保住老的 `<D, E>` 位置就只能
+  让推导失效. 需要显式指定类型时写 `new DynamicStructBuffer<any, MyType>(...)`. 仓库内与真实
+  调用方都没有显式泛型用法
+- 引擎里字符串字段一律是 text 形态的字节段: `string_t[n]` 是 n 字节定宽字符串,
+  `string_t[n][m]` 是 n 个字 × m 字节的字符串(不是字符串数组). 类型一律 `string`
+
 ## 5.2.0 2022-9-28
 
 - 📦 update packages

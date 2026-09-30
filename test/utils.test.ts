@@ -1,4 +1,5 @@
 import {
+  DynamicStructBuffer,
   createDataView,
   makeDataView,
   pack,
@@ -6,6 +7,7 @@ import {
   sbytes2 as b2,
   sview,
   TEXT,
+  uint8_t,
 } from "../src";
 
 describe("utils test", () => {
@@ -16,6 +18,20 @@ describe("utils test", () => {
   it("makeDataView", () => {
     expect(sview(makeDataView([1, 2, 3]))).toBe("01 02 03");
     expect(sview(makeDataView(Uint8Array.from([1, 2, 3])))).toBe("01 02 03");
+  });
+
+  it("makeDataView 尊重 subarray 窗口(别读出去)", () => {
+    const whole = Uint8Array.from([0xaa, 0xbb, 1, 2, 3, 0xcc]);
+    // 非零 byteOffset: 必须从窗口起点读, 而不是整块 buffer 的 0
+    expect(sview(makeDataView(whole.subarray(2, 5)))).toBe("01 02 03");
+    // 长度受限: 窗口外的字节不能进来
+    const win = makeDataView(whole.subarray(0, 3));
+    expect(win.byteOffset).toBe(0);
+    expect(win.byteLength).toBe(3);
+    expect(() => new Uint8Array(win.buffer, win.byteOffset + 3, 1)[0]).not.toThrow();
+    // 端到端: decode 只看窗口里的字节
+    const S = new DynamicStructBuffer("s", { a: uint8_t, b: uint8_t, c: uint8_t });
+    expect(S.decode(whole.subarray(0, 3))).toEqual({ a: 0xaa, b: 0xbb, c: 1 });
   });
 
   it("sbytes", () => {

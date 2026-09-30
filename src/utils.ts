@@ -59,11 +59,36 @@ export function makeDataView(view: DecodeBuffer_t): DataView {
   if (Array.isArray(view)) view = Uint8Array.from(view);
   if (!ArrayBuffer.isView(view))
     throw new Error(`Type Error: (${view}) is not an ArrayBuffer!!!`);
-  return new DataView(view.buffer);
+  // 必须带上 byteOffset/byteLength: `buf.subarray(4, 14)` 之类是**窗口**而不是整块
+  // buffer, 只取 .buffer 会越界读到窗口之外(FramedField 会在尾部凭空多解一个子帧),
+  // 非零 byteOffset 时更是从错误的位置开读.
+  return new DataView(view.buffer, view.byteOffset, view.byteLength);
 }
 
 let refSeq = 0;
 const REF_MAP = new Map<string, Ref>();
+
+/**
+ * 元素个数通道. Field 引擎解析完 `ref("n")` 后把结果挂到 ctx 的这个 symbol 键上,
+ * `StructType.getCount` 优先读它.
+ *
+ * 用 symbol 而不是 `ctx.__count` 字符串键: ctx 就是正在解析的那条记录本身, 字符串键
+ * 会和用户真叫 `__count` 的字段撞名, 而撞名的后果是长度解析成完全无关的数字 ——
+ * 这类静默错误比崩溃难查得多.
+ */
+export const COUNT: unique symbol = Symbol.for(
+  "struct-buffer.element-count"
+) as any;
+
+/** 给 ctx 附上显式元素数(不改动原对象); ctx 为空时只带 count */
+export function withCount(ctx: any, count: number): any {
+  if (ctx == null) return { [COUNT]: count };
+  if (ctx[COUNT] === count) return ctx;
+  // 多数字段没有 ref, 不必付出一次浅拷贝的代价
+  const out = Object.create(ctx);
+  out[COUNT] = count;
+  return out;
+}
 
 export class Ref {
   readonly __isRef = true;
@@ -99,11 +124,22 @@ export function isRef(v: any): v is Ref {
   );
 }
 
+declare const REF_INDEX: unique symbol;
+
+/**
+ * `ref()` 的返回值类型. 运行时是一个 `Ref` 对象, 但类型上声明为
+ * `number & {...}` —— 这样 `uint8_t[ref("msg_size")]` 就能命中 `StructType extends
+ * Array<...>` 的下标签名, 推导出 `StructType<number[], number[]>`(即解码结果是
+ * `number[]`), 从而让 `InferDef` 拿到真实类型. `ref` 原先声明为 `any`, 推导到这里
+ * 就断了.
+ */
+export type RefIndex = number & { readonly [REF_INDEX]?: Ref };
+
 export function ref(
   field: string,
   transform?: (val: number, ctx: any) => number
-): any {
-  return new Ref(field, transform);
+): RefIndex {
+  return new Ref(field, transform) as any;
 }
 
 export function arrayProxy(
