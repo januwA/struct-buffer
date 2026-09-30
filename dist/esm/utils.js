@@ -4,7 +4,7 @@ export function unflattenDeep(array, deeps, isString = false) {
         r = r.split("");
     for (let i = deeps.length - 1; i >= 1; i--) {
         const isFirst = i === deeps.length - 1;
-        const value = deeps[i];
+        const value = isRef(deeps[i]) ? deeps[i].resolve(undefined) : Number(deeps[i]);
         r = r.reduce((acc, it, index) => {
             if (index % value === 0)
                 acc.push([]);
@@ -33,13 +33,54 @@ export function makeDataView(view) {
         throw new Error(`Type Error: (${view}) is not an ArrayBuffer!!!`);
     return new DataView(view.buffer);
 }
+let refSeq = 0;
+const REF_MAP = new Map();
+export class Ref {
+    constructor(field, transform) {
+        this.field = field;
+        this.transform = transform;
+        this.__isRef = true;
+        this.id = `__ref_${++refSeq}_${field}__`;
+        REF_MAP.set(this.id, this);
+    }
+    resolve(ctx) {
+        if (!ctx)
+            return 0;
+        const val = Number(ctx[this.field] ?? 0);
+        return this.transform ? this.transform(val, ctx) : val;
+    }
+    [Symbol.toPrimitive]() {
+        return this.id;
+    }
+    toString() {
+        return this.id;
+    }
+}
+export function isRef(v) {
+    return (v instanceof Ref ||
+        (typeof v === "object" && v !== null && v.__isRef === true));
+}
+export function ref(field, transform) {
+    return new Ref(field, transform);
+}
 export function arrayProxy(context, cb) {
     return new Proxy(context, {
         get(t, k) {
             if (k in t)
                 return t[k];
-            if (/\d+/.test(k.toString()))
-                return cb(t, parseInt(k));
+            if (typeof k === "string") {
+                if (REF_MAP.has(k)) {
+                    return cb(t, REF_MAP.get(k));
+                }
+                if (k.startsWith("__ref_")) {
+                    const m = k.match(/^__ref_\d+_(.+)__$/);
+                    if (m) {
+                        return cb(t, new Ref(m[1]));
+                    }
+                }
+                if (/\d+/.test(k))
+                    return cb(t, parseInt(k));
+            }
         },
     });
 }

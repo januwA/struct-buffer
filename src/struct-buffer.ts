@@ -47,7 +47,7 @@ class StructBufferNext {
   }
 }
 
-type StructBufferConfig = {
+export type StructBufferConfig = {
   textDecode?: TextDecoder;
   textEncoder?: TextEncoder;
 

@@ -11,8 +11,10 @@ import {
   createDataView,
   createTextDecoder,
   createTextEncoder,
+  isRef,
   makeDataView,
   realloc,
+  Ref,
   unflattenDeep,
 } from "./utils";
 
@@ -70,7 +72,7 @@ class StructTypeNext {
 // E encode obj type
 export class StructType<D, E> extends Array<StructType<D[], E[]>> {
   names: string[];
-  deeps: number[] = [];
+  deeps: (number | Ref)[] = [];
 
   /**
    * ```
@@ -82,9 +84,45 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
     return !!this.deeps.length;
   }
 
-  // 最少会返回1
+  get isDynamic(): boolean {
+    return this.deeps.some((it) => isRef(it));
+  }
+
+  get refField(): string | undefined {
+    const r = this.deeps.find((it) => isRef(it));
+    return (r as any)?.field;
+  }
+
   get count(): number {
-    return this.deeps.reduce((acc, it) => (acc *= it), 1);
+    return this.getCount();
+  }
+
+  getCount(ctx?: any): number {
+    return this.deeps.reduce((acc: number, it) => {
+      let val: number;
+      if (isRef(it)) {
+        val = it.resolve(ctx);
+      } else {
+        val = Number(it);
+      }
+      return acc * val;
+    }, 1);
+  }
+
+  getDeeps(ctx?: any): number[] {
+    return this.deeps.map((it) => {
+      if (isRef(it)) {
+        return it.resolve(ctx);
+      }
+      return Number(it);
+    });
+  }
+
+  getSize(ctx?: any): number {
+    if (this.isList) {
+      return this.size * this.getCount(ctx);
+    }
+    return this.size;
   }
 
   is<D, E>(type: StructType<D, E>): boolean {
@@ -127,21 +165,29 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
    * @param view
    * @param littleEndian
    * @param offset
+   * @param textDecodeOrCtx
+   * @param ctx
    */
   decode(
     view: DecodeBuffer_t,
     littleEndian: boolean = false,
-    offset: number = 0
+    offset: number = 0,
+    textDecodeOrCtx?: any,
+    ctx?: any
   ): D {
     view = makeDataView(view);
+    const actualCtx =
+      ctx ?? (textDecodeOrCtx && !textDecodeOrCtx.decode ? textDecodeOrCtx : undefined);
+    const count = this.getCount(actualCtx);
 
     const result: AnyObject[] = [];
-    let i = this.count;
+    let i = count;
     while (i--) {
       result.push((view as any)[this.get](offset, littleEndian));
       offset += this.size;
     }
-    return this.isList ? unflattenDeep(result, this.deeps, false) : result[0];
+    const deeps = this.getDeeps(actualCtx);
+    return this.isList ? unflattenDeep(result, deeps, false) : result[0];
   }
 
   /**
@@ -159,18 +205,25 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
    * @param littleEndian
    * @param offset
    * @param view
+   * @param textEncoderOrCtx
+   * @param ctx
    */
   encode(
     obj: E,
     littleEndian: boolean = false,
     offset: number = 0,
-    view?: DataView
+    view?: DataView,
+    textEncoderOrCtx?: any,
+    ctx?: any
   ): DataView {
-    const v = createDataView(this.count * this.size, view);
+    const actualCtx =
+      ctx ?? (textEncoderOrCtx && !textEncoderOrCtx.encode ? textEncoderOrCtx : obj);
+    const count = this.getCount(actualCtx);
+    const v = createDataView(count * this.size, view);
 
     if (this.isList && Array.isArray(obj)) (obj as any) = obj.flat();
 
-    for (let i = 0; i < this.count; i++) {
+    for (let i = 0; i < count; i++) {
       const it = (this.isList ? (obj as any)[i] : obj) ?? 0;
       try {
         (v as any)[this.set](offset, it, littleEndian);
@@ -198,12 +251,16 @@ export class BitsType<
   override decode(
     view: DecodeBuffer_t,
     littleEndian: boolean = false,
-    offset: number = 0
+    offset: number = 0,
+    textDecodeOrCtx?: any,
+    ctx?: any
   ): D {
     const data: number[] | number = super.decode(
       view,
       littleEndian,
-      offset
+      offset,
+      textDecodeOrCtx,
+      ctx
     ) as any;
     if (this.isList && Array.isArray(data)) {
       return data.map((it) => {
@@ -226,12 +283,17 @@ export class BitsType<
     obj: E,
     littleEndian: boolean = false,
     offset: number = 0,
-    view?: DataView
+    view?: DataView,
+    textEncoderOrCtx?: any,
+    ctx?: any
   ): DataView {
-    const v = createDataView(this.count * this.size, view);
+    const actualCtx =
+      ctx ?? (textEncoderOrCtx && !textEncoderOrCtx.encode ? textEncoderOrCtx : obj);
+    const count = this.getCount(actualCtx);
+    const v = createDataView(count * this.size, view);
 
     if (this.isList && Array.isArray(obj)) {
-      for (let i = 0; i < this.count; i++) {
+      for (let i = 0; i < count; i++) {
         let flags = 0;
         Object.entries<number>(obj[i]).forEach(([k, v]) => {
           const i: number = this.bits![k];
@@ -301,12 +363,16 @@ export class BitFieldsType<
   override decode(
     view: DecodeBuffer_t,
     littleEndian: boolean = false,
-    offset: number = 0
+    offset: number = 0,
+    textDecodeOrCtx?: any,
+    ctx?: any
   ): D {
     const data: number[] | number = super.decode(
       view,
       littleEndian,
-      offset
+      offset,
+      textDecodeOrCtx,
+      ctx
     ) as any;
 
     let i = 0;
@@ -341,9 +407,14 @@ export class BitFieldsType<
     obj: E,
     littleEndian: boolean = false,
     offset: number = 0,
-    view?: DataView
+    view?: DataView,
+    textEncoderOrCtx?: any,
+    ctx?: any
   ): DataView {
-    const v = createDataView(this.count * this.size, view);
+    const actualCtx =
+      ctx ?? (textEncoderOrCtx && !textEncoderOrCtx.encode ? textEncoderOrCtx : obj);
+    const count = this.getCount(actualCtx);
+    const v = createDataView(count * this.size, view);
 
     const _getValue = (obj: any): number => {
       let val = 0;
@@ -359,7 +430,7 @@ export class BitFieldsType<
     };
 
     if (this.isList && Array.isArray(obj)) {
-      for (let i = 0; i < this.count; i++) {
+      for (let i = 0; i < count; i++) {
         (v as any)[this.set](offset, _getValue(obj[i]), littleEndian);
         offset += this.size;
       }
@@ -395,12 +466,16 @@ export class BoolType<
   override decode(
     view: DecodeBuffer_t,
     littleEndian: boolean = false,
-    offset: number = 0
+    offset: number = 0,
+    textDecodeOrCtx?: any,
+    ctx?: any
   ): D {
-    let r = super.decode(view, littleEndian, offset) as any;
+    const actualCtx =
+      ctx ?? (textDecodeOrCtx && !textDecodeOrCtx.decode ? textDecodeOrCtx : undefined);
+    let r = super.decode(view, littleEndian, offset, textDecodeOrCtx, ctx) as any;
     if (Array.isArray(r)) {
       r = r.flat().map((it) => Boolean(it));
-      r = unflattenDeep(r, this.deeps);
+      r = unflattenDeep(r, this.getDeeps(actualCtx));
     } else {
       r = Boolean(r);
     }
@@ -419,19 +494,23 @@ export class BoolType<
    * @param littleEndian
    * @param offset
    * @param view
+   * @param textEncoderOrCtx
+   * @param ctx
    */
   override encode(
     obj: E,
     littleEndian: boolean = false,
     offset: number = 0,
-    view?: DataView
+    view?: DataView,
+    textEncoderOrCtx?: any,
+    ctx?: any
   ): DataView {
     if (obj && Array.isArray(obj)) {
       obj = obj.flat().map((it) => Number(Boolean(it))) as any;
     } else if (obj) {
       obj = Number(Boolean(obj)) as any;
     }
-    return super.encode(obj, littleEndian, offset, view);
+    return super.encode(obj, littleEndian, offset, view, textEncoderOrCtx, ctx);
   }
 }
 
@@ -453,13 +532,15 @@ export class StringType extends StructType<string, string> {
     view: DecodeBuffer_t,
     littleEndian: boolean = false,
     offset: number = 0,
-    textDecode?: TextDecoder
+    textDecode?: TextDecoder,
+    ctx?: any
   ) {
     view = makeDataView(view);
     textDecode ??= this.textDecode;
 
+    const count = this.getCount(ctx);
     const result: AnyObject[] = [];
-    let i = this.count;
+    let i = count;
     while (i--) {
       let data = (view as any)[this.get](offset, littleEndian);
       if (data === 0) break;
@@ -470,9 +551,10 @@ export class StringType extends StructType<string, string> {
 
     // string_t[2] => 'ab'
     // string_t[2][1] => ['a', 'b']
-    if (this.deeps.length < 2) return result.join("") as any;
+    const deeps = this.getDeeps(ctx);
+    if (deeps.length < 2) return result.join("") as any;
 
-    return this.isList ? unflattenDeep(result, this.deeps, true) : result[0];
+    return this.isList ? unflattenDeep(result, deeps, true) : result[0];
   }
 
   /**
@@ -486,9 +568,12 @@ export class StringType extends StructType<string, string> {
     littleEndian: boolean = false,
     offset: number = 0,
     view?: DataView,
-    textEncoder?: TextEncoder
+    textEncoder?: TextEncoder,
+    ctx?: any
   ): DataView {
-    const v = createDataView(this.count * this.size, view);
+    const actualCtx = ctx ?? obj;
+    const count = this.getCount(actualCtx);
+    const v = createDataView(count * this.size, view);
 
     if (Array.isArray(obj)) (obj as any) = obj.flat().join("");
 
@@ -496,7 +581,7 @@ export class StringType extends StructType<string, string> {
 
     const bytes: Uint8Array = textEncoder.encode(obj);
 
-    for (let i = 0; i < this.count; i++) {
+    for (let i = 0; i < count; i++) {
       const it = bytes[i] ?? 0;
       try {
         (v as any)[this.set](offset, it, littleEndian);

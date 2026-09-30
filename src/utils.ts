@@ -8,7 +8,7 @@ import { DecodeBuffer_t, Type } from "./interfaces";
  */
 export function unflattenDeep(
   array: any[] | string,
-  deeps: number[],
+  deeps: (number | any)[],
   isString = false
 ) {
   let r: any = array;
@@ -17,7 +17,7 @@ export function unflattenDeep(
 
   for (let i = deeps.length - 1; i >= 1; i--) {
     const isFirst = i === deeps.length - 1;
-    const value = deeps[i];
+    const value = isRef(deeps[i]) ? deeps[i].resolve(undefined) : Number(deeps[i]);
     r = r.reduce((acc: any, it: any, index: number) => {
       if (index % value === 0) acc.push([]);
       acc[acc.length - 1].push(it);
@@ -62,14 +62,69 @@ export function makeDataView(view: DecodeBuffer_t): DataView {
   return new DataView(view.buffer);
 }
 
+let refSeq = 0;
+const REF_MAP = new Map<string, Ref>();
+
+export class Ref {
+  readonly __isRef = true;
+  readonly id: string;
+
+  constructor(
+    public readonly field: string,
+    public readonly transform?: (val: number, ctx: any) => number
+  ) {
+    this.id = `__ref_${++refSeq}_${field}__`;
+    REF_MAP.set(this.id, this);
+  }
+
+  resolve(ctx: any): number {
+    if (!ctx) return 0;
+    const val = Number(ctx[this.field] ?? 0);
+    return this.transform ? this.transform(val, ctx) : val;
+  }
+
+  [Symbol.toPrimitive](): string {
+    return this.id;
+  }
+
+  toString(): string {
+    return this.id;
+  }
+}
+
+export function isRef(v: any): v is Ref {
+  return (
+    v instanceof Ref ||
+    (typeof v === "object" && v !== null && (v as any).__isRef === true)
+  );
+}
+
+export function ref(
+  field: string,
+  transform?: (val: number, ctx: any) => number
+): any {
+  return new Ref(field, transform);
+}
+
 export function arrayProxy(
   context: any,
-  cb: (target: any, index: number) => any
+  cb: (target: any, index: any) => any
 ) {
   return new Proxy(context, {
     get(t: any, k: string | number | symbol) {
       if (k in t) return t[k];
-      if (/\d+/.test(k.toString())) return cb(t, parseInt(k as string));
+      if (typeof k === "string") {
+        if (REF_MAP.has(k)) {
+          return cb(t, REF_MAP.get(k)!);
+        }
+        if (k.startsWith("__ref_")) {
+          const m = k.match(/^__ref_\d+_(.+)__$/);
+          if (m) {
+            return cb(t, new Ref(m[1]));
+          }
+        }
+        if (/\d+/.test(k)) return cb(t, parseInt(k));
+      }
     },
   });
 }

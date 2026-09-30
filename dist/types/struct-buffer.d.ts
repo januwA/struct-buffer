@@ -5,7 +5,7 @@ export type StructBuffer_t = {
     [k: string]: Type_t;
 };
 export declare function sizeof(type: Type_t): number;
-type StructBufferConfig = {
+export type StructBufferConfig = {
     textDecode?: TextDecoder;
     textEncoder?: TextEncoder;
     littleEndian?: boolean;
@@ -26,5 +26,4 @@ export declare class StructBuffer<D = {
     decode(view: DecodeBuffer_t, littleEndian?: boolean, offset?: number): D;
     encode(obj: E, littleEndian?: boolean, offset?: number, view?: DataView): DataView;
 }
-export {};
 //# sourceMappingURL=struct-buffer.d.ts.map

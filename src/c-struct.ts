@@ -164,7 +164,7 @@ export function from(sb: StructBuffer) {
         : type.structName;
 
     if (type.isList) {
-      const arr = type.deeps.map((i: number) => `[${i}]`).join("");
+      const arr = type.deeps.map((i: any) => `[${i}]`).join("");
       propName = `${propName}${arr}`;
     }
     props += `\t${typeName} ${propName};\n`;
