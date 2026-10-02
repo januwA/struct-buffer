@@ -7,6 +7,6 @@ export * from "./types";
 export { DecodeError, EncodeError } from "./errors";
 export { Cursor } from "./cursor";
 export { Writer } from "./writer";
-export { registerType, typedef, bits, bitFields, BoolType, Inject, } from "./class-type";
+export { registerType, typedef, bits, bitFields, Inject } from "./class-type";
 export { display } from "./display";
 export { COUNT, createDataView, makeDataView, sbytes, sbytes2, sview, TEXT, realloc, ref, Ref, isRef, } from "./utils";

@@ -8,7 +8,6 @@ import {
   bitFields,
   bits,
   blob,
-  BoolType,
   float,
   framed,
   records,
@@ -25,9 +24,6 @@ const hex = (dv: DataView) =>
   Array.from({ length: dv.byteLength }, (_, i) =>
     dv.getUint8(i).toString(16).padStart(2, "0")
   ).join(" ");
-
-/** 布尔不再内置: 宽度由使用者选, 这里用 C 的 bool(1B) */
-const bool = new BoolType("bool", uint8_t);
 
 /**
  * 类型推导的断言.
@@ -53,23 +49,44 @@ describe("类型推导", () => {
       u32: uint32_t,
       f: float,
       s: string_t,
-      b: bool,
     });
     type D = InferType<typeof F>;
     type _t = [
       Assert<Equals<D["u8"], number>>,
       Assert<Equals<D["u32"], number>>,
       Assert<Equals<D["f"], number>>,
-      Assert<Equals<D["s"], string>>,
-      Assert<Equals<D["b"], boolean>>
+      Assert<Equals<D["s"], string>>
     ];
 
-    // 1B + 4B + 4B + 1 字符 + 1B. string_t 本身只读 1 个字符, 不是 NUL 结尾的串 ——
+    // 1B + 4B + 4B + 1 字符. string_t 本身只读 1 个字符, 不是 NUL 结尾的串 ——
     // 要定宽字符串得写 string_t[N]
     const d = F.decode(
-      Uint8Array.from([7, 0, 0, 0, 0, 0x40, 0x40, 0x00, 0x00, 0x41, 1])
+      Uint8Array.from([7, 0, 0, 0, 0, 0x40, 0x40, 0x00, 0x00, 0x41])
     );
-    expect([d.u8, d.u32, d.f, d.s, d.b]).toEqual([7, 0, 3, "A", true]);
+    expect([d.u8, d.u32, d.f, d.s]).toEqual([7, 0, 3, "A"]);
+  });
+
+  it("布尔语义的字段推出来是 number, 不是 boolean", () => {
+    // 库里没有 bool / BOOL / BoolType: 宽度是 uintN_t 的事, 真值判断是调用方的事。
+    // 编译期这一半的断言在 bool.test.ts 的运行时那一半之外单列, 因为"折成 boolean"
+    // 是个只在类型上才看得出来的诱惑
+    const F = new DynamicStructBuffer("F", {
+      ok1: uint8_t,
+      ok4: uint32_t,
+    });
+    type D = InferType<typeof F>;
+    type _t = [
+      Assert<Equals<D["ok1"], number>>,
+      Assert<Equals<D["ok4"], number>>
+    ];
+
+    const d = F.decode(Uint8Array.from([1, 0, 0, 0, 2]));
+    // 真值判断交给调用方, 所以要自己收窄
+    expect(d.ok1 !== 0).toBe(true);
+    expect(Boolean(d.ok4)).toBe(true);
+
+    // @ts-expect-error 推出来是 number, 与 true 比较不合法
+    void (d.ok1 === true);
   });
 
   it("下标就是数组, 多维就是多维; string_t 的下标只定字节数", () => {

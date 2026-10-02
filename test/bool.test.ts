@@ -1,49 +1,39 @@
-import { BoolType, uint8_t, uint32_t, sizeof, makeDataView } from "../src";
+import { uint8_t, uint16_t, uint32_t, makeDataView } from "../src";
 
 /**
- * `bool` / `BOOL` 已经不再内置: 一个布尔就是"底层整数非零即真", 宽度交给使用者选,
- * 所以只留 `BoolType` 本身(C 的 `bool` 取 1B, Windows 的 `BOOL` 取 4B)。
+ * 布尔语义的归属。
+ *
+ * 库里没有 bool / BOOL, 也没有 BoolType: 一个"布尔"字段在真实报文里是 1 / 2 / 4 字节
+ * 整数, 而合法取值往往不止 {0, 1}。折成 `boolean` 会同时丢两样东西 ——
+ *
+ *   - 不同的字节解出同一个值: [1, 2] 都变 true, 于是 `a === b` 在两种报文字节下都成立
+ *   - 编不回去: encode 只认 0 / 1, 原始的 2 永远出不来, 往返即损坏
+ *
+ * 所以宽度交给 `uintN_t`, 真值判断交给调用方。下面的断言就是防止有人再把折叠加回来。
  */
-const bool = new BoolType("bool", uint8_t);
-const BOOL = new BoolType("BOOL", uint32_t);
+describe("布尔语义由调用方判断", () => {
+  it("整数类型不做真值折叠, 保留原始取值", () => {
+    const wire = [0, 0, 0, 1, 0, 0, 0, 2];
+    const data = uint32_t[2].decode(wire);
 
-describe("BoolType 测试", () => {
-  it("encode", () => {
-    expect(uint8_t.decode(bool.encode(2))).toBe(1);
-    expect(uint8_t.decode(bool.encode(0))).toBe(0);
-    expect(uint32_t.decode(BOOL.encode(2))).toBe(1);
-    expect(uint32_t.decode(BOOL.encode(0))).toBe(0);
+    expect(data).toEqual([1, 2]);
+    expect(data[0] === data[1]).toBe(false);
 
-    expect(uint8_t.decode(bool[1].encode([2]))).toBe(1);
-    expect(uint8_t.decode(bool[1].encode([0]))).toBe(0);
-    expect(uint32_t.decode(BOOL[1].encode([2]))).toBe(1);
-    expect(uint32_t.decode(BOOL[1].encode([0]))).toBe(0);
+    // 真值判断是消费方的事, 各宽度都一样
+    expect(data.map(Boolean)).toEqual([true, true]);
+    expect(data.filter((it) => it !== 0)).toEqual([1, 2]);
   });
 
-  it("decode", () => {
-    // bool 走 1B, BOOL 走 4B 大端
-    expect(bool.decode(makeDataView([2]))).toBe(true);
-    expect(bool.decode(makeDataView([0]))).toBe(false);
-
-    expect(BOOL.decode(makeDataView([0, 0, 0, 2]))).toBe(true);
-    expect(BOOL.decode(makeDataView([0, 0, 0, 0]))).toBe(false);
-
-    expect(bool[2].decode(makeDataView([2, 0]))).toEqual([true, false]);
-    expect(bool[2].decode(makeDataView([0, 2]))).toEqual([false, true]);
-    expect(BOOL[2].decode(makeDataView([0, 0, 0, 2, 0, 0, 0, 0]))).toEqual([
-      true,
-      false,
-    ]);
-    expect(BOOL[2].decode(makeDataView([0, 0, 0, 0, 0, 0, 0, 2]))).toEqual([
-      false,
-      true,
-    ]);
+  it("取值能原样编回去", () => {
+    const wire = [0, 0, 0, 1, 0, 0, 0, 2];
+    expect(uint32_t[2].encode(uint32_t[2].decode(wire))).toEqual(
+      makeDataView(wire)
+    );
   });
 
-  it("sizeof", () => {
-    expect(sizeof(bool)).toBe(1);
-    expect(sizeof(bool[2])).toBe(2);
-    expect(sizeof(BOOL)).toBe(4);
-    expect(sizeof(BOOL[2])).toBe(8);
+  it("1 / 2 / 4 字节都只是整数宽度, 没有额外语义", () => {
+    expect(uint8_t.decode(makeDataView([2]))).toBe(2);
+    expect(uint16_t.decode(makeDataView([0, 2]))).toBe(2);
+    expect(uint32_t.decode(makeDataView([0, 0, 0, 2]))).toBe(2);
   });
 });

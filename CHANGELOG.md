@@ -10,7 +10,6 @@ bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那�
 - `InferType` / `InferDef` / `InferEncodeDef` 导出, 可以单独拿来推任意字段表
 - `blob` / `rest` / `records` / `framed` / `variant` 声明式字段工厂
 - `decodeLenient`: 坏字段变 `undefined` 并收集错误, 而不是整帧丢掉
-- `BoolType` 从 `class-type` 提到公开导出, 布尔类型可以自己按宽度构造
 
 ### 🐛 修复
 
@@ -47,9 +46,11 @@ bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那�
   `short` / `ushort` / `int` / `uint` / `long` / `ulong` / `long long` / `ulong long` /
   `BYTE` / `WORD` / `DWORD` / `QWORD` / `CHAR`..`ULONGLONG` / `FLOAT` / `DOUBLE`
   改写即可, 例如 `DWORD` → `uint32_t`
-- 删除 `bool` / `BOOL`: 语义就是"底层整数非零即真", 宽度交给使用者选。
-  `new BoolType("bool", uint8_t)` 是 1 字节, `new BoolType("BOOL", uint32_t)` 是
-  Windows 的 4 字节
+- 删除 `bool` / `BOOL` / `BoolType`: 布尔字段在真实报文里是 1 / 2 / 4 字节整数, 而合法
+  取值往往不止 `{0, 1}`。宽度用 `uint8_t` / `uint16_t` / `uint32_t`, 真值判断自己写。
+  `BoolType` 的折算是有损的 —— `[1, 2]` 都解成 `true`(于是 `a === b` 在两种报文字节下都
+  成立), 且 `encode` 只认 `0` / `1`, 原始的 `2` 编不回去, 往返即损坏; 它的
+  `D extends boolean` 也表达不了三态。删除后整数类型一律保留原始取值
 - 删除 `padding_t`: 它会把跳过的字节解成 uint8 数组塞进结果, 真实项目里协议表一半的字段
   是"未知/保留/填充", 让它们出现在结果里只会污染每一次消费。动态结构体请用 `skip()`
 - 删除 `StructType.is()`: 唯一使用者是被删掉的 `CStruct`

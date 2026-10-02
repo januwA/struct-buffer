@@ -1,7 +1,5 @@
-import { BoolType, int32_t, string_t, StructBuffer } from "../src";
+import { int32_t, string_t, StructBuffer } from "../src";
 import { bits, BitsType, StringType, StructType } from "../src/class-type";
-
-const BOOL = new BoolType("BOOL", int32_t);
 
 describe("deeps test", () => {
   it("type", () => {
@@ -17,7 +15,6 @@ describe("deeps test", () => {
     expect(c instanceof StructType).toEqual(true);
 
     expect(bits(int32_t, {})[2][2] instanceof BitsType).toEqual(true);
-    expect(BOOL[2][2] instanceof BoolType).toEqual(true);
     expect(string_t[2][2] instanceof StringType).toEqual(true);
   });
 

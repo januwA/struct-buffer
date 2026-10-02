@@ -136,7 +136,7 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
 
   /**
    * 元素个数. `ctx[COUNT]` 是 Field 引擎解析完 ref 后回灌的显式元素数, 优先级最高:
-   * 只有它能让**覆写了 decode/encode 的子类型**(bits/BoolType/string_t/自定义类型)在
+   * 只有它能让**覆写了 decode/encode 的子类型**(bits/string_t/自定义类型)在
    * ref 驱动列表下拿到正确个数, 而不必给每个子类各写一份 count 感知的实现.
    * ctx 为普通对象时无副作用, 未走 Field 引擎的老调用完全不受影响。
    */
@@ -498,85 +498,6 @@ export class BitFieldsType<
       (v as any)[this.set](offset, this.toRaw(val), littleEndian);
       return v;
     }
-  }
-}
-
-export class BoolType<
-  D extends boolean,
-  E extends boolean | number
-> extends StructType<D, E> {
-  /**
-   * 布尔不再内置 —— 一个布尔就是"底层整数非零即真", 宽度交给使用者选:
-   *
-   * ```
-   * new BoolType("bool", uint8_t)   // C 的 bool,  1 字节
-   * new BoolType("BOOL", uint32_t)  // Windows 的 BOOL, 4 字节
-   * ```
-   */
-  constructor(typeName: string | string[], type: StructType<number, number>) {
-    super(typeName, type.size, type.unsigned);
-  }
-
-  /**
-   * ```
-   * new BoolType("bool", uint8_t).decode([1])
-   * => true
-   *
-   * new BoolType("BOOL", uint32_t).decode([0, 0, 0, 1])
-   * => true
-   * ```
-   * @param view
-   * @param littleEndian
-   * @param offset
-   */
-  override decode(
-    view: DecodeBuffer_t,
-    littleEndian: boolean = false,
-    offset: number = 0,
-    textDecodeOrCtx?: any,
-    ctx?: any
-  ): D {
-    const actualCtx =
-      ctx ?? (textDecodeOrCtx && !textDecodeOrCtx.decode ? textDecodeOrCtx : undefined);
-    let r = super.decode(view, littleEndian, offset, textDecodeOrCtx, ctx) as any;
-    if (Array.isArray(r)) {
-      r = r.flat().map((it) => Boolean(it));
-      r = unflattenDeep(r, this.getDeeps(actualCtx));
-    } else {
-      r = Boolean(r);
-    }
-    return r;
-  }
-
-  /**
-   * ```
-   * new BoolType("bool", uint8_t).encode(0)
-   * => <00>
-   *
-   * new BoolType("BOOL", uint32_t).encode(0)
-   * => <00 00 00 00>
-   * ```
-   * @param obj
-   * @param littleEndian
-   * @param offset
-   * @param view
-   * @param textEncoderOrCtx
-   * @param ctx
-   */
-  override encode(
-    obj: E,
-    littleEndian: boolean = false,
-    offset: number = 0,
-    view?: DataView,
-    textEncoderOrCtx?: any,
-    ctx?: any
-  ): DataView {
-    if (obj && Array.isArray(obj)) {
-      obj = obj.flat().map((it) => Number(Boolean(it))) as any;
-    } else if (obj) {
-      obj = Number(Boolean(obj)) as any;
-    }
-    return super.encode(obj, littleEndian, offset, view, textEncoderOrCtx, ctx);
   }
 }
 

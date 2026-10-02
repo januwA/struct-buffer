@@ -243,32 +243,6 @@ export class BitFieldsType extends StructType {
         }
     }
 }
-export class BoolType extends StructType {
-    constructor(typeName, type) {
-        super(typeName, type.size, type.unsigned);
-    }
-    decode(view, littleEndian = false, offset = 0, textDecodeOrCtx, ctx) {
-        const actualCtx = ctx ?? (textDecodeOrCtx && !textDecodeOrCtx.decode ? textDecodeOrCtx : undefined);
-        let r = super.decode(view, littleEndian, offset, textDecodeOrCtx, ctx);
-        if (Array.isArray(r)) {
-            r = r.flat().map((it) => Boolean(it));
-            r = unflattenDeep(r, this.getDeeps(actualCtx));
-        }
-        else {
-            r = Boolean(r);
-        }
-        return r;
-    }
-    encode(obj, littleEndian = false, offset = 0, view, textEncoderOrCtx, ctx) {
-        if (obj && Array.isArray(obj)) {
-            obj = obj.flat().map((it) => Number(Boolean(it)));
-        }
-        else if (obj) {
-            obj = Number(Boolean(obj));
-        }
-        return super.encode(obj, littleEndian, offset, view, textEncoderOrCtx, ctx);
-    }
-}
 export class StringType extends StructType {
     constructor() {
         super("string_t", 1, true);

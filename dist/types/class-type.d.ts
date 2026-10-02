@@ -46,11 +46,6 @@ export declare class BitFieldsType<D = {
     decode(view: DecodeBuffer_t, littleEndian?: boolean, offset?: number, textDecodeOrCtx?: any, ctx?: any): D;
     encode(obj: E, littleEndian?: boolean, offset?: number, view?: DataView, textEncoderOrCtx?: any, ctx?: any): DataView;
 }
-export declare class BoolType<D extends boolean, E extends boolean | number> extends StructType<D, E> {
-    constructor(typeName: string | string[], type: StructType<number, number>);
-    decode(view: DecodeBuffer_t, littleEndian?: boolean, offset?: number, textDecodeOrCtx?: any, ctx?: any): D;
-    encode(obj: E, littleEndian?: boolean, offset?: number, view?: DataView, textEncoderOrCtx?: any, ctx?: any): DataView;
-}
 export declare class StringType extends StructType<string, string> {
     constructor();
     textDecode: TextDecoder;

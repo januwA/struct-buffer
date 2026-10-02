@@ -73,8 +73,20 @@ const data = uint32_t[2].decode(view);
 - 8 字节类型的**值类型统一是 `number`**，不再把 `bigint` 抛给调用方。代价是超过
   `2^53` 的值会掉精度（协议里的 64 位计数/时间戳基本够用，文件偏移请自己确认）。
 
-布尔不再内置：`new BoolType("bool", uint8_t)` 是 1 字节，`new BoolType("BOOL", uint32_t)`
-是 Windows 的 4 字节，语义都是"底层整数非零即真"。
+布尔字段在真实报文里是 1 / 2 / 4 字节整数，而合法取值往往不止 `{0, 1}`，所以库里**没有**
+`bool` / `BOOL`，也不做真值折叠：宽度用 `uint8_t` / `uint16_t` / `uint32_t`，真值判断自己写。
+
+```ts
+const M = new DynamicStructBuffer("M", { ok: uint32_t });
+
+const d = M.decode(sbytes("00 00 00 02"));
+d.ok;          // => 2   原始取值，不会被折成 true
+Boolean(d.ok); // => true 真值判断是消费方的事
+```
+
+折成 `boolean` 会同时丢两样东西：不同的字节解出同一个值（`[1, 2]` 都变 `true`，于是
+`a === b` 在两种报文字节下都成立），以及编不回去（`encode` 只认 `0` / `1`，原始的 `2`
+永远出不来，往返即损坏）。需要状态多于两态的字段，同理直接用整数类型自己收窄。
 
 ## register Type
 ```ts

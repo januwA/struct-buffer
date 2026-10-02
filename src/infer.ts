@@ -41,7 +41,7 @@ import type { DynamicStructBuffer } from "./dynamic-struct-buffer";
  * 再套一层是幂等的。
  */
 export type InferType<T> = T extends { [VALUE_TYPE]: infer V }
-  ? ValueOf<V> // uint8_t / string_t / BoolType / bits / uint8_t[ref(...)] / blob() / framed()
+  ? ValueOf<V> // uint8_t / string_t / bits / uint8_t[ref(...)] / blob() / framed()
   : InferShape<T>;
 
 /**
