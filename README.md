@@ -149,51 +149,6 @@ XINPUT_STATE.encode({
 });
 ```
 
-## parse c-struct
-```ts
-import { CStruct } from "struct-buffer";
-
-const cStruct = `
-//
-// Structures used by XInput APIs
-//
-typedef struct _XINPUT_GAMEPAD
-{
-    WORD                                wButtons;
-    BYTE                                bLeftTrigger;
-    BYTE                                bRightTrigger;
-    SHORT                               sThumbLX;
-    SHORT                               sThumbLY;
-    SHORT                               sThumbRX;
-    SHORT                               sThumbRY;
-} XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
-
-typedef struct _XINPUT_STATE
-{
-    DWORD                               dwPacketNumber;
-    XINPUT_GAMEPAD                      Gamepad;
-} XINPUT_STATE, *PXINPUT_STATE;
-
-typedef struct _XINPUT_VIBRATION
-{
-    WORD                                wLeftMotorSpeed;
-    WORD                                wRightMotorSpeed;
-} XINPUT_VIBRATION, *PXINPUT_VIBRATION;
-
-typedef struct _XINPUT_BATTERY_INFORMATION
-{
-    BYTE BatteryType;
-    BYTE BatteryLevel;
-} XINPUT_BATTERY_INFORMATION, *PXINPUT_BATTERY_INFORMATION;
-`;
-
-const structs = CStruct.parse(cStruct);
-sizeof(structs.XINPUT_GAMEPAD) // 12
-sizeof(structs.XINPUT_STATE) // 16
-sizeof(structs.XINPUT_VIBRATION) // 4
-sizeof(structs.XINPUT_BATTERY_INFORMATION) // 2
-```
-
 ## struct list
 ```ts
 const User = new StructBuffer("User", {
@@ -372,34 +327,6 @@ Msg.encode({ msg_typo: 1 }); // 编译期报错
   写 `new DynamicStructBuffer<any, MyType>(...)` —— `S` 填 `any` 就是放弃推导
 
 单独用 `InferDef<typeof Msg.struct>` / `InferType<typeof Msg>` 也能拿到类型.
-
-## StructBuffer to c-struct
-```ts
-import { CStruct } from "struct-buffer";
-
-const XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
-  wButtons: WORD,
-  bLeftTrigger: BYTE,
-  bRightTrigger: BYTE,
-  sThumbLX: int16_t,
-  sThumbLY: int16_t,
-  sThumbRX: int16_t,
-  sThumbRY: int16_t[2],
-});
-const cStruct = CStruct.from(XINPUT_GAMEPAD);
-
-// console.log(cStruct) => 
-typedef struct _XINPUT_GAMEPAD
-{
-    WORD wButtons;
-    BYTE bLeftTrigger;
-    BYTE bRightTrigger;
-    int16_t sThumbLX;
-    int16_t sThumbLY;
-    int16_t sThumbRX;
-    int16_t sThumbRY[2];
-} XINPUT_GAMEPAD, *XINPUT_GAMEPAD;
-```
 
 ## "string_t" Truncate when encountering 0
 ```ts

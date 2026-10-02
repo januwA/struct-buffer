@@ -11,7 +11,6 @@ import {
   StructBuffer,
   uchar,
   typedef,
-  CStruct,
   pack,
   sview,
   sbytes2 as b2,
@@ -213,66 +212,6 @@ describe("test struct nesting", () => {
   });
 });
 
-describe("test parseCStruct", () => {
-  it("test parse", () => {
-    const cStruct = `
-//
-// Structures used by XInput APIs
-//
-typedef struct _XINPUT_GAMEPAD
-{
-    WORD                                wButtons;
-    BYTE                                bLeftTrigger;
-    BYTE                                bRightTrigger;
-    SHORT                               sThumbLX;
-    SHORT                               sThumbLY;
-    SHORT                               sThumbRX;
-    SHORT                               sThumbRY;
-} XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
-
-typedef struct _XINPUT_STATE
-{
-    DWORD                               dwPacketNumber;
-    XINPUT_GAMEPAD                      Gamepad;
-} XINPUT_STATE, *PXINPUT_STATE;
-
-typedef struct _XINPUT_VIBRATION
-{
-    WORD                                wLeftMotorSpeed;
-    WORD                                wRightMotorSpeed;
-} XINPUT_VIBRATION, *PXINPUT_VIBRATION;
-
-typedef struct _XINPUT_BATTERY_INFORMATION
-{
-    BYTE BatteryType;
-    BYTE BatteryLevel;
-} XINPUT_BATTERY_INFORMATION, *PXINPUT_BATTERY_INFORMATION;
-
-`;
-    const structs = CStruct.parse(cStruct);
-    expect(sizeof(structs.XINPUT_GAMEPAD)).toBe(12);
-    expect(sizeof(structs.XINPUT_STATE)).toBe(16);
-    expect(sizeof(structs.XINPUT_VIBRATION)).toBe(4);
-    expect(sizeof(structs.XINPUT_BATTERY_INFORMATION)).toBe(2);
-  });
-
-  it("test parse 2", () => {
-    const structs = CStruct.parse(`
-  struct Player {
-    char name[10];
-    unsigned   int   health;
-    DWORD coins;
-    float x;
-    float y;
-    float z;
-  };
-`);
-
-    expect(sizeof(structs.Player)).toBe(32);
-    expect(structs.Player.byteLength).toBe(30);
-  });
-});
-
 describe("test typedef", () => {
   it("test typedef", () => {
     const HANDLE = typedef("HANDLE", DWORD);
@@ -355,39 +294,5 @@ describe("test struct Multilevel array", () => {
   it("test byteLength", () => {
     expect(player.byteLength).toBe(8);
     expect(players.byteLength).toBe(32);
-  });
-
-  it("test toCStruct", () => {
-    // console.log(s_player.toCStruct());
-    // console.log(s_players.toCStruct());
-  });
-});
-
-describe("test toCStruct", () => {
-  it("test toCStruct", () => {
-    const XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
-      wButtons: WORD,
-      bLeftTrigger: BYTE,
-      bRightTrigger: BYTE,
-      sThumbLX: int16_t,
-      sThumbLY: int16_t,
-      sThumbRX: int16_t,
-      sThumbRY: int16_t[2],
-    });
-    const cStruct = CStruct.from(XINPUT_GAMEPAD);
-    expect(cStruct).toEqual(
-      expect.not.stringContaining(`
-    typedef struct _XINPUT_GAMEPAD
-    {
-        WORD wButtons;
-        BYTE bLeftTrigger;
-        BYTE bRightTrigger;
-        int16_t sThumbLX;
-        int16_t sThumbLY;
-        int16_t sThumbRX;
-        int16_t sThumbRY[2];
-    } XINPUT_GAMEPAD, *XINPUT_GAMEPAD;
-    `)
-    );
   });
 });
