@@ -1,23 +1,23 @@
-import { DWORD, BYTE, WORD, QWORD, float, double, display, makeDataView } from "../src";
+import { uint32_t, uint8_t, uint16_t, uint64_t, float, double, display, makeDataView } from "../src";
 
 describe("test display", () => {
   const view: DataView = makeDataView([1, 2, 3, 4, 5, 6, 7, 8]);
-  it("test byte", () => {
-    const data = display(view, BYTE, { hex: false });
+  it("test uint8_t", () => {
+    const data = display(view, uint8_t, { hex: false });
     expect(data[0].value).toBe(1);
     expect(data[1].value).toBe(2);
   });
-  it("test word", () => {
-    const data = display(view, WORD);
+  it("test uint16_t", () => {
+    const data = display(view, uint16_t);
     expect(parseInt(data[0].value, 16)).toBe(0x0102);
     expect(parseInt(data[1].value, 16)).toBe(0x0304);
   });
-  it("test dword", () => {
-    const data = display(view, DWORD);
+  it("test uint32_t", () => {
+    const data = display(view, uint32_t);
     expect(parseInt(data[0].value, 16)).toBe(0x01020304);
   });
-  it("test qword", () => {
-    const data = display(view, QWORD);
+  it("test uint64_t", () => {
+    const data = display(view, uint64_t);
     expect(parseInt(data[0].value, 16)).toBe(0x0102030405060708);
   });
 

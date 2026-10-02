@@ -6,7 +6,6 @@ import {
   discriminated,
   DynamicStructBuffer,
   framed,
-  padding_t,
   records,
   ref,
   rest,
@@ -109,10 +108,10 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
     expect(() => Fwd.decode([0, 1])).toThrow(/尚未解析/);
   });
 
-  it("padding_t[ref] 不再静默返回空数组", () => {
+  it("ref 驱动的列表不再静默返回空数组", () => {
     const Padded = new DynamicStructBuffer("padded", {
       n: uint8_t,
-      pad: padding_t[ref("n")],
+      pad: uint8_t[ref("n")],
     });
     const encoded = Padded.encode({ n: 3 });
     expect(encoded.byteLength).toBe(4);

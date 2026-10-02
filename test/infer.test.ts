@@ -8,7 +8,7 @@ import {
   bitFields,
   bits,
   blob,
-  bool,
+  BoolType,
   float,
   framed,
   records,
@@ -25,6 +25,9 @@ const hex = (dv: DataView) =>
   Array.from({ length: dv.byteLength }, (_, i) =>
     dv.getUint8(i).toString(16).padStart(2, "0")
   ).join(" ");
+
+/** 布尔不再内置: 宽度由使用者选, 这里用 C 的 bool(1B) */
+const bool = new BoolType("bool", uint8_t);
 
 /**
  * 类型推导的断言.

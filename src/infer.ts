@@ -29,20 +29,19 @@ import type { DynamicStructBuffer } from "./dynamic-struct-buffer";
  * 唯一不适用的是字符串家族(见 `ValueOf`): 下标只定字节数, 一律出 `string`.
  *
  * 旧版 `ref()` 声明成 `any`, 推导到 `uint8_t[ref("len")]` 就断了; 改成 `RefIndex`
- * (运行时是 Ref 对象, 类型上是 number)之后才能穿过长度前缀。
+* (运行时是 Ref 对象, 类型上是 number)之后才能穿过长度前缀。
  *
-* **有意不管的两处**:
+ * **有意不管的一处**:
  *
  * - `variant` / `discriminated`: 分支字段在运行时是**平铺**进父对象的, 所以类型上
  *   由 `VariantExtras` 把各分支的字段并进父对象(都可选); 但"哪个分支生效"取决于
  *   判别字段的运行时值, 静态没法收窄成一个 union, 字段自己仍按各分支的类型给出.
- * - `padding_t`: 它只占位不产出值, 解出来是一串 0, 沿用类型自身的 `number`.
  *
  * 非对象原样透传(`InferType<number>` 就是 `number`), 因此对已经解码出来的对象
  * 再套一层是幂等的。
  */
 export type InferType<T> = T extends { [VALUE_TYPE]: infer V }
-  ? ValueOf<V> // uint8_t / string_t / bool / bits / uint8_t[ref(...)] / blob() / framed()
+  ? ValueOf<V> // uint8_t / string_t / BoolType / bits / uint8_t[ref(...)] / blob() / framed()
   : InferShape<T>;
 
 /**

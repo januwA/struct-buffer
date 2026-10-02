@@ -22,6 +22,9 @@ import {
 export const FLOAT_TYPE = "float";
 export const DOUBLE_TYPE = "double";
 
+/** [DataView 读方法, DataView 写方法, 该类型是否走 BigInt 访问器] */
+type TypeHandle_t = [get: string, set: string, isBig: boolean];
+
 const hData: any = {
   1: {
     1: "getUint8",
@@ -43,7 +46,7 @@ const hData: any = {
   d: "getFloat64",
 };
 
-function typeHandle<D, E>(type: StructType<D, E>): [get: string, set: string] {
+function typeHandle<D, E>(type: StructType<D, E>): TypeHandle_t {
   let h: string | undefined = undefined;
 
   const isFloat =
@@ -60,7 +63,7 @@ function typeHandle<D, E>(type: StructType<D, E>): [get: string, set: string] {
   if (!h) h = hData[type.size][+type.unsigned];
   if (!h) throw new Error(`StructBuffer: Unrecognized ${type} type.`);
 
-  return [h, h.replace(/^g/, "s")];
+  return [h, h.replace(/^g/, "s"), h.startsWith("getBig")];
 }
 
 class StructTypeNext {
@@ -133,7 +136,7 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
 
   /**
    * 元素个数. `ctx[COUNT]` 是 Field 引擎解析完 ref 后回灌的显式元素数, 优先级最高:
-   * 只有它能让**覆写了 decode/encode 的子类型**(bits/bool/string_t/自定义类型)在
+   * 只有它能让**覆写了 decode/encode 的子类型**(bits/BoolType/string_t/自定义类型)在
    * ref 驱动列表下拿到正确个数, 而不必给每个子类各写一份 count 感知的实现.
    * ctx 为普通对象时无副作用, 未走 Field 引擎的老调用完全不受影响。
    */
@@ -169,16 +172,19 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
     return this.size;
   }
 
-  is<D, E>(type: StructType<D, E>): boolean {
-    return type.names.some((name) => this.names.includes(name));
-  }
-
   isName(typeName: string) {
     return this.names.includes(typeName);
   }
 
   get: string;
   set: string;
+
+  /**
+   * 该类型是否走 `getBigInt64` / `setBigInt64` 一族的访问器。
+   * 声明的值类型始终是 `number`, 转换统一收在 decode/encode 里做:
+   * 免得类型撒谎(旧引擎把 bigint 原样抛给调用方, 新引擎的 `Cursor.u64` 给的是 number)。
+   */
+  readonly isBig: boolean;
 
   constructor(
     typeName: string | string[],
@@ -189,21 +195,32 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
     this.names = Array.isArray(typeName) ? typeName : [typeName];
 
     if (this.size) {
-      const [get, set] = typeHandle(this);
+      const [get, set, isBig] = typeHandle(this);
       this.set = set;
       this.get = get;
+      this.isBig = isBig;
     } else {
       this.set = this.get = "";
+      this.isBig = false;
     }
     return arrayProxyNext(this, StructTypeNext);
   }
 
   /**
+   * 写进 DataView 前把值调到访问器要的形态。
+   * `setBigInt64` 只收 bigint, `setUint8` 只收 number —— 之前靠"先抛 TypeError 再
+   * 兜底重试"来区分, 那条路径在 encode 的 catch 里, 一旦真的越界会把原始错误盖掉。
+   */
+  protected toRaw(value: any): any {
+    return this.isBig ? BigInt(value) : value;
+  }
+
+  /**
    *
    * ```ts
-   * DWORD.decode( new Uint8Array([0,0,0,1]) ) => 1
+   * uint32_t.decode( new Uint8Array([0,0,0,1]) ) => 1
    *
-   * DWORD[2].decode( new Uint8Array([0,0,0,1, 0,0,0,2]) ) => [1, 2]
+   * uint32_t[2].decode( new Uint8Array([0,0,0,1, 0,0,0,2]) ) => [1, 2]
    * ```
    *
    * @param view
@@ -227,7 +244,10 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
     const result: AnyObject[] = [];
     let i = count;
     while (i--) {
-      result.push((view as any)[this.get](offset, littleEndian));
+      const v = (view as any)[this.get](offset, littleEndian);
+      // 8 字节类型走 DataView 的 BigInt 访问器, 但声明的值类型是 number: 统一收窄,
+      // 调用方拿到的一律是 number, 不用再自己判断 bigint
+      result.push(this.isBig ? Number(v) : v);
       offset += this.size;
     }
     const deeps = this.getDeeps(actualCtx);
@@ -237,12 +257,12 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
   /**
    *
    * ```ts
-   * DWORD.encode(4)         => <00 00 00 02>
+   * uint32_t.encode(4)         => <00 00 00 02>
    *
-   * DWORD[2].encode([1,2])  => <00 00 00 01 00 00 00 02>
+   * uint32_t[2].encode([1,2])  => <00 00 00 01 00 00 00 02>
    *
    * // padding zero
-   * DWORD[2].encode([1])    => <00 00 00 01 00 00 00 00>
+   * uint32_t[2].encode([1])    => <00 00 00 01 00 00 00 00>
    * ```
    *
    * @param obj
@@ -269,11 +289,7 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
 
     for (let i = 0; i < count; i++) {
       const it = (this.isList ? (obj as any)[i] : obj) ?? 0;
-      try {
-        (v as any)[this.set](offset, it, littleEndian);
-      } catch (error) {
-        (v as any)[this.set](offset, BigInt(it), littleEndian);
-      }
+      (v as any)[this.set](offset, this.toRaw(it), littleEndian);
       offset += this.size;
     }
 
@@ -343,7 +359,7 @@ export class BitsType<
           const i: number = this.bits![k];
           if (i !== undefined) flags |= v << i;
         });
-        (v as any)[this.set](offset, flags, littleEndian);
+        (v as any)[this.set](offset, this.toRaw(flags), littleEndian);
         offset += this.size;
       }
 
@@ -354,7 +370,7 @@ export class BitsType<
         const i: number = this.bits![k];
         if (i !== undefined) flags |= v << i;
       });
-      (v as any)[this.set](offset, flags, littleEndian);
+      (v as any)[this.set](offset, this.toRaw(flags), littleEndian);
       return v;
     }
   }
@@ -473,13 +489,13 @@ export class BitFieldsType<
 
     if (this.isList && Array.isArray(obj)) {
       for (let i = 0; i < count; i++) {
-        (v as any)[this.set](offset, _getValue(obj[i]), littleEndian);
+        (v as any)[this.set](offset, this.toRaw(_getValue(obj[i])), littleEndian);
         offset += this.size;
       }
       return v;
     } else {
       const val = _getValue(obj);
-      (v as any)[this.set](offset, val, littleEndian);
+      (v as any)[this.set](offset, this.toRaw(val), littleEndian);
       return v;
     }
   }
@@ -489,16 +505,24 @@ export class BoolType<
   D extends boolean,
   E extends boolean | number
 > extends StructType<D, E> {
+  /**
+   * 布尔不再内置 —— 一个布尔就是"底层整数非零即真", 宽度交给使用者选:
+   *
+   * ```
+   * new BoolType("bool", uint8_t)   // C 的 bool,  1 字节
+   * new BoolType("BOOL", uint32_t)  // Windows 的 BOOL, 4 字节
+   * ```
+   */
   constructor(typeName: string | string[], type: StructType<number, number>) {
     super(typeName, type.size, type.unsigned);
   }
 
   /**
    * ```
-   * bool.decode([1])
+   * new BoolType("bool", uint8_t).decode([1])
    * => true
    *
-   * BOOL.decode([0, 0, 0, 1])
+   * new BoolType("BOOL", uint32_t).decode([0, 0, 0, 1])
    * => true
    * ```
    * @param view
@@ -526,10 +550,10 @@ export class BoolType<
 
   /**
    * ```
-   * bool.encode(0)
+   * new BoolType("bool", uint8_t).encode(0)
    * => <00>
    *
-   * BOOL.encode(0)
+   * new BoolType("BOOL", uint32_t).encode(0)
    * => <00 00 00 00>
    * ```
    * @param obj
@@ -633,71 +657,6 @@ export class StringType extends StructType<string, string> {
       offset += this.size;
     }
 
-    return v;
-  }
-}
-
-export class PaddingType extends StructType<number, number> {
-  constructor() {
-    super("padding_t", 1, true);
-  }
-
-  /**
-   * ```
-   * padding_t[2].decode([1, 2, 3])
-   * => [ 1, 2 ]
-   * ```
-   * @param view
-   * @param littleEndian
-   * @param offset
-   * @param textDecodeOrCtx
-   * @param ctx
-   */
-  override decode(
-    view: DecodeBuffer_t,
-    littleEndian: boolean = false,
-    offset: number = 0,
-    textDecodeOrCtx?: any,
-    ctx?: any
-  ) {
-    const actualCtx = ctx ?? textDecodeOrCtx;
-    view = makeDataView(view);
-    let i = this.getSize(actualCtx);
-    const r: number[] = [];
-    while (i--) {
-      r.push((view as any)[this.get](offset, littleEndian));
-      offset++;
-    }
-    return r as any;
-  }
-
-  /**
-   *
-   * ```
-   * padding_t[10].encode(0 as any)
-   * => <00 00 00 00 00 00 00 00 00 00>
-   * ```
-   *
-   * @param zero
-   * @param littleEndian
-   * @param offset
-   * @param view
-   * @param textEncoderOrCtx
-   * @param ctx
-   */
-  override encode(
-    zero: number = 0,
-    littleEndian: boolean = false,
-    offset: number = 0,
-    view?: DataView,
-    textEncoderOrCtx?: any,
-    ctx?: any
-  ): DataView {
-    const actualCtx = ctx ?? textEncoderOrCtx;
-    const v = createDataView(this.getSize(actualCtx), view);
-    if (typeof zero !== "number") zero = 0;
-    let length = this.getSize(actualCtx);
-    while (length-- > 0) v.setUint8(offset++, zero);
     return v;
   }
 }

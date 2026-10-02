@@ -1,20 +1,27 @@
-import { BOOL, bool, uchar, uint, sizeof, makeDataView } from "../src";
+import { BoolType, uint8_t, uint32_t, sizeof, makeDataView } from "../src";
 
-describe("bool and BOOL test", () => {
+/**
+ * `bool` / `BOOL` 已经不再内置: 一个布尔就是"底层整数非零即真", 宽度交给使用者选,
+ * 所以只留 `BoolType` 本身(C 的 `bool` 取 1B, Windows 的 `BOOL` 取 4B)。
+ */
+const bool = new BoolType("bool", uint8_t);
+const BOOL = new BoolType("BOOL", uint32_t);
+
+describe("BoolType 测试", () => {
   it("encode", () => {
-    expect(uchar.decode(bool.encode(2))).toBe(1);
-    expect(uchar.decode(bool.encode(0))).toBe(0);
-    expect(uint.decode(BOOL.encode(2))).toBe(1);
-    expect(uint.decode(BOOL.encode(0))).toBe(0);
+    expect(uint8_t.decode(bool.encode(2))).toBe(1);
+    expect(uint8_t.decode(bool.encode(0))).toBe(0);
+    expect(uint32_t.decode(BOOL.encode(2))).toBe(1);
+    expect(uint32_t.decode(BOOL.encode(0))).toBe(0);
 
-    expect(uchar.decode(bool[1].encode([2]))).toBe(1);
-    expect(uchar.decode(bool[1].encode([0]))).toBe(0);
-    expect(uint.decode(BOOL[1].encode([2]))).toBe(1);
-    expect(uint.decode(BOOL[1].encode([0]))).toBe(0);
+    expect(uint8_t.decode(bool[1].encode([2]))).toBe(1);
+    expect(uint8_t.decode(bool[1].encode([0]))).toBe(0);
+    expect(uint32_t.decode(BOOL[1].encode([2]))).toBe(1);
+    expect(uint32_t.decode(BOOL[1].encode([0]))).toBe(0);
   });
 
   it("decode", () => {
-    // BOOL 走 int(4B 大端), bool 走 char(1B)
+    // bool 走 1B, BOOL 走 4B 大端
     expect(bool.decode(makeDataView([2]))).toBe(true);
     expect(bool.decode(makeDataView([0]))).toBe(false);
 

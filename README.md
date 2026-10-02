@@ -36,23 +36,45 @@ const view = struct.encode({
 ```html
 <script src="struct-buffer.js"></script>
 <script>
-  const { DWORD, string_t, StructBuffer, uint32_t } = window.StructBuffer;
+  const { uint32_t, string_t, StructBuffer } = window.StructBuffer;
 </script>
 ```
 
 ## Use ["type"](https://github.com/januwA/struct-buffer/blob/main/src/types.ts) for conversion
 
 ```ts
-import { DWORD } from "struct-buffer";
+import { uint32_t } from "struct-buffer";
 
 // encode
-const view = DWORD[2].encode([1, 2]); 
+const view = uint32_t[2].encode([1, 2]); 
 // view => <00 00 00 01 00 00 00 02>
 
 // decode
-const data = DWORD[2].decode(view);
+const data = uint32_t[2].decode(view);
 // data => [ 1, 2 ]
 ```
+
+只导出 11 个类型, 别名收进类型自己的 `names` 而不是各导出一个实例 —— 同宽同符号的
+别名本来就是同一个类型, 多导一份只会让人在 "该用哪个" 上纠结:
+
+| 有符号 | 无符号 | C / Windows 别名（在 `names` 里） |
+| --- | --- | --- |
+| `int8_t` | `uint8_t` | `char` / `signed char`、`unsigned char`、`uchar`、`BYTE` |
+| `int16_t` | `uint16_t` | `short`、`signed short`、`unsigned short`、`ushort`、`WORD` |
+| `int32_t` | `uint32_t` | `int`、`signed`、`unsigned int`、`uint`、`DWORD` |
+| `int64_t` | `uint64_t` | `long long`、`signed long long`、`unsigned long long`、`ulonglong`、`QWORD` |
+
+浮点是 `float` / `double`，定宽字节是 `string_t`，宽度不合适就
+[`registerType`](#register-type)。
+
+两处语义在 6.0 修正，升级时留意：
+
+- `int64_t` 之前走的是无符号的 `getBigUint64`，负数解出来是一大坨正数。现在按有符号解。
+- 8 字节类型的**值类型统一是 `number`**，不再把 `bigint` 抛给调用方。代价是超过
+  `2^53` 的值会掉精度（协议里的 64 位计数/时间戳基本够用，文件偏移请自己确认）。
+
+布尔不再内置：`new BoolType("bool", uint8_t)` 是 1 字节，`new BoolType("BOOL", uint32_t)`
+是 Windows 的 4 字节，语义都是"底层整数非零即真"。
 
 ## register Type
 ```ts
@@ -79,7 +101,7 @@ const data = struct.decode(view);
 
 ## typedef
 ```ts
-const HANDLE = typedef("HANDLE", DWORD);
+const HANDLE = typedef("HANDLE", uint32_t);
 HANDLE.size // 4
 HANDLE.unsigned // true
 ```
@@ -106,9 +128,9 @@ typedef struct _XINPUT_GAMEPAD {
 */
 
 XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
-  wButtons: WORD,
-  bLeftTrigger: BYTE,
-  bRightTrigger: BYTE,
+  wButtons: uint16_t,
+  bLeftTrigger: uint8_t,
+  bRightTrigger: uint8_t,
   sThumbLX: int16_t,
   sThumbLY: int16_t,
   sThumbRX: int16_t,
@@ -116,7 +138,7 @@ XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
 });
 
 XINPUT_STATE = new StructBuffer("XINPUT_STATE", {
-  dwPacketNumber: DWORD,
+  dwPacketNumber: uint32_t,
   Gamepad: XINPUT_GAMEPAD,
 });
 
@@ -336,11 +358,11 @@ string_t[4].decode(new Uint8Array([0x61, 0x62, 0x00, 0x64]); // ab
 
 ## bits
 ```ts
-import { DWORD, bits, StructBuffer } from "struct-buffer";
+import { uint32_t, bits, StructBuffer } from "struct-buffer";
 
 const EFLAG_DATA = 0x00000246;
 const littleEndian = true;
-const EFLAG = bits(DWORD, {
+const EFLAG = bits(uint32_t, {
   CF: 0,
   PF: 2,
   AF: 4,

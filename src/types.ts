@@ -1,79 +1,72 @@
 import {
-  BoolType,
   DOUBLE_TYPE,
   FLOAT_TYPE,
-  PaddingType,
-  registerType,
   StringType,
-  typedef,
+  registerType,
 } from "./class-type";
 
 export const string_t = new StringType();
-export const padding_t = new PaddingType();
 
-// c-type
-export const char = registerType(["char", "signed char"], 1, false);
-export const bool = new BoolType("bool", char);
-export const uchar = registerType("unsigned char", 1);
-export const short = registerType(
-  ["short", "short int", "signed short", "signed short int"],
-  2,
+/**
+ * 一个公开类型 = 一次 `registerType`; C / C++ / Windows 的别名收进 `names` 数组,
+ * 不再各导出一个实例:
+ *
+ * - 同一 (size, unsigned) 组合的别名共用实例, `sizeof` 一类的遍历少走一半 StructType
+ * - 有符号与无符号的 8 字节类型**必须**是两个实例 —— `typeHandle` 靠 `unsigned` 选
+ *   `getBigInt64` / `getBigUint64`, 一旦共用就有一边符号是错的
+ *
+ * `int64_t` 之前是从 `longlong` typedef 来的, 而 `longlong` 没显式传 `unsigned`,
+ * 落进默认的 `true` —— 于是 `int64_t` 实际是无符号的, 负数解出来是一大坨正数。
+ * 现在两个 8 字节类型都显式传 `unsigned`。
+ */
+export const int8_t = registerType(
+  ["int8_t", "__int8", "signed char", "char"],
+  1,
   false
 );
 
-export const ushort = registerType(["unsigned short", "unsigned short int"], 2);
-export const int = registerType(["int", "signed", "signed int"], 4, false);
-export const uint = registerType(["unsigned", "unsigned int"], 4);
-export const long = registerType(
-  ["long", "long int", "signed long", "signed long int"],
+export const int16_t = registerType(["int16_t", "__int16", "short"], 2, false);
+
+export const int32_t = registerType(
+  ["int32_t", "__int32", "int", "signed"],
   4,
   false
 );
-export const ulong = registerType(["unsigned long", "unsigned long int"], 4);
-export const longlong = registerType(
-  ["long long", "long long int", "signed long long", "signed long long int"],
+
+export const int64_t = registerType(
+  ["int64_t", "__int64", "long long", "signed long long"],
   8,
   false
 );
-export const ulonglong = registerType(
-  ["unsigned long long", "unsigned long long int"],
-  8
+
+export const uint8_t = registerType(
+  ["uint8_t", "__uint8", "unsigned char", "uchar", "BYTE"],
+  1,
+  true
 );
-export const float = registerType(FLOAT_TYPE, 4);
-export const double = registerType([DOUBLE_TYPE, "long double"], 8);
 
-// c++ type
-export const int8_t = typedef(["int8_t", "__int8"], char);
-export const int16_t = typedef(["int16_t", "__int16"], short);
-export const int32_t = typedef(["int32_t", "__int32"], int);
-export const int64_t = typedef(["int64_t", "__int64"], longlong);
+export const uint16_t = registerType(
+  ["uint16_t", "__uint16", "unsigned short", "ushort", "WORD"],
+  2,
+  true
+);
 
-export const uint8_t = typedef(["uint8_t", "unsigned __int8"], uchar);
-export const uint16_t = typedef(["uint16_t", "unsigned __int16"], ushort);
-export const uint32_t = typedef(["uint32_t", "unsigned __int32"], uint);
-export const uint64_t = typedef(["uint64_t", "unsigned __int64"], ulonglong);
+export const uint32_t = registerType(
+  ["uint32_t", "__uint32", "unsigned int", "uint", "DWORD"],
+  4,
+  true
+);
 
-// windows
-export const BOOL = new BoolType("BOOL", int);
-export const BYTE = typedef("BYTE", uchar);
-export const WORD = typedef("WORD", ushort);
-export const DWORD = typedef("DWORD", ulong);
-export const QWORD = registerType("QWORD", 8);
+export const uint64_t = registerType(
+  ["uint64_t", "__uint64", "unsigned long long", "ulonglong", "QWORD"],
+  8,
+  true
+);
 
-export const FLOAT = typedef(FLOAT_TYPE.toUpperCase(), float);
-export const DOUBLE = typedef(DOUBLE_TYPE.toUpperCase(), double);
+export const float = registerType([FLOAT_TYPE, "FLOAT"], 4, true);
 
-export const CHAR = typedef("CHAR", char);
-export const UCHAR = typedef("UCHAR", uchar);
-
-export const SHORT = typedef("SHORT", short);
-export const USHORT = typedef("USHORT", ushort);
-
-export const INT = typedef("INT", int);
-export const UINT = typedef("UINT", uint);
-
-export const LONG = typedef("LONG", long);
-export const ULONG = typedef("ULONG", ulong);
-
-export const LONGLONG = typedef("LONGLONG", longlong);
-export const ULONGLONG = typedef("ULONGLONG", ulonglong);
+export const double = registerType(
+  [DOUBLE_TYPE, "DOUBLE", "long double"],
+  8,
+  true
+);

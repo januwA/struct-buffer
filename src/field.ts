@@ -299,9 +299,9 @@ function shapeOf(deeps: (number | Ref)[] | undefined): number[] {
 }
 
 /**
- * 任意 `StructType`: `uint8_t` / `uint16_t` / `bool_t` / `bits(...)` /
- * `padding_t` / 用户自定义 codec. 个数语义与旧实现完全一致: **ref 取到的就是
- * 元素个数**(`uint8_t[ref("n")]` 的 n 是元素数; 对 u8 来说也就是字节数).
+ * 任意 `StructType`: `uint8_t` / `uint16_t` / `string_t` / `bits(...)` / 用户自定义
+ * codec. 个数语义与旧实现完全一致: **ref 取到的就是元素个数**
+ * (`uint8_t[ref("n")]` 的 n 是元素数; 对 u8 来说也就是字节数).
  *
  * 位置不再靠"返回值 + getByteLength 相加"推进, 而是 decode/encode 后按
  * `type.getSize(ctx)` 精确跳过 —— 全库只剩这一处尺寸计算, 而它与类型自己写出的
@@ -387,8 +387,8 @@ export class TypeField implements Field {
 /**
  * 跳过 n 个字节, **不产生任何输出字段**.
  *
- * 与 `padding_t[n]` 的区别是"这里根本不是数据": `padding_t` 会把跳过的字节解成
- * uint8 数组塞进结果, 于是上报时得自己剔掉, 类型里也永远带着那几个键 —— 真实项目
+ * 与"把字节解成 uint8 数组"的写法相比, skip 的区别是"这里根本不是数据": 那条路会把
+ * 跳过的字节塞进结果, 于是上报时得自己剔掉, 类型里也永远带着那几个键 —— 真实项目
  * 里协议表一半的字段是"未知/保留/填充", 让它们出现在结果里只会污染每一次消费.
  *
  * 值类型是 `never`, `InferDef` 据此把这个键从推导结果里整个去掉, 所以
