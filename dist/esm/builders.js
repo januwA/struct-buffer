@@ -1,4 +1,4 @@
-import { BlobField, FramedField, normalizeDef, resolveCount, SkipField, StructField, VariantField, } from "./field";
+import { BlobField, FramedField, normalizeDef, SkipField, StructField, VariantField, } from "./field";
 export function field(build) {
     return { __fieldSpec: true, build };
 }
@@ -41,4 +41,6 @@ export function discriminated(name, keyField, keyType, cases) {
 export function framed(reader, writer) {
     return field((b) => new FramedField(b.name, reader, writer));
 }
-export { resolveCount };
+export function delimited(reader, writer) {
+    return field((b) => new FramedField(b.name, reader, writer, true));
+}

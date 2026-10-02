@@ -9,7 +9,6 @@ import {
   records,
   ref,
   rest,
-  StructBuffer,
   uint16_t,
   uint32_t,
   uint8_t,
@@ -185,8 +184,8 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
     expect(out.flags[0]).not.toBe(out.flags[1]);
   });
 
-  it("嵌套 StructBuffer 的 littleEndian 由子结构体自己决定", () => {
-    const Child = new StructBuffer(
+  it("嵌套子结构体的 littleEndian 由子结构体自己决定", () => {
+    const Child = new DynamicStructBuffer(
       "child",
       { a: uint16_t, b: uint16_t },
       { littleEndian: true }
@@ -199,7 +198,7 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
       c: 0x0102,
       child: { a: 0x0304, b: 0x0506 },
     });
-    // c 走父级(大端), child 走自身配置(小端). 旧实现对嵌套 StructBuffer
+    // c 走父级(大端), child 走自身配置(小端). 旧实现对嵌套子结构体
     // 一律透传父级 littleEndian, 这里会写成 03 04 05 06
     expect(hex(encoded)).toBe("01 02 04 03 06 05");
     expect(Parent.decode(encoded)).toEqual({
@@ -209,13 +208,50 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
   });
 
   it("父级 littleEndian 会向下继承", () => {
-    const Child = new StructBuffer("child", { a: uint16_t });
+    const Child = new DynamicStructBuffer("child", { a: uint16_t });
     const Parent = new DynamicStructBuffer(
       "parent",
       { c: uint16_t, child: Child },
       { littleEndian: true }
     );
     expect(hex(Parent.encode({ c: 0x0102, child: { a: 0x0304 } }))).toBe(
+      "02 01 04 03"
+    );
+  });
+
+  it("同一个子结构体放进不同字节序的父级, 各自按自己的父级走", () => {
+    // 子结构体自己没配字节序, 它的字节序只能由**放它的那个父级**决定。
+    // 这条曾经是坏的: DynamicStructBuffer 会直接复用自己构造期算好的 def,
+    // 而那份 def 是拿 `littleEndian ?? false` 算的 —— "没配" 被焊死成大端,
+    // 父级之后再怎么配都传不进去
+    const Child = new DynamicStructBuffer("child", { a: uint16_t });
+    const BE = new DynamicStructBuffer("be", { child: Child });
+    const LE = new DynamicStructBuffer("le", { child: Child }, { littleEndian: true });
+
+    expect(hex(BE.encode({ child: { a: 0x0304 } }))).toBe("03 04");
+    expect(hex(LE.encode({ child: { a: 0x0304 } }))).toBe("04 03");
+
+    // 子结构体自己配了就谁也不听 —— 两条父级下都一样
+    const Own = new DynamicStructBuffer(
+      "own",
+      { a: uint16_t },
+      { littleEndian: true }
+    );
+    const P1 = new DynamicStructBuffer("p1", { c: Own }, { littleEndian: false });
+    const P2 = new DynamicStructBuffer("p2", { c: Own }, { littleEndian: true });
+    expect(hex(P1.encode({ c: { a: 0x0304 } }))).toBe("04 03");
+    expect(hex(P2.encode({ c: { a: 0x0304 } }))).toBe("04 03");
+  });
+
+  it("字节序穿透多层嵌套", () => {
+    const L3 = new DynamicStructBuffer("l3", { v: uint16_t });
+    const L2 = new DynamicStructBuffer("l2", { deep: L3 });
+    const L1 = new DynamicStructBuffer(
+      "l1",
+      { mid: L2, v: uint16_t },
+      { littleEndian: true }
+    );
+    expect(hex(L1.encode({ mid: { deep: { v: 0x0102 } }, v: 0x0304 }))).toBe(
       "02 01 04 03"
     );
   });
@@ -271,7 +307,7 @@ describe("声明式字段: rest / blob / records / variant / framed", () => {
   });
 
   it("records 把定长子记录填到末尾", () => {
-    const Ent = new StructBuffer("ent", { id: uint16_t, hp: uint16_t });
+    const Ent = new DynamicStructBuffer("ent", { id: uint16_t, hp: uint16_t });
     const Pkt = new DynamicStructBuffer("pkt", { ents: records(Ent) });
     const encoded = Pkt.encode({
       ents: [
@@ -291,7 +327,7 @@ describe("声明式字段: rest / blob / records / variant / framed", () => {
   });
 
   it("records 遇到变长子结构体直接报错而不是猜尺寸", () => {
-    const Bad = new StructBuffer("bad", {
+    const Bad = new DynamicStructBuffer("bad", {
       len: uint8_t,
       data: uint8_t[ref("len")],
     });

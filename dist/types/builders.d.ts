@@ -1,4 +1,4 @@
-import { CountSpec, Def, Field, FieldBuildCtx, FieldSpec, FrameReader, FrameWriter, resolveCount, StructSource } from "./field";
+import { CountSpec, Def, Field, FieldBuildCtx, FieldSpec, FrameReader, FrameWriter, StructSource } from "./field";
 import type { VARIANT_CASES } from "./class-type";
 import { InferSource } from "./infer";
 export declare function field<T = any, E = T>(build: (b: FieldBuildCtx) => Field): FieldSpec<T, E>;
@@ -23,6 +23,6 @@ export declare function discriminated(name: string, keyField: string, keyType: a
     [k: string]: any;
 };
 export declare function framed<T>(reader: FrameReader<T>, writer: FrameWriter<T>): FieldSpec<T[]>;
-export { resolveCount };
-export type { Field, FieldSpec, FieldBuildCtx, StructSource, CountSpec, Def };
+export declare function delimited<T>(reader: FrameReader<T>, writer: FrameWriter<T>): FieldSpec<T>;
+export type { Field, FieldSpec, FieldBuildCtx, StructSource, CountSpec, FrameReader, FrameWriter, Def, };
 //# sourceMappingURL=builders.d.ts.map

@@ -1,5 +1,5 @@
 import {
-  StructBuffer,
+  DynamicStructBuffer,
   uint32_t,
   sview,
   uint8_t,
@@ -11,7 +11,7 @@ import {
 
 describe("test bitFields", () => {
   it("test 1", () => {
-    const s = new StructBuffer("test", {
+    const s = new DynamicStructBuffer("test", {
       a: bitFields(uint8_t, {
         alpha: 2,
         beta: 4,

@@ -56,7 +56,7 @@ function typeHandle<D, E>(type: StructType<D, E>): TypeHandle_t {
   if (isDouble) h = hData["d"];
 
   if (!h) h = hData[type.size][+type.unsigned];
-  if (!h) throw new Error(`StructBuffer: Unrecognized ${type} type.`);
+  if (!h) throw new Error(`StructType: Unrecognized ${type} type.`);
 
   return [h, h.replace(/^g/, "s"), h.startsWith("getBig")];
 }

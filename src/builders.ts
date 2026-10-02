@@ -9,7 +9,6 @@ import {
   FrameReader,
   FrameWriter,
   normalizeDef,
-  resolveCount,
   SkipField,
   StructField,
   StructSource,
@@ -266,5 +265,13 @@ export function delimited<T>(
   return field((b) => new FramedField<T>(b.name, reader, writer, true));
 }
 
-export { resolveCount };
-export type { Field, FieldSpec, FieldBuildCtx, StructSource, CountSpec, Def };
+export type {
+  Field,
+  FieldSpec,
+  FieldBuildCtx,
+  StructSource,
+  CountSpec,
+  FrameReader,
+  FrameWriter,
+  Def,
+};

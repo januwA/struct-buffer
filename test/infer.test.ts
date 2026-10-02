@@ -3,7 +3,6 @@ import {
   InferDef,
   InferEncodeDef,
   InferType,
-  StructBuffer,
   Writer,
   bitFields,
   bits,
@@ -339,23 +338,6 @@ describe("类型推导", () => {
     const F = new DynamicStructBuffer("F", { n: uint8_t, c });
     type _t2 = [Assert<Equals<InferType<typeof F>["c"], number[]>>];
     expect(F.decode(Uint8Array.from([2, 7, 8])).c).toEqual([7, 8]);
-  });
-
-  it("嵌套 StructBuffer: 旧 API 的 D 只能显式给", () => {
-    // StructBuffer 的泛型顺序(D 在第一位)是既有公开 API, 实际项目里就是
-    // `new StructBuffer<{...}>(...)` 这样用的, 所以不能为了推导把它挪到 S 后面 ——
-    // 不显式给 D 时它就是默认的索引签名类型, 推不出字段名.
-    const S = new StructBuffer<{ q: number; w: number }>("S", {
-      q: uint8_t,
-      w: uint16_t,
-    });
-    const F = new DynamicStructBuffer("F", { head: uint8_t, sub: S });
-    type _t = [
-      Assert<Equals<InferType<typeof F>["sub"], { q: number; w: number }>>
-    ];
-
-    const d = F.decode(Uint8Array.from([1, 9, 0, 8]));
-    expect(d.sub).toEqual({ q: 9, w: 8 }); // 大端
   });
 
   it("子结构体的下标就是数组(deeps 的层数)", () => {

@@ -1,4 +1,4 @@
-import { int32_t, uint8_t, StructBuffer } from "../src";
+import { int32_t, uint8_t, DynamicStructBuffer } from "../src";
 import { bits, bitFields, BitsType, BitFieldsType, StructType } from "../src/class-type";
 
 describe("deeps test", () => {
@@ -20,15 +20,15 @@ describe("deeps test", () => {
   });
 
   it("struct", () => {
-    let a = new StructBuffer("a", {});
+    let a = new DynamicStructBuffer("a", {});
     let b = a[2];
     let c = b[3];
     expect(a.deeps).toEqual([]);
     expect(b.deeps).toEqual([2]);
     expect(c.deeps).toEqual([2, 3]);
 
-    expect(a instanceof StructBuffer).toEqual(true);
-    expect(b instanceof StructBuffer).toEqual(true);
-    expect(c instanceof StructBuffer).toEqual(true);
+    expect(a instanceof DynamicStructBuffer).toEqual(true);
+    expect(b instanceof DynamicStructBuffer).toEqual(true);
+    expect(c instanceof DynamicStructBuffer).toEqual(true);
   });
 });

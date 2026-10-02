@@ -5,7 +5,6 @@ import type { ENCODE_VALUE_TYPE, VALUE_TYPE } from "./class-type";
 import { Cursor } from "./cursor";
 import { DecodeError, EncodeError } from "./errors";
 import { AnyObject } from "./interfaces";
-import { StructBuffer } from "./struct-buffer";
 import { isRef, Ref, withCount } from "./utils";
 import { Writer } from "./writer";
 
@@ -474,7 +473,7 @@ export class BlobField implements Field {
 // -------------------------------------------------------------- StructField
 
 /**
- * 嵌套结构体, 来源可以是 `StructBuffer` / `DynamicStructBuffer` / 内联对象字面量.
+ * 嵌套结构体, 来源可以是 `DynamicStructBuffer` / 归一化好的 `Def` / 内联对象字面量.
  * 归一化成 `Def` 后与父级**共用同一个 Cursor**, 所以任意深度都只有一次线性扫描.
  */
 export class StructField implements Field {
@@ -727,14 +726,20 @@ export class FramedField<T = any> implements Field {
 // ------------------------------------------------------------------ 归一化
 
 export type InlineDef = { [k: string]: any };
-export type StructSource = StructBuffer | Def | InlineDef;
+export type StructSource = Def | InlineDef | DefSource;
 
 export function isDef(x: any): x is Def {
   return !!x && Array.isArray(x.fields);
 }
 
 /** `DynamicStructBuffer` 之类"自带已归一化 def"的结构体 */
-function isDefSource(x: any): boolean {
+export interface DefSource {
+  readonly def: Def;
+  readonly struct: InlineDef;
+  readonly config: { littleEndian?: boolean };
+}
+
+function isDefSource(x: any): x is DefSource {
   return !!x && !isDef(x) && isDef(x.def);
 }
 
@@ -796,9 +801,10 @@ export function isFieldSpec(x: any): x is FieldSpec {
 /**
  * 把任意一种结构体来源归一化成 `Def`, 只在构造期跑一次.
  *
- * `StructBuffer` 会被展开成 `Field[]`, 顺带修掉一个旧 bug: 旧实现对嵌套
- * `StructBuffer` 一律透传**父级**字节序, 子结构体自己的 `config.littleEndian`
- * 只有在特定路径下才生效; 现在子结构体一定赢。
+ * 字节序是**逐级链式**定下来的: 自己显式配了就用自己的, 没配就继承父级 —— 最近的
+ * 显式配置赢. 修掉一个旧 bug: `DynamicStructBuffer` 曾直接复用自己构造期算好的 `.def`,
+ * 而那份 def 是拿 `littleEndian ?? false` 算的, 于是"没配 = 大端"被焊死在子结构体上,
+ * 父级配了小端也传不进去。
  *
  * 代价: 构造后再改 `sb.struct` 不会反映到已归一化的 def 里(旧实现会)。
  * 换来的是 decode 路径上零属性查找。
@@ -809,10 +815,11 @@ export function normalizeDef(
   inheritedLE: boolean
 ): Def {
   if (isDef(source)) return source;
-  if (isDefSource(source)) return (source as any).def;
-  if (source instanceof StructBuffer) {
-    const le = source.config.littleEndian ?? inheritedLE;
-    return buildDef(source.struct, name, le);
+  if (isDefSource(source)) {
+    // 自带 def 的 DynamicStructBuffer: 只有当它自己把字节序配死了, 那份 def 才能
+    // 直接复用; 否则得按当前父级的字节序重新定型
+    if (source.config.littleEndian !== undefined) return source.def;
+    return buildDef(source.struct, name, inheritedLE);
   }
   return buildDef(source, name, inheritedLE);
 }
@@ -827,9 +834,9 @@ function buildDef(struct: InlineDef, name: string, le: boolean): Def {
 function makeField(key: string, type: any, bctx: FieldBuildCtx): Field {
   if (isFieldSpec(type)) return type.build({ ...bctx, name: key });
 
-  if (type instanceof StructBuffer || isDef(type) || isDefSource(type)) {
+  if (isDef(type) || isDefSource(type)) {
     const def = normalizeDef(type, `${bctx.parentName}.${key}`, bctx.le);
-    const deeps = (type as StructBuffer).deeps ?? [];
+    const deeps = (type as { deeps?: (number | Ref)[] }).deeps ?? [];
     return new StructField(key, def, countOfDeeps(deeps), shapeOf(deeps));
   }
 

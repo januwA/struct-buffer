@@ -1,10 +1,21 @@
 import { DOUBLE_TYPE, FLOAT_TYPE, registerType } from "./class-type";
 
 /**
+ * 结构体构造配置。
+ *
+ * 这里配了会让 `encode` / `decode` 的 `littleEndian` 形参失效。
+ *
+ * https://github.com/januwA/struct-buffer/issues/2
+ */
+export type StructBufferConfig = {
+  littleEndian?: boolean;
+};
+
+/**
  * 一个公开类型 = 一次 `registerType`; C / C++ / Windows 的别名收进 `names` 数组,
  * 不再各导出一个实例:
  *
- * - 同一 (size, unsigned) 组合的别名共用实例, `sizeof` 一类的遍历少走一半 StructType
+ * - 同一 (size, unsigned) 组合的别名共用实例, 尺寸遍历少走一半 StructType
  * - 有符号与无符号的 8 字节类型**必须**是两个实例 —— `typeHandle` 靠 `unsigned` 选
  *   `getBigInt64` / `getBigUint64`, 一旦共用就有一边符号是错的
  *

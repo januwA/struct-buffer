@@ -1,4 +1,4 @@
-import { uint32_t, bits, StructBuffer, uint16_t } from "../src";
+import { uint32_t, bits, DynamicStructBuffer, uint16_t } from "../src";
 
 describe("bits test", () => {
   it("decode and encode", () => {
@@ -32,7 +32,7 @@ describe("bits test", () => {
   });
 
   it("test struct", () => {
-    const struct = new StructBuffer("Test", {
+    const struct = new DynamicStructBuffer("Test", {
       id: uint16_t,
       eflag: bits(uint32_t, {
         PF: 2,

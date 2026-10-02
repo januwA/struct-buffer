@@ -1,10 +1,11 @@
 import { DecodeBuffer_t } from "./interfaces";
 import { LenientResult } from "./errors";
 import { Def, Field } from "./field";
-import { StructBuffer, StructBufferConfig, Type_t } from "./struct-buffer";
+import { StructBufferConfig } from "./types";
+import { StructType } from "./class-type";
 import { InferDef, InferEncodeDef } from "./infer";
 import { Ref } from "./utils";
-export type DynamicFieldType = Type_t | DynamicStructBuffer<DynamicStructDef, any, any> | {
+export type DynamicFieldType = StructType<any, any> | DynamicStructBuffer<DynamicStructDef, any, any> | {
     [k: string]: any;
 };
 export type DynamicStructDef = {
@@ -29,6 +30,5 @@ export declare class DynamicStructBuffer<S extends DynamicStructDef = DynamicStr
     encode(obj: E, littleEndian?: boolean, offset?: number, view?: DataView, parentCtx?: any): DataView;
     getByteLength(obj?: any, parentCtx?: any): number;
 }
-export declare function dynamicByteLength(type: DynamicStructBuffer | StructBuffer): number | undefined;
 export type { Field, Def };
 //# sourceMappingURL=dynamic-struct-buffer.d.ts.map

@@ -1,4 +1,4 @@
-import { Bit_t, DecodeBuffer_t, InjectNext, TypeSize_t } from "./interfaces";
+import { Bit_t, DecodeBuffer_t, TypeSize_t } from "./interfaces";
 import { Ref } from "./utils";
 export declare const FLOAT_TYPE = "float";
 export declare const DOUBLE_TYPE = "double";
@@ -45,15 +45,6 @@ export declare class BitFieldsType<D = {
     constructor(size: TypeSize_t, bitFields: BitsType_t);
     decode(view: DecodeBuffer_t, littleEndian?: boolean, offset?: number, ctx?: any): D;
     encode(obj: E, littleEndian?: boolean, offset?: number, view?: DataView, ctx?: any): DataView;
-}
-type HInjectDecode = (view: DataView, offset: number) => InjectNext;
-type HInjectEncode = (value: any) => DecodeBuffer_t;
-export declare class Inject extends StructType<any, any> {
-    private hInjectDecode?;
-    private hInjectEncode?;
-    constructor(hInjectDecode?: HInjectDecode | undefined, hInjectEncode?: HInjectEncode | undefined);
-    decode(view: DecodeBuffer_t, littleEndian?: boolean, offset?: number, ctx?: any): any;
-    encode(obj: any, littleEndian?: boolean, offset?: number, view?: DataView, ctx?: any): DataView;
 }
 export declare function registerType<D extends number, E extends number>(typeName: string | string[], size: TypeSize_t, unsigned?: boolean): StructType<D, E>;
 export declare function typedef<D extends number, E extends number>(typeName: string | string[], type: StructType<any, any>): StructType<D, E>;

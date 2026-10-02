@@ -4,7 +4,6 @@ import {
   DynamicStructBuffer,
   makeDataView,
   ref,
-  StructBuffer,
   uint16_t,
   uint32_t,
   uint8_t,
@@ -89,8 +88,8 @@ describe("DynamicStructBuffer", () => {
     expect(new TextDecoder().decode(decoded.text)).toBe("hello world");
   });
 
-  it("dynamic array of nested StructBuffer", () => {
-    const Item = new StructBuffer("item", {
+  it("dynamic array of nested struct", () => {
+    const Item = new DynamicStructBuffer("item", {
       id: uint32_t,
       count: uint16_t,
     });

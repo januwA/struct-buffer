@@ -1,15 +1,15 @@
-import { StructBuffer, sview, uint16_t } from "../src";
+import { DynamicStructBuffer, sview, uint16_t } from "../src";
 
 // https://github.com/januwA/struct-buffer/issues/2
 
 describe("debug", () => {
   it("littleEndian: 配置优先于参数", () => {
-    const s = new StructBuffer(
+    const s = new DynamicStructBuffer(
       "test",
       {
         a: uint16_t,
         b: uint16_t,
-        c: new StructBuffer(
+        c: new DynamicStructBuffer(
           "test2",
           {
             ip: uint16_t,
@@ -37,11 +37,11 @@ describe("debug", () => {
   });
 
   it("test extends", () => {
-    class X extends StructBuffer {
+    class X extends DynamicStructBuffer<any, any, any> {
       a = 10;
     }
 
-    let s = new X("s", {})[2][2] as any;
+    const s = new X("s", {})[2][2] as any;
     expect(s.a).toBe(10);
   });
 });

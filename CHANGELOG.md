@@ -13,6 +13,12 @@ bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那�
 
 ### 🐛 修复
 
+- **嵌套 `DynamicStructBuffer` 收不到父级的 `littleEndian`**: 归一化字段表时, 自带 def 的结构体
+  曾直接复用**自己构造期**算好的那份 def, 而那份 def 是拿 `littleEndian ?? false` 算的 ——
+  于是"没配"被焊死成大端, 父级之后配成小端也传不进去。旧 `StructBuffer` 那条分支一直是对的
+  (`config.littleEndian ?? inheritedLE`), 所以旧结构体嵌进新引擎正常、新结构体嵌新结构体才
+  坏 —— 之前没有任何用例覆盖到后者。现在两条分支合成一条链式规则: 最近的显式配置赢,
+  没配就继承父级
 - **`int64_t` 之前实际是无符号的**: 它是从 `longlong` typedef 来的, 而 `longlong` 没显式
   传 `unsigned`, 落进默认的 `true`, 于是走的是 `getBigUint64` —— `0xFFFFFFFFFFFFFFFF`
   解出来是 `18446744073709551615` 而不是 `-1`
@@ -29,6 +35,42 @@ bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那�
   「文本与编码」说明为什么库里没有字符串类型
 
 ### 💥 破坏性变更
+
+**删除 `StructBuffer`**(`src/struct-buffer.ts`)—— 现在只有一个结构体引擎
+
+旧 `StructBuffer` 是"每个字段各自持有状态、自己按 offset 递归"的引擎, 新 `DynamicStructBuffer`
+是"构造期把字段表归一化成 `Field[]`, decode/encode 只做一件事: 拿 `Cursor`/`Writer` 从头走到
+尾"。功能上前者是后者的子集(新引擎多出 `blob` / `ref` / `framed` / `delimited` / `records` /
+`variant` / `decodeLenient`, 旧引擎一样都表达不了), 复杂度和 bug 面却是反过来的。
+
+迁移是机械的:
+
+```ts
+new StructBuffer("Player", { ... })          →  new DynamicStructBuffer("Player", { ... })
+sb.byteLength                                 →  sb.getByteLength()      // 变长字段要传样本对象
+struct.byteLength                             →  struct.getByteLength()
+```
+
+**同时删除 `sizeof()`**
+
+`sizeof(type)` 这个自由函数没了, 拆成两处、各自只有一个算法来源:
+
+- `StructType.getSize(ctx?)` —— 单个类型(含下标展开)的字节数
+- `DynamicStructBuffer.getByteLength(obj?)` —— 整个结构体; 全定长时不必传对象, 有变长字段时
+  **直接把对象 encode 一遍量出来**, 而不是另写一套尺寸推算
+
+删它的理由不是"有更好的替代", 而是它**在结构体上是错的**。`sizeof` 对 `StructBuffer` 会按
+`maxSize` 做 C 风格对齐补位, 而这套补位从来没在 `encode` 里实现过:
+
+```ts
+const B = new StructBuffer("B", { a: uint32_t, b: A, c: uint8_t }) // A = { u64, u8 }
+sizeof(B)            // 16
+B.encode(...).byteLength  // 14
+```
+
+也就是说全库最危险的函数恰好是尺寸问题的标准答案 —— 按它切片就会错位, 而且要到对端才
+发现。对齐补位因此没有被"移植"到新引擎: 真要补位就用 `skip()` 显式写出来, 让字节布局在
+声明处看得见。`byteLength` / `maxSize` 一并删除(`maxSize` 只服务于上面那个错误的对齐)。
 
 **删除 `CStruct`**(`src/c-struct.ts`)
 

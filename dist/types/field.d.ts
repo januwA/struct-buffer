@@ -3,7 +3,6 @@ import type { ENCODE_VALUE_TYPE, VALUE_TYPE } from "./class-type";
 import { Cursor } from "./cursor";
 import { DecodeError } from "./errors";
 import { AnyObject } from "./interfaces";
-import { StructBuffer } from "./struct-buffer";
 import { Writer } from "./writer";
 export type Scope = "self" | "parent" | "root";
 export interface RefSpec {
@@ -124,8 +123,9 @@ export declare class FramedField<T = any> implements Field {
     readonly name: string;
     private readonly reader;
     private readonly writer;
+    private readonly single;
     readonly fixedSize: undefined;
-    constructor(name: string, reader: FrameReader<T>, writer: FrameWriter<T>);
+    constructor(name: string, reader: FrameReader<T>, writer: FrameWriter<T>, single?: boolean);
     resolveLengths(obj: AnyObject, ctx: Ctx): AnyObject;
     decode(c: Cursor, out: AnyObject, ctx: Ctx, sink?: ErrorSink): void;
     encode(w: Writer, value: any, ctx: Ctx): void;
@@ -133,8 +133,15 @@ export declare class FramedField<T = any> implements Field {
 export type InlineDef = {
     [k: string]: any;
 };
-export type StructSource = StructBuffer | Def | InlineDef;
+export type StructSource = Def | InlineDef | DefSource;
 export declare function isDef(x: any): x is Def;
+export interface DefSource {
+    readonly def: Def;
+    readonly struct: InlineDef;
+    readonly config: {
+        littleEndian?: boolean;
+    };
+}
 export interface FieldBuildCtx {
     name: string;
     parentName: string;

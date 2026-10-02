@@ -9,9 +9,9 @@ $ npm i struct-buffer
 
 ## how to use
 ```ts
-import { uint32_t, uint8_t, StructBuffer, sbytes } from "struct-buffer";
+import { uint32_t, uint8_t, DynamicStructBuffer, sbytes } from "struct-buffer";
 
-const struct = new StructBuffer("Player", {
+const struct = new DynamicStructBuffer("Player", {
   hp: uint32_t,
   mp: uint32_t,
   name: uint8_t[3],
@@ -36,7 +36,7 @@ const view = struct.encode({
 ```html
 <script src="struct-buffer.js"></script>
 <script>
-  const { uint32_t, uint8_t, StructBuffer } = window.StructBuffer;
+  const { uint32_t, uint8_t, DynamicStructBuffer } = window.StructBuffer;
 </script>
 ```
 
@@ -91,7 +91,7 @@ Boolean(d.ok); // => true 真值判断是消费方的事
 ```ts
 const myShort = registerType("short", 2, false);
 
-const struct = new StructBuffer("Player", {
+const struct = new DynamicStructBuffer("Player", {
   hp: myShort,
   mp: myShort,
   pos: myShort[2],
@@ -138,7 +138,7 @@ typedef struct _XINPUT_GAMEPAD {
 } XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
 */
 
-XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
+XINPUT_GAMEPAD = new DynamicStructBuffer("XINPUT_GAMEPAD", {
   wButtons: uint16_t,
   bLeftTrigger: uint8_t,
   bRightTrigger: uint8_t,
@@ -148,7 +148,7 @@ XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
   sThumbRY: int16_t,
 });
 
-XINPUT_STATE = new StructBuffer("XINPUT_STATE", {
+XINPUT_STATE = new DynamicStructBuffer("XINPUT_STATE", {
   dwPacketNumber: uint32_t,
   Gamepad: XINPUT_GAMEPAD,
 });
@@ -184,12 +184,12 @@ XINPUT_STATE.encode({
 
 ## struct list
 ```ts
-const User = new StructBuffer("User", {
+const User = new DynamicStructBuffer("User", {
   name: uint8_t[2],
   name2: uint8_t[2],
 });
 
-const Users = new StructBuffer("Users", {
+const Users = new DynamicStructBuffer("Users", {
   users: User[2],
 });
 
@@ -399,7 +399,7 @@ Msg.encode({ name: "hello" });
 
 ## bits
 ```ts
-import { uint32_t, bits, StructBuffer } from "struct-buffer";
+import { uint32_t, bits, DynamicStructBuffer } from "struct-buffer";
 
 const EFLAG_DATA = 0x00000246;
 const littleEndian = true;
@@ -433,7 +433,7 @@ const view = EFLAG.encode(
 
 ## bitFields
 ```ts
-import { uint8_t, bitFields, StructBuffer, sbytes as b, } from "struct-buffer";
+import { uint8_t, bitFields, DynamicStructBuffer, sbytes as b, } from "struct-buffer";
 
 const bf = bitFields(uint8_t, {
   a: 1,

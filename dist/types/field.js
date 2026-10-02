@@ -1,6 +1,5 @@
 import { StructType } from "./class-type";
 import { DecodeError, EncodeError } from "./errors";
-import { StructBuffer } from "./struct-buffer";
 import { isRef, withCount } from "./utils";
 export function isRefSpec(spec) {
     return typeof spec === "object" && "field" in spec;
@@ -382,16 +381,28 @@ export class VariantField {
     }
 }
 export class FramedField {
-    constructor(name, reader, writer) {
+    constructor(name, reader, writer, single = false) {
         this.name = name;
         this.reader = reader;
         this.writer = writer;
+        this.single = single;
         this.fixedSize = undefined;
     }
     resolveLengths(obj, ctx) {
         return obj;
     }
     decode(c, out, ctx, sink) {
+        if (this.single) {
+            if (sink?.stopped)
+                return;
+            const before = c.pos;
+            const value = this.reader.read(c, 0);
+            if (value == null) {
+                throw DecodeError.reason(c.where, before, `${this.name}: 子帧不完整(reader 返回 null), 而本字段声明为单个子帧`);
+            }
+            out[this.name] = value;
+            return;
+        }
         const values = [];
         while (c.left > 0) {
             if (sink?.stopped)
@@ -408,6 +419,10 @@ export class FramedField {
         out[this.name] = values;
     }
     encode(w, value, ctx) {
+        if (this.single) {
+            this.writer.write(w, value, 0);
+            return;
+        }
         const items = flatten(value);
         for (let i = 0; i < items.length; i++)
             this.writer.write(w, items[i], i);
@@ -444,11 +459,10 @@ export function isFieldSpec(x) {
 export function normalizeDef(source, name, inheritedLE) {
     if (isDef(source))
         return source;
-    if (isDefSource(source))
-        return source.def;
-    if (source instanceof StructBuffer) {
-        const le = source.config.littleEndian ?? inheritedLE;
-        return buildDef(source.struct, name, le);
+    if (isDefSource(source)) {
+        if (source.config.littleEndian !== undefined)
+            return source.def;
+        return buildDef(source.struct, name, inheritedLE);
     }
     return buildDef(source, name, inheritedLE);
 }
@@ -459,7 +473,7 @@ function buildDef(struct, name, le) {
 function makeField(key, type, bctx) {
     if (isFieldSpec(type))
         return type.build({ ...bctx, name: key });
-    if (type instanceof StructBuffer || isDef(type) || isDefSource(type)) {
+    if (isDef(type) || isDefSource(type)) {
         const def = normalizeDef(type, `${bctx.parentName}.${key}`, bctx.le);
         const deeps = type.deeps ?? [];
         return new StructField(key, def, countOfDeeps(deeps), shapeOf(deeps));

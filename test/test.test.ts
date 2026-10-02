@@ -1,6 +1,5 @@
 import {
   uint32_t,
-  sizeof,
   int8_t,
   uint8_t,
   uint16_t,
@@ -8,7 +7,7 @@ import {
   int64_t,
   uint64_t,
   double,
-  StructBuffer,
+  DynamicStructBuffer,
   typedef,
   makeDataView,
   sview,
@@ -17,7 +16,7 @@ import {
 
 describe("test decode and encode", () => {
   it("test decode and encode", () => {
-    const struct = new StructBuffer("Player", {
+    const struct = new DynamicStructBuffer("Player", {
       hp: uint32_t,
       mp: uint32_t,
       name: uint8_t[3],
@@ -35,7 +34,7 @@ describe("test decode and encode", () => {
 
     expect(struct.decode(view)).toEqual(obj);
     expect(sview(struct.encode(obj))).toBe(sview(view));
-    expect(struct.byteLength).toBe(11);
+    expect(struct.getByteLength()).toBe(11);
   });
 
   it("test uint32_t encode", () => {
@@ -61,18 +60,18 @@ describe("test int8_t", () => {
       b: [0x62],
       c: [0x63, 0x64],
     };
-    let struct = new StructBuffer("Test", {
+    let struct = new DynamicStructBuffer("Test", {
       a: int8_t,
       b: int8_t[1],
       c: int8_t[2],
     });
     expect(struct.decode(view)).toEqual(obj);
     expect(sview(struct.encode(obj))).toBe(sview(view));
-    expect(struct.byteLength).toBe(4);
+    expect(struct.getByteLength()).toBe(4);
   });
 
   it("test int8_t and uint8_t", () => {
-    const s = new StructBuffer("Test", {
+    const s = new DynamicStructBuffer("Test", {
       a: int8_t,
       b: uint8_t,
     });
@@ -86,7 +85,7 @@ describe("test int8_t", () => {
 
 describe("test pos", () => {
   let view: DataView;
-  let struct: StructBuffer<any>;
+  let struct: DynamicStructBuffer<any, any, any>;
   const obj = {
     pos: [
       [1.23, 22.66],
@@ -103,7 +102,7 @@ describe("test pos", () => {
       (v, i) => view.setFloat64(i * 8, v, false)
     );
 
-    struct = new StructBuffer("Pos", {
+    struct = new DynamicStructBuffer("Pos", {
       pos: double[4][2],
     });
   });
@@ -117,7 +116,7 @@ describe("test pos", () => {
   });
 
   it("test byteLength", () => {
-    expect(struct.byteLength).toBe(2 * 8 * 4);
+    expect(struct.getByteLength()).toBe(2 * 8 * 4);
   });
 });
 
@@ -140,8 +139,8 @@ describe("test struct nesting", () => {
     } XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
  */
 
-  let XINPUT_STATE: StructBuffer<any>;
-  let XINPUT_GAMEPAD: StructBuffer<any>;
+  let XINPUT_STATE: DynamicStructBuffer<any, any, any>;
+  let XINPUT_GAMEPAD: DynamicStructBuffer<any, any, any>;
   const obj = {
     dwPacketNumber: 0,
     Gamepad: {
@@ -155,7 +154,7 @@ describe("test struct nesting", () => {
     },
   };
   beforeAll(() => {
-    XINPUT_GAMEPAD = new StructBuffer("XINPUT_GAMEPAD", {
+    XINPUT_GAMEPAD = new DynamicStructBuffer("XINPUT_GAMEPAD", {
       wButtons: uint16_t,
       bLeftTrigger: uint8_t,
       bRightTrigger: uint8_t,
@@ -164,7 +163,7 @@ describe("test struct nesting", () => {
       sThumbRX: int16_t,
       sThumbRY: int16_t,
     });
-    XINPUT_STATE = new StructBuffer("XINPUT_STATE", {
+    XINPUT_STATE = new DynamicStructBuffer("XINPUT_STATE", {
       dwPacketNumber: uint32_t,
       Gamepad: XINPUT_GAMEPAD,
     });
@@ -194,7 +193,7 @@ describe("test struct nesting", () => {
   });
 
   it("test byteLength", () => {
-    expect(XINPUT_STATE.byteLength).toBe(16);
+    expect(XINPUT_STATE.getByteLength()).toBe(16);
   });
 });
 
@@ -207,8 +206,8 @@ describe("test typedef", () => {
 });
 
 describe("test struct list", () => {
-  let user: StructBuffer<any>;
-  let users: StructBuffer<any>;
+  let user: DynamicStructBuffer<any, any, any>;
+  let users: DynamicStructBuffer<any, any, any>;
   const obj = {
     users: [
       { name: [0x61, 0x31], name2: [0x61, 0x32] },
@@ -216,11 +215,11 @@ describe("test struct list", () => {
     ],
   };
   beforeAll(() => {
-    user = new StructBuffer("User", {
+    user = new DynamicStructBuffer("User", {
       name: uint8_t[2],
       name2: uint8_t[2],
     });
-    users = new StructBuffer("Users", {
+    users = new DynamicStructBuffer("Users", {
       users: user[2],
     });
   });
@@ -235,14 +234,13 @@ describe("test struct list", () => {
   });
 
   it("test byteLength", () => {
-    expect(users.byteLength).toBe(8);
-    expect(sizeof(users)).toBe(8);
+    expect(users.getByteLength()).toBe(8);
   });
 });
 
 describe("test struct Multilevel array", () => {
-  let player: StructBuffer<any>;
-  let players: StructBuffer<any>;
+  let player: DynamicStructBuffer<any, any, any>;
+  let players: DynamicStructBuffer<any, any, any>;
   let view: DataView;
   const obj = {
     players: [
@@ -257,12 +255,12 @@ describe("test struct Multilevel array", () => {
     ],
   };
   beforeAll(() => {
-    player = new StructBuffer("Player", {
+    player = new DynamicStructBuffer("Player", {
       hp: uint32_t,
       mp: uint32_t,
     });
 
-    players = new StructBuffer("Players", {
+    players = new DynamicStructBuffer("Players", {
       players: player[2][2],
     });
 
@@ -281,8 +279,8 @@ describe("test struct Multilevel array", () => {
   });
 
   it("test byteLength", () => {
-    expect(player.byteLength).toBe(8);
-    expect(players.byteLength).toBe(32);
+    expect(player.getByteLength()).toBe(8);
+    expect(players.getByteLength()).toBe(32);
   });
 });
 

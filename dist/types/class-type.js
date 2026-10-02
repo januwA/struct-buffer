@@ -1,4 +1,4 @@
-import { arrayProxyNext, COUNT, createDataView, isRef, makeDataView, realloc, unflattenDeep, } from "./utils";
+import { arrayProxyNext, COUNT, createDataView, isRef, makeDataView, unflattenDeep, } from "./utils";
 export const FLOAT_TYPE = "float";
 export const DOUBLE_TYPE = "double";
 const hData = {
@@ -34,7 +34,7 @@ function typeHandle(type) {
     if (!h)
         h = hData[type.size][+type.unsigned];
     if (!h)
-        throw new Error(`StructBuffer: Unrecognized ${type} type.`);
+        throw new Error(`StructType: Unrecognized ${type} type.`);
     return [h, h.replace(/^g/, "s"), h.startsWith("getBig")];
 }
 class StructTypeNext {
@@ -240,42 +240,6 @@ export class BitFieldsType extends StructType {
             v[this.set](offset, this.toRaw(val), littleEndian);
             return v;
         }
-    }
-}
-export class Inject extends StructType {
-    constructor(hInjectDecode, hInjectEncode) {
-        super("inject_t", 0, true);
-        this.hInjectDecode = hInjectDecode;
-        this.hInjectEncode = hInjectEncode;
-    }
-    decode(view, littleEndian = false, offset = 0, ctx) {
-        if (!this.hInjectDecode)
-            return null;
-        this.size = 0;
-        view = makeDataView(view);
-        const result = [];
-        let i = this.getCount(ctx);
-        while (i--) {
-            const res = this.hInjectDecode(view, offset);
-            result.push(res.value);
-            offset += res.size;
-            this.size += res.size;
-        }
-        return this.isList ? unflattenDeep(result, this.deeps, false) : result[0];
-    }
-    encode(obj, littleEndian = false, offset = 0, view, ctx) {
-        view = createDataView(0, view);
-        if (!this.hInjectEncode)
-            return view;
-        this.size = 0;
-        for (let i = 0; i < this.getCount(ctx ?? obj); i++) {
-            const it = this.isList ? obj[i] : obj;
-            const buf = makeDataView(this.hInjectEncode(it));
-            view = realloc(view, view.byteLength + buf.byteLength, buf, offset);
-            offset += buf.byteLength;
-            this.size += buf.byteLength;
-        }
-        return view;
     }
 }
 export function registerType(typeName, size, unsigned = true) {

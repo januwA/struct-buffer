@@ -1,12 +1,11 @@
 import type { ENCODE_VALUE_TYPE, VALUE_TYPE, VARIANT_CASES } from "./class-type";
-import type { StructBuffer } from "./struct-buffer";
 import type { Def } from "./field";
 import type { DynamicStructBuffer } from "./dynamic-struct-buffer";
 export type InferType<T> = T extends {
     [VALUE_TYPE]: infer V;
 } ? V : InferShape<T>;
 export type InferSource<T> = T extends Def ? any : InferShape<T>;
-type InferShape<T> = T extends StructBuffer<infer V, any> ? V : T extends DynamicStructBuffer<any, infer V, any> ? V : T extends object ? {
+type InferShape<T> = T extends DynamicStructBuffer<any, infer V, any> ? V : T extends object ? {
     [K in keyof T]: InferType<T[K]>;
 } : T;
 type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never) extends (k: infer I) => void ? I : never;

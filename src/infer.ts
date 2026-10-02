@@ -3,7 +3,6 @@ import type {
   VALUE_TYPE,
   VARIANT_CASES,
 } from "./class-type";
-import type { StructBuffer } from "./struct-buffer";
 import type { Def } from "./field";
 import type { DynamicStructBuffer } from "./dynamic-struct-buffer";
 
@@ -47,13 +46,11 @@ export type InferSource<T> = T extends Def
   ? any // 归一化后的运行时形态, 类型信息已丢失
   : InferShape<T>;
 
-type InferShape<T> = T extends StructBuffer<infer V, any>
-  ? V
-  : T extends DynamicStructBuffer<any, infer V, any>
-    ? V // D 的默认值就是 InferDef<S>; 下标把它推成数组, 这里直接读
-    : T extends object
-      ? { [K in keyof T]: InferType<T[K]> } // 内联对象 = 匿名子结构体
-      : T; // 非对象 = 已经是解码后的值(number/string/Uint8Array...), 原样透传
+type InferShape<T> = T extends DynamicStructBuffer<any, infer V, any>
+  ? V // D 的默认值就是 InferDef<S>; 下标把它推成数组, 这里直接读
+  : T extends object
+    ? { [K in keyof T]: InferType<T[K]> } // 内联对象 = 匿名子结构体
+    : T; // 非对象 = 已经是解码后的值(number/string/Uint8Array...), 原样透传
 
 /** 联合 -> 交叉(为了把 variant 的各分支合并) */
 type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never) extends (

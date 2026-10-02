@@ -1,7 +1,6 @@
 import { Cursor } from "./cursor";
 import { Writer } from "./writer";
 import { Ctx, flatten, nest, normalizeDef, resolveLengths, runFields, } from "./field";
-import { StructBuffer } from "./struct-buffer";
 import { arrayProxyNext, COUNT, isRef } from "./utils";
 class DynamicStructBufferNext {
     constructor() {
@@ -115,9 +114,4 @@ export class DynamicStructBuffer extends Array {
         }
         return this.encode(obj, false, 0, undefined, parentCtx).byteLength;
     }
-}
-export function dynamicByteLength(type) {
-    if (type instanceof StructBuffer)
-        return type.byteLength;
-    return type.def.fixedSize;
 }
