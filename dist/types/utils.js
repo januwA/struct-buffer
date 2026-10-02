@@ -31,7 +31,7 @@ export function makeDataView(view) {
         view = Uint8Array.from(view);
     if (!ArrayBuffer.isView(view))
         throw new Error(`Type Error: (${view}) is not an ArrayBuffer!!!`);
-    return new DataView(view.buffer);
+    return new DataView(view.buffer, view.byteOffset, view.byteLength);
 }
 let refSeq = 0;
 const REF_MAP = new Map();

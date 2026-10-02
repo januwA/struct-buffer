@@ -18,11 +18,12 @@ export declare class StructType<D, E> extends Array<StructType<D[], E[]>> {
     getCount(ctx?: any): number;
     getDeeps(ctx?: any): number[];
     getSize(ctx?: any): number;
-    is<D, E>(type: StructType<D, E>): boolean;
     isName(typeName: string): boolean;
     get: string;
     set: string;
+    readonly isBig: boolean;
     constructor(typeName: string | string[], size: TypeSize_t, unsigned: boolean);
+    protected toRaw(value: any): any;
     decode(view: DecodeBuffer_t, littleEndian?: boolean, offset?: number, textDecodeOrCtx?: any, ctx?: any): D;
     encode(obj: E, littleEndian?: boolean, offset?: number, view?: DataView, textEncoderOrCtx?: any, ctx?: any): DataView;
 }
@@ -56,11 +57,6 @@ export declare class StringType extends StructType<string, string> {
     textEncoder: TextEncoder;
     decode(view: DecodeBuffer_t, littleEndian?: boolean, offset?: number, textDecode?: TextDecoder, ctx?: any): any;
     encode(obj: string, littleEndian?: boolean, offset?: number, view?: DataView, textEncoder?: TextEncoder, ctx?: any): DataView;
-}
-export declare class PaddingType extends StructType<number, number> {
-    constructor();
-    decode(view: DecodeBuffer_t, littleEndian?: boolean, offset?: number, textDecodeOrCtx?: any, ctx?: any): any;
-    encode(zero?: number, littleEndian?: boolean, offset?: number, view?: DataView, textEncoderOrCtx?: any, ctx?: any): DataView;
 }
 type HInjectDecode = (view: DataView, offset: number) => InjectNext;
 type HInjectEncode = (value: any) => DecodeBuffer_t;

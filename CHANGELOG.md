@@ -1,21 +1,64 @@
-## 5.3.0
+## 6.0.0
 
-- ✨ `DynamicStructBuffer`: decode 结果与 encode 入参类型全部自动推出来, 字段名拼错编译期就报错
-- ✨ `InferType` / `InferDef` / `InferEncodeDef` 导出, 可以单独拿来推任意字段表
-- ✨ `blob` / `rest` / `records` / `framed` / `variant` 声明式字段工厂
-- ✨ `decodeLenient`: 坏字段变 `undefined` 并收集错误, 而不是整帧丢掉
-- 🐛 定宽文本字段(`string_t[n]`)encode 现在写满 n 字节(短补 NUL / 长截断), decode 在第一个
+6.0 只做减法: 把定位模糊、又在真实项目里用不上的外围功能砍掉, 并修掉两个把类型撒谎的
+bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那套表达力不够、也没人靠它读
+长度前缀。
+
+### ✨ 新增
+
+- `DynamicStructBuffer`: decode 结果与 encode 入参类型全部自动推出来, 字段名拼错编译期就报错
+- `InferType` / `InferDef` / `InferEncodeDef` 导出, 可以单独拿来推任意字段表
+- `blob` / `rest` / `records` / `framed` / `variant` 声明式字段工厂
+- `decodeLenient`: 坏字段变 `undefined` 并收集错误, 而不是整帧丢掉
+- `BoolType` 从 `class-type` 提到公开导出, 布尔类型可以自己按宽度构造
+
+### 🐛 修复
+
+- **`int64_t` 之前实际是无符号的**: 它是从 `longlong` typedef 来的, 而 `longlong` 没显式
+  传 `unsigned`, 落进默认的 `true`, 于是走的是 `getBigUint64` —— `0xFFFFFFFFFFFFFFFF`
+  解出来是 `18446744073709551615` 而不是 `-1`
+- **8 字节类型的值类型统一是 `number`**: 之前 decode 把 `bigint` 原样抛给调用方, 声明
+  类型和运行时类型对不上。代价是超过 `2^53` 的值会掉精度
+- 定宽文本字段(`string_t[n]`)encode 现在写满 n 字节(短补 NUL / 长截断), decode 在第一个
   NUL 处截断 —— 之前短字符串会把后面所有字段整体前移, 而 `sizeof()` 报的仍是 n
-- 🐛 `frameReader.read` 类型允许返回 `null`(文档一直是这么说的)
-- 🐛 判别字段没有对应分支 / `ref` 指向非法值时, 错误消息不再被塞进 `hex:` 槽位
-- 📚 README 补 `DynamicStructBuffer` 与类型推导章节
+- `frameReader.read` 类型允许返回 `null`(文档一直是这么说的)
+- 判别字段没有对应分支 / `ref` 指向非法值时, 错误消息不再被塞进 `hex:` 槽位
 
-**破坏性变更**
+### 📚 文档
 
-- `DynamicStructBuffer` 泛型顺序变成 `<S, D, E>`(`S` 是字段表). 类的类型参数默认值不能引用
-  后声明的参数(TS2744), 而 `D` 的默认值就是 `InferDef<S>`, 想保住老的 `<D, E>` 位置就只能
-  让推导失效. 需要显式指定类型时写 `new DynamicStructBuffer<any, MyType>(...)`. 仓库内与真实
-  调用方都没有显式泛型用法
+- README 补 `DynamicStructBuffer`、类型推导、11 个类型的对照表与别名归属
+
+### 💥 破坏性变更
+
+**删除 `CStruct`**(`src/c-struct.ts`)
+
+- 去掉 C 头文件解析(`CStruct.parse`)与反向生成(`toCStruct`)两个方向的映射。协议表还是
+  手写, 只是不再假装能从头文件自动生成 —— 生成的 C 代码没人真拿去编译过
+
+**删除 `py-struct`**(`src/py-struct.ts`)
+
+- 去掉 `pack` / `pack_into` / `unpack` / `unpack_from` / `iter_unpack` / `calcsize` /
+  `Struct`。格式串表达不了长度前缀、变长正文、未知/保留字节这些真实报文里最常见的形状
+
+**类型导出从 40 个压到 11 个**
+
+- 只保留 `uint8_t`~`uint64_t`、`int8_t`~`int64_t`、`float`、`double`、`string_t`
+- C / Windows 别名收进类型自己的 `names` 数组, 不再各导出一个实例: `char` / `uchar` /
+  `short` / `ushort` / `int` / `uint` / `long` / `ulong` / `long long` / `ulong long` /
+  `BYTE` / `WORD` / `DWORD` / `QWORD` / `CHAR`..`ULONGLONG` / `FLOAT` / `DOUBLE`
+  改写即可, 例如 `DWORD` → `uint32_t`
+- 删除 `bool` / `BOOL`: 语义就是"底层整数非零即真", 宽度交给使用者选。
+  `new BoolType("bool", uint8_t)` 是 1 字节, `new BoolType("BOOL", uint32_t)` 是
+  Windows 的 4 字节
+- 删除 `padding_t`: 它会把跳过的字节解成 uint8 数组塞进结果, 真实项目里协议表一半的字段
+  是"未知/保留/填充", 让它们出现在结果里只会污染每一次消费。动态结构体请用 `skip()`
+- 删除 `StructType.is()`: 唯一使用者是被删掉的 `CStruct`
+
+**其他**
+
+- `DynamicStructBuffer` 泛型顺序变成 `<S, D, E>`(`S` 是字段表)。类的类型参数默认值不能
+  引用后声明的参数(TS2744), 而 `D` 的默认值就是 `InferDef<S>`, 想保住老的 `<D, E>` 位置
+  就只能让推导失效. 需要显式指定类型时写 `new DynamicStructBuffer<any, MyType>(...)`
 - 引擎里字符串字段一律是 text 形态的字节段: `string_t[n]` 是 n 字节定宽字符串,
   `string_t[n][m]` 是 n 个字 × m 字节的字符串(不是字符串数组). 类型一律 `string`
 

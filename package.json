@@ -1,6 +1,6 @@
 {
   "name": "struct-buffer",
-  "version": "5.2.1",
+  "version": "6.0.0",
   "description": "Add structure to ArrayBuffer",
   "private": false,
   "main": "./dist/umd/struct-buffer.js",
@@ -25,8 +25,8 @@
     "struct-buffer",
     "ArrayBuffer",
     "DataView",
-    "pack",
-    "unpack",
+    "binary",
+    "deserialize",
     "buffer",
     "Struct"
   ],

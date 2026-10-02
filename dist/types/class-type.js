@@ -35,7 +35,7 @@ function typeHandle(type) {
         h = hData[type.size][+type.unsigned];
     if (!h)
         throw new Error(`StructBuffer: Unrecognized ${type} type.`);
-    return [h, h.replace(/^g/, "s")];
+    return [h, h.replace(/^g/, "s"), h.startsWith("getBig")];
 }
 class StructTypeNext {
     constructor() {
@@ -87,9 +87,6 @@ export class StructType extends Array {
         }
         return this.size;
     }
-    is(type) {
-        return type.names.some((name) => this.names.includes(name));
-    }
     isName(typeName) {
         return this.names.includes(typeName);
     }
@@ -100,14 +97,19 @@ export class StructType extends Array {
         this.deeps = [];
         this.names = Array.isArray(typeName) ? typeName : [typeName];
         if (this.size) {
-            const [get, set] = typeHandle(this);
+            const [get, set, isBig] = typeHandle(this);
             this.set = set;
             this.get = get;
+            this.isBig = isBig;
         }
         else {
             this.set = this.get = "";
+            this.isBig = false;
         }
         return arrayProxyNext(this, StructTypeNext);
+    }
+    toRaw(value) {
+        return this.isBig ? BigInt(value) : value;
     }
     decode(view, littleEndian = false, offset = 0, textDecodeOrCtx, ctx) {
         view = makeDataView(view);
@@ -116,7 +118,8 @@ export class StructType extends Array {
         const result = [];
         let i = count;
         while (i--) {
-            result.push(view[this.get](offset, littleEndian));
+            const v = view[this.get](offset, littleEndian);
+            result.push(this.isBig ? Number(v) : v);
             offset += this.size;
         }
         const deeps = this.getDeeps(actualCtx);
@@ -130,12 +133,7 @@ export class StructType extends Array {
             obj = obj.flat();
         for (let i = 0; i < count; i++) {
             const it = (this.isList ? obj[i] : obj) ?? 0;
-            try {
-                v[this.set](offset, it, littleEndian);
-            }
-            catch (error) {
-                v[this.set](offset, BigInt(it), littleEndian);
-            }
+            v[this.set](offset, this.toRaw(it), littleEndian);
             offset += this.size;
         }
         return v;
@@ -177,7 +175,7 @@ export class BitsType extends StructType {
                     if (i !== undefined)
                         flags |= v << i;
                 });
-                v[this.set](offset, flags, littleEndian);
+                v[this.set](offset, this.toRaw(flags), littleEndian);
                 offset += this.size;
             }
             return v;
@@ -189,7 +187,7 @@ export class BitsType extends StructType {
                 if (i !== undefined)
                     flags |= v << i;
             });
-            v[this.set](offset, flags, littleEndian);
+            v[this.set](offset, this.toRaw(flags), littleEndian);
             return v;
         }
     }
@@ -233,14 +231,14 @@ export class BitFieldsType extends StructType {
         };
         if (this.isList && Array.isArray(obj)) {
             for (let i = 0; i < count; i++) {
-                v[this.set](offset, _getValue(obj[i]), littleEndian);
+                v[this.set](offset, this.toRaw(_getValue(obj[i])), littleEndian);
                 offset += this.size;
             }
             return v;
         }
         else {
             const val = _getValue(obj);
-            v[this.set](offset, val, littleEndian);
+            v[this.set](offset, this.toRaw(val), littleEndian);
             return v;
         }
     }
@@ -314,32 +312,6 @@ export class StringType extends StructType {
             }
             offset += this.size;
         }
-        return v;
-    }
-}
-export class PaddingType extends StructType {
-    constructor() {
-        super("padding_t", 1, true);
-    }
-    decode(view, littleEndian = false, offset = 0, textDecodeOrCtx, ctx) {
-        const actualCtx = ctx ?? textDecodeOrCtx;
-        view = makeDataView(view);
-        let i = this.getSize(actualCtx);
-        const r = [];
-        while (i--) {
-            r.push(view[this.get](offset, littleEndian));
-            offset++;
-        }
-        return r;
-    }
-    encode(zero = 0, littleEndian = false, offset = 0, view, textEncoderOrCtx, ctx) {
-        const actualCtx = ctx ?? textEncoderOrCtx;
-        const v = createDataView(this.getSize(actualCtx), view);
-        if (typeof zero !== "number")
-            zero = 0;
-        let length = this.getSize(actualCtx);
-        while (length-- > 0)
-            v.setUint8(offset++, zero);
         return v;
     }
 }
