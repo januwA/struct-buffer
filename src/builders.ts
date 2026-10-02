@@ -186,25 +186,84 @@ export function discriminated(
  * 自定界子帧循环: 反复读一个自带长度的子帧直到字节耗尽。
  *
  * `op|flen|body` 这种流式布局没法用长度前缀声明 —— 与其做一个猜错一半的 DSL,
- * 不如让调用方老实描述"怎么跳过一个子帧"。子帧内部用 `c.region(n, ...)` 划
+ * 不如老实让调用方描述"怎么跳过一个子帧"。子帧内部用 `c.region(n, ...)` 划
  * 窗口, 于是帧尾残余字节不会漏进父结构。
  *
  * ```ts
- * ops: framed({
- *   read: (c) => {
- *     const op = c.u8("op");
- *     const n = c.u8("flen");
- *     return { op, body: c.bytes(n, "body") };
+ * ops: framed(
+ *   {
+ *     read: (c) => {
+ *       const op = c.u8("op");
+ *       const n = c.u8("flen");
+ *       return { op, body: c.bytes(n, "body") };
+ *     },
  *   },
- *   write: (w, v) => { w.u8(v.op); w.u8(v.body.length); w.bytes(v.body); },
- * })
+ *   {
+ *     write: (w, v) => {
+ *       w.u8(v.op);
+ *       w.u8(v.body.length);
+ *       w.bytes(v.body);
+ *     },
+ *   }
+ * )
  * ```
+ *
+ * 注意它**贪婪读到缓冲区末尾**, 所以**只能放在结构体最后一个字段** —— 后面还有字段
+ * 时它会把那些字节也当成下一个子帧吃掉(而且失败时已经吃掉了, 后面字段直接报越界)。
+ * 变长字段夹在中间请用 `delimited`.
  */
 export function framed<T>(
   reader: FrameReader<T>,
   writer: FrameWriter<T>
 ): FieldSpec<T[]> {
   return field((b) => new FramedField<T>(b.name, reader, writer));
+}
+
+/**
+ * 单个自定界字段: 读**一个**子帧, 然后把游标停在它后面, 后续字段继续。
+ *
+ * 与 `framed` 只差"读几个": framed 是流式布局(读到字节耗尽), 变长字段夹在结构体
+ * 中间时它会把后面字段的字节也当成下一个子帧吃掉。尺寸完全由 reader 推进
+ * `Cursor` 决定 —— 引擎不需要提前知道, 所以 NUL 结尾的 C 字符串这类"长度只能
+ * 跑起来才知道"的字段在这里是自然的.
+ *
+ * ```ts
+ * // NUL 结尾的 C 字符串
+ * const cstr = () =>
+ *   delimited<string>(
+ *     {
+ *       read: (c) => {
+ *         const at = c.pos;
+ *         while (c.left > 0) {
+ *           if (c.view.getUint8(c.pos++) === 0) {
+ *             // 已经扫过整段正文, 直接从 view 取: bytes() 只能从当前位置读,
+ *             // 而游标此刻已经停在结尾 NUL 之后了
+ *             const n = c.pos - at - 1;
+ *             const view = new Uint8Array(
+ *               c.view.buffer,
+ *               c.view.byteOffset + at,
+ *               n
+ *             );
+ *             return new TextDecoder().decode(view);
+ *           }
+ *         }
+ *         throw DecodeError.reason(c.where, at, "没遇到结尾 NUL");
+ *       },
+ *     },
+ *     {
+ *       write: (w, v) => {
+ *         w.bytes(new TextEncoder().encode(v));
+ *         w.u8(0);
+ *       },
+ *     }
+ *   );
+ * ```
+ */
+export function delimited<T>(
+  reader: FrameReader<T>,
+  writer: FrameWriter<T>
+): FieldSpec<T> {
+  return field((b) => new FramedField<T>(b.name, reader, writer, true));
 }
 
 export { resolveCount };

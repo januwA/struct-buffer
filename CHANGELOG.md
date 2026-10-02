@@ -8,7 +8,7 @@ bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那�
 
 - `DynamicStructBuffer`: decode 结果与 encode 入参类型全部自动推出来, 字段名拼错编译期就报错
 - `InferType` / `InferDef` / `InferEncodeDef` 导出, 可以单独拿来推任意字段表
-- `blob` / `rest` / `records` / `framed` / `variant` 声明式字段工厂
+- `blob` / `rest` / `records` / `framed` / `delimited` / `variant` 声明式字段工厂
 - `decodeLenient`: 坏字段变 `undefined` 并收集错误, 而不是整帧丢掉
 
 ### 🐛 修复
@@ -61,6 +61,20 @@ bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那�
 - 删除 `padding_t`: 它会把跳过的字节解成 uint8 数组塞进结果, 真实项目里协议表一半的字段
   是"未知/保留/填充", 让它们出现在结果里只会污染每一次消费。动态结构体请用 `skip()`
 - 删除 `StructType.is()`: 唯一使用者是被删掉的 `CStruct`
+- **删除 `Inject`**: 它是"任意字节级读写"的逃生舱口, 但代价是整个引擎有一处依赖**跨调用
+  共享的可变 `size`**。`Inject` 的长度只有执行回调才知道, 而 `TypeField` 是全库唯一要求
+  尺寸提前已知的那条路(`reserve(size)` → encode → `advance(size)`)。于是尺寸只能等 encode
+  跑完再读回去 —— `StructBuffer` 恰好是 encode 之后才做 `offset += sizeof(type)`, 所以蒙对
+  了; `Field` 引擎先 `reserve` 再 `advance`, 于是直接坏掉(同一个字段写出 1 字节却要读 2
+  字节)。更糟的是 `sizeof(inject) === 0` 而 `size` 会残留上一次 encode 的结果, 同一个
+  `Inject` 实例先 encode 短串再 encode 长串, 尺寸就串味了
+
+  取代它的是 `delimited` —— 与 `framed` 只差"读几个": `framed` 贪婪读到缓冲区末尾(所以只能
+  放在最后一个字段), `delimited` 读一个就停, 变长字段可以夹在中间。尺寸完全由 reader 推进
+  `Cursor` 决定, 引擎不需要提前知道, 于是"长度只能跑起来才知道"不再是特例, 而 `size` 也
+  不再是跨调用可变状态。C 字符串的写法见 README 与 `test/delimited.test.ts`
+- 删除 `realloc`: 它只服务过 `Inject`(以及它之前的 py-struct), 新引擎里 `Writer` 自己管
+  buffer 增长, 没有调用方了
 
 **文本与编码不再是库的事**
 

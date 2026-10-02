@@ -57,8 +57,8 @@ export class Writer {
   }
 
   /**
-   * `StructType.encode` 内部的 `realloc` 换了底层 buffer 时换回来. 偏移语义不变:
-   * `realloc` 产出的新 view 同样从 0 开始, 所以绝对 offset 可以直接沿用.
+   * `StructType.encode` 内部换了底层 buffer 时换回来. 偏移语义不变: 新 view 同样从 0
+   * 开始, 所以绝对 offset 可以直接沿用.
    */
   rebind(view: DataView): void {
     this.buf = view;

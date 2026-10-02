@@ -2,17 +2,14 @@ import {
   AnyObject,
   Bit_t,
   DecodeBuffer_t,
-  InjectNext,
   TypeSize_t,
 } from "./interfaces";
-import { sizeof } from "./struct-buffer";
 import {
   arrayProxyNext,
   COUNT,
   createDataView,
   isRef,
   makeDataView,
-  realloc,
   Ref,
   unflattenDeep,
 } from "./utils";
@@ -481,68 +478,6 @@ export class BitFieldsType<
       (v as any)[this.set](offset, this.toRaw(val), littleEndian);
       return v;
     }
-  }
-}
-
-type HInjectDecode = (view: DataView, offset: number) => InjectNext;
-type HInjectEncode = (value: any) => DecodeBuffer_t;
-
-export class Inject extends StructType<any, any> {
-  /**
-   * Customize the working content of decode and encode
-   */
-  constructor(
-    private hInjectDecode?: HInjectDecode,
-    private hInjectEncode?: HInjectEncode
-  ) {
-    super("inject_t", 0, true);
-  }
-
-  override decode(
-    view: DecodeBuffer_t,
-    littleEndian: boolean = false,
-    offset: number = 0,
-    ctx?: any
-  ) {
-    if (!this.hInjectDecode) return null;
-
-    this.size = 0;
-    view = makeDataView(view);
-
-    const result: AnyObject[] = [];
-    let i = this.getCount(ctx);
-    while (i--) {
-      const res = this.hInjectDecode(view as DataView, offset);
-
-      result.push(res.value);
-      offset += res.size;
-      this.size += res.size;
-    }
-
-    return this.isList ? unflattenDeep(result, this.deeps, false) : result[0];
-  }
-
-  override encode(
-    obj: any,
-    littleEndian: boolean = false,
-    offset: number = 0,
-    view?: DataView,
-    ctx?: any
-  ): DataView {
-    view = createDataView(0, view);
-    if (!this.hInjectEncode) return view;
-
-    this.size = 0;
-    for (let i = 0; i < this.getCount(ctx ?? obj); i++) {
-      const it = this.isList ? (obj as any)[i] : obj;
-      const buf = makeDataView(this.hInjectEncode(it));
-
-      view = realloc(view!, view!.byteLength + buf.byteLength, buf, offset);
-      offset += buf.byteLength;
-      this.size += buf.byteLength;
-    }
-
-    return view;
   }
 }
 

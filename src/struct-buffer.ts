@@ -1,4 +1,4 @@
-import { Inject, StructType } from "./class-type";
+import { StructType } from "./class-type";
 import { AnyObject, DecodeBuffer_t } from "./interfaces";
 import {
   arrayProxyNext,
@@ -22,8 +22,7 @@ export function sizeof(type: Type_t): number {
     while ((size + padidng++) % maxSize);
     return (size + padidng - 1) * type.count;
   }
-  if (type instanceof Inject) return type.size;
-  
+
   return type.isList ? type.size * type.count : type.size;
 }
 

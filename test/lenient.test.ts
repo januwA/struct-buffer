@@ -1,7 +1,7 @@
 import {
   DecodeError,
   DynamicStructBuffer,
-  Inject,
+  delimited,
   ref,
   uint16_t,
   uint32_t,
@@ -131,10 +131,15 @@ describe("宽松解码 decodeLenient", () => {
     expect(r.errors[0].need).toBe(0xff);
   });
 
-  it("只捕获 DecodeError, 自定义 codec 的 TypeError 照炸", () => {
-    const boom = new Inject(() => {
-      throw new TypeError("codec 写错了");
-    });
+  it("只捕获 DecodeError, 自定义 Field 的 TypeError 照炸", () => {
+    const boom = delimited<number>(
+      {
+        read: () => {
+          throw new TypeError("codec 写错了");
+        },
+      },
+      { write: (w) => w.u8(1) }
+    );
     const Bad = new DynamicStructBuffer("Bad", { a: uint8_t, b: boom });
     expect(() => Bad.decode(bytes(1, 2))).toThrow(TypeError);
     // 宽松解码不能把 bug 伪装成"这帧数据坏了"

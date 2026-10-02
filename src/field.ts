@@ -654,6 +654,8 @@ export interface FrameWriter<T = any> {
  * `op|flen|body` 这种流式布局没法用长度前缀声明 —— 与其做一个猜错一半的 DSL,
  * 不如老实让调用方描述"怎么跳过一个子帧". 子帧内部用 `c.region(n, ...)` 划窗口,
  * 于是帧尾残余字节不会漏进父结构.
+ *
+ * `single` 把它从"循环"降成"读一个": 见 `delimited`.
  */
 export class FramedField<T = any> implements Field {
   readonly fixedSize = undefined;
@@ -661,7 +663,13 @@ export class FramedField<T = any> implements Field {
   constructor(
     readonly name: string,
     private readonly reader: FrameReader<T>,
-    private readonly writer: FrameWriter<T>
+    private readonly writer: FrameWriter<T>,
+    /**
+     * 只读一个子帧, 而不是读到字节耗尽. `false`(默认)是流式布局; `true` 用于
+     * "自定界字段夹在结构体中间" —— 后面还有字段时, 循环版会把后面字段的字节
+     * 也当成下一个子帧吃掉.
+     */
+    private readonly single: boolean = false
   ) {}
 
   resolveLengths(obj: AnyObject, ctx: Ctx): AnyObject {
@@ -669,6 +677,25 @@ export class FramedField<T = any> implements Field {
   }
 
   decode(c: Cursor, out: AnyObject, ctx: Ctx, sink?: ErrorSink): void {
+    if (this.single) {
+      if (sink?.stopped) return;
+      const before = c.pos;
+      const value = this.reader.read(c, 0);
+      // null 在这里是"这一帧不完整"而不是"流结束" —— 与 framed 的收手段落不同,
+      // 所以不能静默吞掉: 位置已经不可信, 必须让调用方知道
+      if (value == null) {
+        throw DecodeError.reason(
+          c.where,
+          before,
+          `${this.name}: 子帧不完整(reader 返回 null), 而本字段声明为单个子帧`
+        );
+      }
+      // 这里**不查"有没有消费字节"**: 单次读没有循环, 不推进是合法的零长度子帧
+      // (空 C 字符串就是). 那个检查只对 framed 的循环有意义, 见下.
+      out[this.name] = value;
+      return;
+    }
+
     const values: any[] = [];
     while (c.left > 0) {
       if (sink?.stopped) break;
@@ -688,6 +715,10 @@ export class FramedField<T = any> implements Field {
   }
 
   encode(w: Writer, value: any, ctx: Ctx): void {
+    if (this.single) {
+      this.writer.write(w, value, 0);
+      return;
+    }
     const items = flatten(value);
     for (let i = 0; i < items.length; i++) this.writer.write(w, items[i], i);
   }

@@ -452,38 +452,70 @@ const data = bf.decode(b("1D"));
 // => { a: 1, b: 2, c: 3 }
 ```
 
-## Inject
+## delimited
 
-Customize the working content of decode and encode
+单个**自定界**字段: 读一个, 然后把游标停在它后面, 后续字段继续。尺寸由 reader 自己推进
+`Cursor` 决定 —— 引擎不需要提前知道, 所以 NUL 结尾的 C 字符串这类"长度只能跑起来才知道"
+的字段在这里是自然的。
 
 ```ts
-const c_str = new Inject(
-  // decode
-  (view: DataView, offset: number) => {
-    const buf: number[] = [];
-    let size = offset + 0;
-    while (true) {
-      let data = view.getUint8(size++);
-      if (data === 0) break;
-      buf.push(data);
+import { delimited, DecodeError, DynamicStructBuffer, float } from "struct-buffer";
+
+const cstr = () =>
+  delimited<string>(
+    {
+      read: (c) => {
+        const at = c.pos;
+        while (c.left > 0) {
+          if (c.view.getUint8(c.pos++) === 0) {
+            // 已经扫过整段正文, 直接从 view 取: bytes() 只能从当前位置读,
+            // 而游标此刻已经停在结尾 NUL 之后了
+            const n = c.pos - at - 1;
+            const view = new Uint8Array(
+              c.view.buffer,
+              c.view.byteOffset + at,
+              n
+            );
+            return new TextDecoder().decode(view);
+          }
+        }
+        throw DecodeError.reason(c.where, at, "没遇到结尾 NUL");
+      },
+    },
+    {
+      write: (w, v) => {
+        w.bytes(new TextEncoder().encode(v));
+        w.u8(0);
+      },
     }
+  );
 
-    return {
-      size: size - offset,
-      value: new TextDecoder().decode(new Uint8Array(buf)),
-    };
-  },
-
-  // encode
-  (value: string) => {
-    const bytes: Uint8Array = new TextEncoder().encode(value);
-    const res = realloc(bytes, bytes.byteLength + 1);
-    return res;
-  }
-);
+// 变长字段夹在定长字段中间
+const Player = new DynamicStructBuffer("Player", {
+  hp: float,
+  name: cstr(),
+  mp: float,
+});
 ```
 
-See `Inject.test.ts` file.
+### delimited 与 framed 的区别
+
+两者只差**读几个**:`framed` 贪婪读到缓冲区末尾, 所以**只能放在结构体最后一个字段**;
+变长字段夹在中间时它会把后面字段的字节也当成下一个子帧吃掉(而且失败时已经吃掉了,
+后面字段直接报越界)。`delimited` 读一个就停。
+
+| | `framed` | `delimited` |
+| --- | --- | --- |
+| 解出来是 | `T[]` | `T` |
+| 读几个子帧 | 直到字节耗尽 | 一个 |
+| 能放中间吗 | **不能** | 能 |
+| 适合 | `op\|flen\|body` 这种流式布局 | 夹在中间的 C 字符串、单个 TLV |
+
+reader 返回 `null` 的含义也不同:`framed` 里是"流结束"(干净收手), `delimited` 里是
+"这一帧不完整"—— 后者会抛 `DecodeError`, 因为位置已经不可信了。
+
+`delimited` 不检查"reader 有没有推进游标":单次读没有循环, 空 C 字符串消费 0 字节是合法的。
+那个死循环检查只对 `framed` 有意义。
 
 ## Some utility functions
 ```ts
