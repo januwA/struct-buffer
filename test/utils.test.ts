@@ -2,7 +2,6 @@ import {
   DynamicStructBuffer,
   createDataView,
   makeDataView,
-  pack,
   sbytes as b,
   sbytes2 as b2,
   sview,
@@ -45,7 +44,12 @@ describe("utils test", () => {
   });
 
   it("TEXT", () => {
-    const view: DataView = pack("3s2b3s2I", "abc", 1, 2, "xyz", 8, 9);
+    const view: DataView = makeDataView([
+      0x61, 0x62, 0x63, // "abc"
+      0x01, 0x02, // 1, 2
+      0x78, 0x79, 0x7a, // "xyz"
+      0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x09,
+    ]);
     expect(TEXT(view)).toBe("abc..xyz........");
     expect(
       TEXT(view, (byte: number) => {

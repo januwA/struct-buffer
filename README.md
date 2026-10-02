@@ -9,7 +9,7 @@ $ npm i struct-buffer
 
 ## how to use
 ```ts
-import { float, string_t, StructBuffer, pack } from "struct-buffer";
+import { float, string_t, StructBuffer, sbytes } from "struct-buffer";
 
 const struct = new StructBuffer("Player", {
   hp: float,
@@ -17,7 +17,7 @@ const struct = new StructBuffer("Player", {
   name: string_t[3],
 });
 
-const buffer: DataView = pack("2f3s", 10, 100, "abc");
+const buffer: DataView = sbytes("41 20 00 00 42 c8 00 00 61 62 63");
 
 // decode
 const data = struct.decode(buffer);
@@ -422,31 +422,6 @@ const c_str = new Inject(
 
 See `Inject.test.ts` file.
 
-## [pack and unpack](https://docs.python.org/3/library/struct.html)
-```ts
-import { pack, pack_into, unpack, unpack_from, iter_unpack, calcsize, Struct, sbytes as b } from "struct-buffer";
-
-pack("b2xb", 2, 1)
-// => <02 00 00 01>
-
-unpack("b2xb", b("02 00 00 01"))
-// => [ 2, 1 ]
-
-calcsize("hhl")
-// => 8
-
-
-const [hp, mp, name] = unpack(
-  ">II3s",
-  b("00 00 00 64 00 00 00 0A 61 62 63")
-);
-expect(hp).toBe(100);
-expect(mp).toBe(10);
-expect(name).toBe('abc');
-```
-
-Note: Without "@, =, P", the default byte order is ">"
-
 ## Some utility functions
 ```ts
 import { createDataView, makeDataView, sbytes as b, sbytes2 as b2, sview, TEXT } from "struct-buffer";
@@ -463,7 +438,9 @@ b("01 02 03")
 b2("abc\\x1\\x2\\x3")
 // => <61 62 63 01 02 03>
 
-TEXT(pack("3s2b3s2I", "abc", 1, 2, "xyz", 8, 9))
+TEXT(makeDataView([
+  0x61, 0x62, 0x63, 0x01, 0x02, 0x78, 0x79, 0x7a, 0, 0, 0, 8, 0, 0, 0, 9,
+]))
 // => "abc..xyz........"
 ```
 

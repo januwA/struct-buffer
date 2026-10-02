@@ -1,7 +1,7 @@
-import { DWORD, BYTE, WORD, QWORD, float, double, display, pack } from "../src";
+import { DWORD, BYTE, WORD, QWORD, float, double, display, makeDataView } from "../src";
 
 describe("test display", () => {
-  const view: DataView = pack("8B", 1, 2, 3, 4, 5, 6, 7, 8);
+  const view: DataView = makeDataView([1, 2, 3, 4, 5, 6, 7, 8]);
   it("test byte", () => {
     const data = display(view, BYTE, { hex: false });
     expect(data[0].value).toBe(1);

@@ -1,4 +1,4 @@
-import { BOOL, bool, uchar, uint, sizeof, pack } from "../src";
+import { BOOL, bool, uchar, uint, sizeof, makeDataView } from "../src";
 
 describe("bool and BOOL test", () => {
   it("encode", () => {
@@ -14,16 +14,20 @@ describe("bool and BOOL test", () => {
   });
 
   it("decode", () => {
-    expect(bool.decode(pack("B", 2))).toBe(true);
-    expect(bool.decode(pack("B", 0))).toBe(false);
+    // BOOL 走 int(4B 大端), bool 走 char(1B)
+    expect(bool.decode(makeDataView([2]))).toBe(true);
+    expect(bool.decode(makeDataView([0]))).toBe(false);
 
-    expect(BOOL.decode(pack("I", 2))).toBe(true);
-    expect(BOOL.decode(pack("I", 0))).toBe(false);
+    expect(BOOL.decode(makeDataView([0, 0, 0, 2]))).toBe(true);
+    expect(BOOL.decode(makeDataView([0, 0, 0, 0]))).toBe(false);
 
-    expect(bool[2].decode(pack("2B", 2, 0))).toEqual([true, false]);
-    expect(bool[2].decode(pack("2B", 0, 2))).toEqual([false, true]);
-    expect(BOOL[2].decode(pack("2I", 2, 0))).toEqual([true, false]);
-    expect(BOOL[2].decode(pack("2I", 0, 2))).toEqual([
+    expect(bool[2].decode(makeDataView([2, 0]))).toEqual([true, false]);
+    expect(bool[2].decode(makeDataView([0, 2]))).toEqual([false, true]);
+    expect(BOOL[2].decode(makeDataView([0, 0, 0, 2, 0, 0, 0, 0]))).toEqual([
+      true,
+      false,
+    ]);
+    expect(BOOL[2].decode(makeDataView([0, 0, 0, 0, 0, 0, 0, 2]))).toEqual([
       false,
       true,
     ]);

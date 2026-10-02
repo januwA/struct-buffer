@@ -255,9 +255,6 @@ export function createTextEncoder(): TextEncoder {
  * b2('abc 0x640ah')
  * b2('abc \\x640ah')
  * // => <61 62 63 20 64 0a>
- *
- * unpack('3sxbb3s', b2('abc \\x640ahend'))
- * // => [ 'abc', 100, 10, 'end' ]
  * ```
  */
 export function sbytes2(str: string, te = createTextEncoder()): DataView {
@@ -311,7 +308,9 @@ export function sview(view: DecodeBuffer_t): string {
 
 /**
  * ```ts
- * const view: DataView = pack("3s2b3s2I", "abc", 1, 2, "xyz", 8, 9);
+ * const view = makeDataView([
+ *   0x61, 0x62, 0x63, 0x01, 0x02, 0x78, 0x79, 0x7a, 0, 0, 0, 8, 0, 0, 0, 9,
+ * ]);
  * TEXT(view)
  * // => "abc..xyz........"
  *

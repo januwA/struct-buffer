@@ -11,7 +11,7 @@ import {
   StructBuffer,
   uchar,
   typedef,
-  pack,
+  makeDataView,
   sview,
   sbytes2 as b2,
 } from "../src";
@@ -28,7 +28,11 @@ describe("test decode and encode", () => {
       mp: 100,
       name: "abc",
     };
-    const view: DataView = pack("II3s", obj.hp, obj.mp, obj.name);
+    const view: DataView = makeDataView([
+      0, 0, 0, 10, // hp  = 10
+      0, 0, 0, 100, // mp  = 100
+      0x61, 0x62, 0x63, // "abc"
+    ]);
 
     expect(struct.decode(view)).toEqual(obj);
     expect(sview(struct.encode(obj))).toBe(sview(view));
@@ -38,11 +42,11 @@ describe("test decode and encode", () => {
   it("test dword encode", () => {
     const view = DWORD[2].encode([1, 2]);
     expect(view.byteLength).toBe(8);
-    expect(sview(view)).toBe(sview(pack("II", 1, 2)));
+    expect(sview(view)).toBe(sview(makeDataView([0, 0, 0, 1, 0, 0, 0, 2])));
   });
 
   it("test dword decode", () => {
-    const data = DWORD[2].decode(pack("II", 1, 2));
+    const data = DWORD[2].decode(makeDataView([0, 0, 0, 1, 0, 0, 0, 2]));
 
     expect(data.length).toBe(2);
     expect(data).toEqual([1, 2]);
@@ -98,7 +102,7 @@ describe("test char", () => {
       a: char,
       b: uchar,
     });
-    const data = s.decode(pack("bb", -1, -1));
+    const data = s.decode(makeDataView([0xff, 0xff]));
     expect(data).toEqual({
       a: -1,
       b: 255,
@@ -118,16 +122,11 @@ describe("test pos", () => {
     ],
   };
   beforeAll(() => {
-    view = pack(
-      "8d",
-      1.23,
-      22.66,
-      140.67,
-      742.45,
-      123.23,
-      1231.23,
-      534.23,
-      873.35
+    // 原 pack("8d", …) 是大端; 这里直接用原生 DataView 写大端 double,
+    // 不经过库的编码器 —— 夹具必须独立于被测代码
+    view = new DataView(new ArrayBuffer(8 * 8));
+    [1.23, 22.66, 140.67, 742.45, 123.23, 1231.23, 534.23, 873.35].forEach(
+      (v, i) => view.setFloat64(i * 8, v, false)
     );
 
     struct = new StructBuffer("Pos", {
@@ -198,13 +197,26 @@ describe("test struct nesting", () => {
   });
 
   it("test decode", () => {
-    const data = XINPUT_STATE.decode(pack("IH2B4h", 0, 1, 0, 0, 1, 2, 3, 4));
+    // DWORD + WORD + BYTE[2] + int16[4]
+    const raw = makeDataView([
+      0, 0, 0, 0, // dwPacketNumber
+      0, 1, // wButtons
+      0, 0, // bLeftTrigger / bRightTrigger
+      0, 1, 0, 2, 0, 3, 0, 4, // sThumbL* / sThumbR*
+    ]);
+    const data = XINPUT_STATE.decode(raw);
     expect(data).toEqual(obj);
   });
 
   it("test encode", () => {
     const view = XINPUT_STATE.encode(obj);
-    expect(sview(view)).toBe(sview(pack("IH2B4h", 0, 1, 0, 0, 1, 2, 3, 4)));
+    expect(sview(view)).toBe(
+      sview(
+        makeDataView([
+          0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0, 3, 0, 4,
+        ])
+      )
+    );
   });
 
   it("test byteLength", () => {
@@ -280,7 +292,10 @@ describe("test struct Multilevel array", () => {
       players: player[2][2],
     });
 
-    view = pack("8I", 1, 1, 2, 2, 3, 3, 4, 4);
+    view = makeDataView([
+      0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 4,
+      0, 0, 0, 4,
+    ]);
   });
 
   it("test decode", () => {
