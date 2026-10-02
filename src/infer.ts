@@ -14,7 +14,7 @@ import type { DynamicStructBuffer } from "./dynamic-struct-buffer";
  * 都有, 运行时都不存在)。不写 `T extends StructType<infer V, any>` 是有原因的 ——
  * 那条路对 `uint8_t` 有效, 但对**子类**会推成 `any`(`StructType` 继承自 `Array` 且
  * 下标签名 `StructType<D[], E[]>` 自引用, TS 从子类结构反推基类类型参数推不出来),
- * `string_t` 正好中招。读 phantom 字段不做结构推断, 绕开整个问题。
+ * `bits(...)` / `bitFields(...)` 正好中招。读 phantom 字段不做结构推断, 绕开整个问题。
  *
  * 关键效果是**下标即数组**: `StructType<D, E> extends Array<StructType<D[], E[]>>`
  * 让下标操作在类型层面把 D 推成数组, 所以
@@ -25,8 +25,6 @@ import type { DynamicStructBuffer } from "./dynamic-struct-buffer";
  * uint8_t[2][3]        => number[][]
  * uint8_t[ref("len")]  => number[]
  * ```
- *
- * 唯一不适用的是字符串家族(见 `ValueOf`): 下标只定字节数, 一律出 `string`.
  *
  * 旧版 `ref()` 声明成 `any`, 推导到 `uint8_t[ref("len")]` 就断了; 改成 `RefIndex`
 * (运行时是 Ref 对象, 类型上是 number)之后才能穿过长度前缀。
@@ -41,48 +39,8 @@ import type { DynamicStructBuffer } from "./dynamic-struct-buffer";
  * 再套一层是幂等的。
  */
 export type InferType<T> = T extends { [VALUE_TYPE]: infer V }
-  ? ValueOf<V> // uint8_t / string_t / bits / uint8_t[ref(...)] / blob() / framed()
+  ? V // uint8_t / bits / uint8_t[ref(...)] / blob() / framed()
   : InferShape<T>;
-
-/**
- * D 是不是字符串(或纯字符串的数组). `Depth` 是硬上限: `StructType` 本身
- * `extends Array<StructType<D[], E[]>>`, 拿它当数组往里递归就是无限自我复制,
- * TS 会直接报 TS2589. 只关心 `string_t` 的下标层数, 8 层绰绰有余.
- */
-type IsStringy<V, Depth extends unknown[] = []> = V extends string
-  ? true
-  : Depth["length"] extends 8
-    ? false
-    : V extends readonly unknown[]
-      ? IsStringy<V[number], [...Depth, 0]>
-      : false;
-
-/**
- * `StructType<D, E>` 上的 D 未必就是取值类型 —— `string_t` 家族是唯一的例外.
- *
- * 在 Field 引擎里字符串字段是 `BlobField(as: "text")`(见 `field.ts`), 下标只决定
- * **读多少字节**, 所以 `string_t` / `string_t[2]` / `string_t[ref("len")]` 一律出
- * `string`. 直接用下标深一层去推会得到 `string[]`, 那在引擎里根本不成立.
- *
- * 顺带说一句: 老的 `StringType.decode` 自己有一套下标语义(第一层当字节宽、第二层
- * 当个数, `string_t[2][2]` 出 `["cd","ef"]`), 两边对不上. 推导只能保证和**引擎**
- * 一致 —— 引擎才是 DynamicStructBuffer 真正走的路径.
- *
- * 为什么只能靠 D 认: 下标操作会把类型擦成基类实例 —— `x[i]` 的元素类型来自
- * 基类的 `extends Array<StructType<D[], E[]>>`, 结果是 `StructType<D[], E[]>`,
- * 子类信息(`StringType`)一律不保留, `T extends StringType` 认不出来. 全库
- * 只有字符串家族的 D 是 string, 于是"是字符串就出 string"对所有内置类型都是
- * 精确的(数值/布尔家族的 D 分别是 number/boolean, 不会误伤).
- *
- * `[V] extends [never]` 那一步不能省: `never` 是裸类型参数时会在条件类型里**分配**,
- * 于是 `IsStringy<never>` 得到 `never`, 而 `never extends true` 为真 —— `skip(n)`
- * (值类型是 never)会被当成字符串, 占位键就混进结果类型了.
- */
-type ValueOf<V> = [V] extends [never]
-  ? never
-  : IsStringy<V> extends true
-    ? string
-    : V;
 
 /** 结构体来源(嵌套字段/`records` 的参数)的值类型 */
 export type InferSource<T> = T extends Def

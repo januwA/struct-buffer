@@ -9,25 +9,25 @@ $ npm i struct-buffer
 
 ## how to use
 ```ts
-import { float, string_t, StructBuffer, sbytes } from "struct-buffer";
+import { uint32_t, uint8_t, StructBuffer, sbytes } from "struct-buffer";
 
 const struct = new StructBuffer("Player", {
-  hp: float,
-  mp: float,
-  name: string_t[3],
+  hp: uint32_t,
+  mp: uint32_t,
+  name: uint8_t[3],
 });
 
 const buffer: DataView = sbytes("41 20 00 00 42 c8 00 00 61 62 63");
 
 // decode
 const data = struct.decode(buffer);
-// data => { hp: 10, mp: 100, name: 'abc' }
+// data => { hp: 10, mp: 100, name: [0x61, 0x62, 0x63] }
 
 // encode
 const view = struct.encode({
   hp: 10,
   mp: 100,
-  name: "abc",
+  name: [0x61, 0x62, 0x63],
 });
 // view => <41 20 00 00 42 c8 00 00 61 62 63>
 ```
@@ -36,7 +36,7 @@ const view = struct.encode({
 ```html
 <script src="struct-buffer.js"></script>
 <script>
-  const { uint32_t, string_t, StructBuffer } = window.StructBuffer;
+  const { uint32_t, uint8_t, StructBuffer } = window.StructBuffer;
 </script>
 ```
 
@@ -54,7 +54,7 @@ const data = uint32_t[2].decode(view);
 // data => [ 1, 2 ]
 ```
 
-只导出 11 个类型, 别名收进类型自己的 `names` 而不是各导出一个实例 —— 同宽同符号的
+只导出 10 个类型, 别名收进类型自己的 `names` 而不是各导出一个实例 —— 同宽同符号的
 别名本来就是同一个类型, 多导一份只会让人在 "该用哪个" 上纠结:
 
 | 有符号 | 无符号 | C / Windows 别名（在 `names` 里） |
@@ -64,8 +64,7 @@ const data = uint32_t[2].decode(view);
 | `int32_t` | `uint32_t` | `int`、`signed`、`unsigned int`、`uint`、`DWORD` |
 | `int64_t` | `uint64_t` | `long long`、`signed long long`、`unsigned long long`、`ulonglong`、`QWORD` |
 
-浮点是 `float` / `double`，定宽字节是 `string_t`，宽度不合适就
-[`registerType`](#register-type)。
+浮点是 `float` / `double`，宽度不合适就 [`registerType`](#register-type)。
 
 两处语义在 6.0 修正，升级时留意：
 
@@ -186,8 +185,8 @@ XINPUT_STATE.encode({
 ## struct list
 ```ts
 const User = new StructBuffer("User", {
-  name: string_t[2],
-  name2: string_t[2],
+  name: uint8_t[2],
+  name2: uint8_t[2],
 });
 
 const Users = new StructBuffer("Users", {
@@ -198,15 +197,15 @@ const data = Users.decode(
   new Uint8Array([0x61, 0x31, 0x61, 0x32, 0x62, 0x31, 0x62, 0x32])
 );
 // data.users.length => 2
-// data.users[0] => { name: "a1", name2: "a2" }
-// data.users[1] => { name: "b1", name2: "b2" }
+// data.users[0] => { name: [0x61, 0x31], name2: [0x61, 0x32] }
+// data.users[1] => { name: [0x62, 0x31], name2: [0x62, 0x32] }
 
 // or
 
 const users = User[2].decode(
   new Uint8Array([0x61, 0x31, 0x61, 0x32, 0x62, 0x31, 0x62, 0x32])
 );
-// users => [ { name: 'a1', name2: 'a2' }, { name: 'b1', name2: 'b2' } ]
+// users => [ { name: [0x61,0x31], name2: [0x61,0x32] }, ... ]
 ```
 
 ## DynamicStructBuffer
@@ -217,9 +216,9 @@ const users = User[2].decode(
 
 ```ts
 import {
+  blob,
   DynamicStructBuffer,
   ref,
-  string_t,
   uint8_t,
   uint16_t,
 } from "struct-buffer";
@@ -230,13 +229,13 @@ const Msg = new DynamicStructBuffer(
     type: uint8_t,
     len: uint16_t, // 后面 payload 的字节数
     payload: uint8_t[ref("len")],
-    name: string_t[8],
+    name: blob(8),
   },
   { littleEndian: true }
 );
 
 Msg.decode(view);
-// => { type: 1, len: 2, payload: Uint8Array, name: "abc" }
+// => { type: 1, len: 2, payload: Uint8Array, name: Uint8Array }
 
 Msg.encode({ type: 1, payload: [0x41, 0x42], name: "abc" });
 // len 不用给: encode 会把 payload 实际字节数回填进 len, 而且**不改你的入参对象**
@@ -301,9 +300,17 @@ framed(
 );
 ```
 
-`string_t[n]` 是**定宽**字段(`char name[8]` 那种): encode 写满 n 字节(短补 NUL / 长截断),
-decode 在第一个 NUL 处截断. `string_t[ref(...)]` 才是变长, 整段解码不做截断 —— NUL
-在那里属于正文.
+`blob(n)` 是**定宽**字节字段(`char name[8]` 那种): encode 写满 n 字节(短补 NUL / 长截断)。
+decode 一律给满 n 字节, **不在 NUL 处截断** —— 截断是 C 风格字符串的约定而不是字节属性,
+定宽字段也常见空格补位或满宽正文, 猜错就是静默丢数据。要截自己切, NUL 是单字节且不会
+出现在多字节序列中间, 所以切在它上面不会劈开 UTF-8 / GBK:
+
+```ts
+const cut = (b: Uint8Array) => {
+  const nul = b.indexOf(0);
+  return new TextDecoder("gbk").decode(nul < 0 ? b : b.subarray(0, nul));
+};
+```
 
 ### 宽松解码
 
@@ -339,7 +346,7 @@ const { value, errors, consumed } = Msg.decodeLenient(Uint8Array.from([1, 0xff, 
 const Msg = new DynamicStructBuffer("msg", {
   msg_type: uint8_t,
   msg: uint8_t[ref("msg_size")],
-  name: string_t[ref("name_size")],
+  name: blob(ref("name_size")),
 });
 
 const data = Msg.decode(view);
@@ -351,10 +358,8 @@ Msg.encode({ msg_typo: 1 }); // 编译期报错
 几个容易踩的点:
 
 - **encode 入参是 Partial, 且长度字段不用给** —— encode 时由框架回填
-- **字符串一律是 `string`**: 引擎里字符串字段就是 `blob` 的 text 形态, 下标只决定
-  字节数(`string_t[2][2]` 是 2 个字 *2 字节*的字符串, 不是字符串数组)
-- **decode 值类型 ≠ encode 入参类型**: `rest()`/`blob()` 解出来是 `Uint8Array`,
-  写回去接受 `Uint8Array | number[]`
+- **`blob()` / `rest()` 解出来是 `Uint8Array`**, 写回去接受 `Uint8Array | number[] | string`
+  (字符串按 UTF-8; 非 UTF-8 自己编码好再传字节)
 - **variant 分支字段在父对象上**(`data.name`, 不是 `data.body.name`), 类型上是可选的;
   不做按判别值收窄的 union
 - **`DynamicStructBuffer` 的泛型顺序是 `<S, D, E>`**(`S` 是字段表)。想显式指定类型时
@@ -362,11 +367,35 @@ Msg.encode({ msg_typo: 1 }); // 编译期报错
 
 单独用 `InferDef<typeof Msg.struct>` / `InferType<typeof Msg>` 也能拿到类型.
 
-## "string_t" Truncate when encountering 0
+## 文本与编码
+
+库里**没有字符串类型**。这不是遗漏, 是刻意的: 线上的字节形状才是类型, 而"这些字节是什么
+字符"是协议属性。真实报文的编码有 UTF-8 / UTF-16LE / UTF-16BE / GBK / GB18030 /
+Big5 / Shift-JIS / codepage..., 把其中一种当默认就是在替协议做决定。
+
+本库一行编解码都没实现 —— `TextDecoder` / `TextEncoder` 全程委托平台, 所以
+"库里支持哪种编码"这个问题不成立: 解码用平台 `TextDecoder` 就能吃下几十种 label。
+
 ```ts
-string_t[4].decode(new Uint8Array([0x61, 0x62, 0x63, 0x64]); // abcd
-string_t[4].decode(new Uint8Array([0x61, 0x62, 0x00, 0x64]); // ab
+const Msg = new DynamicStructBuffer("msg", {
+  name_size: uint8_t,
+  name: blob(ref("name_size")), // 出 Uint8Array, 长度是字节数
+});
+
+// 解码: 编码由你指定
+const gbk = new TextDecoder("gbk");
+gbk.decode(Msg.decode(view).name); // => "你好，世界"
+
+// 编码: Node 的 TextEncoder 按规范只支持 UTF-8, 别的编码得靠 iconv-lite 之类
+Msg.encode({ name: gbkBytes("你好，世界") }); // 自己编码好的 Uint8Array
+// 或者传字符串, 按 UTF-8
+Msg.encode({ name: "hello" });
 ```
+
+长度头一律写**字节数**: `"世界"` 的 `.length` 是 2, UTF-8 占 6 字节, GBK 占 4 字节 ——
+拿字符数当长度会把正文截掉。`blob()` 会在 encode 时按实际字节数回填 `ref` 长度字段。
+
+调试用 `TEXT(bytes, new TextDecoder("gbk"))`, 它会按给定编码渲染字节。
 
 ## bits
 ```ts

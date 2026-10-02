@@ -6,8 +6,6 @@ export type StructBuffer_t = {
 };
 export declare function sizeof(type: Type_t): number;
 export type StructBufferConfig = {
-    textDecode?: TextDecoder;
-    textEncoder?: TextEncoder;
     littleEndian?: boolean;
 };
 export declare class StructBuffer<D = {

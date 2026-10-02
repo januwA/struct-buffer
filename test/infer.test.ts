@@ -8,12 +8,13 @@ import {
   bitFields,
   bits,
   blob,
+  type BlobValue,
+  double,
   float,
   framed,
   records,
   ref,
   rest,
-  string_t,
   uint16_t,
   uint32_t,
   uint8_t,
@@ -48,22 +49,33 @@ describe("类型推导", () => {
       u8: uint8_t,
       u32: uint32_t,
       f: float,
-      s: string_t,
+      d: double,
     });
     type D = InferType<typeof F>;
     type _t = [
       Assert<Equals<D["u8"], number>>,
       Assert<Equals<D["u32"], number>>,
       Assert<Equals<D["f"], number>>,
-      Assert<Equals<D["s"], string>>
+      Assert<Equals<D["d"], number>>
     ];
 
-    // 1B + 4B + 4B + 1 字符. string_t 本身只读 1 个字符, 不是 NUL 结尾的串 ——
-    // 要定宽字符串得写 string_t[N]
+    // 1B + 4B + 4B + 8B. double 的字节序交给 double.encode 自己生成 —— 这个用例
+    // 考的是推导, 不该在这里手算 IEEE754
     const d = F.decode(
-      Uint8Array.from([7, 0, 0, 0, 0, 0x40, 0x40, 0x00, 0x00, 0x41])
+      Uint8Array.from([
+        7,
+        0,
+        0,
+        0,
+        0,
+        0x40,
+        0x40,
+        0,
+        0,
+        ...Array.from(new Uint8Array(double.encode(3).buffer)),
+      ])
     );
-    expect([d.u8, d.u32, d.f, d.s]).toEqual([7, 0, 3, "A"]);
+    expect([d.u8, d.u32, d.f, d.d]).toEqual([7, 0, 3, 3]);
   });
 
   it("布尔语义的字段推出来是 number, 不是 boolean", () => {
@@ -89,20 +101,20 @@ describe("类型推导", () => {
     void (d.ok1 === true);
   });
 
-  it("下标就是数组, 多维就是多维; string_t 的下标只定字节数", () => {
+  it("下标就是数组, 多维就是多维; blob 的下标只定字节数", () => {
     const F = new DynamicStructBuffer("F", {
       a: uint8_t[3],
       b: uint8_t[2][2],
-      c: string_t[2],
-      e: string_t[2][2],
+      c: blob(2),
+      e: blob(4),
     });
     type D = InferType<typeof F>;
     type _t = [
       Assert<Equals<D["a"], number[]>>,
       Assert<Equals<D["b"], number[][]>>,
-      // 引擎里字符串字段是 blob(as:"text"), 下标只决定字节数
-      Assert<Equals<D["c"], string>>,
-      Assert<Equals<D["e"], string>>
+      // blob 出 Uint8Array, 无论定宽还是多维都是同一个类型
+      Assert<Equals<D["c"], Uint8Array>>,
+      Assert<Equals<D["e"], Uint8Array>>
     ];
 
     const d = F.decode(
@@ -113,27 +125,26 @@ describe("类型推导", () => {
       [4, 5],
       [6, 7],
     ]);
-    expect(d.c).toBe("ab");
-    expect(d.e).toBe("cdef"); // 2*2 = 4 字节
+    expect(d.c).toEqual(Uint8Array.from([0x61, 0x62]));
+    expect(d.e).toEqual(Uint8Array.from([0x63, 0x64, 0x65, 0x66]));
   });
 
   it("ref 能穿过长度前缀(旧版 ref 是 any, 推导到这里就断了)", () => {
     const F = new DynamicStructBuffer("F", {
       n: uint8_t,
       body: uint8_t[ref("n")],
-      text: string_t[ref("n")],
+      text: blob(ref("n")),
     });
     type D = InferType<typeof F>;
     type _t = [
       Assert<Equals<D["n"], number>>,
       Assert<Equals<D["body"], number[]>>,
-      // string_t[ref] 同样是定宽串, 不是数组
-      Assert<Equals<D["text"], string>>
+      Assert<Equals<D["text"], Uint8Array>>
     ];
 
     const d = F.decode(Uint8Array.from([2, 0xaa, 0xbb, 0x41, 0x42]));
     expect(d.body).toEqual([0xaa, 0xbb]);
-    expect(d.text).toBe("AB");
+    expect(d.text).toEqual(Uint8Array.from([0x41, 0x42]));
   });
 
   it("bits 是位序号, bitFields 是位宽", () => {
@@ -159,23 +170,23 @@ describe("类型推导", () => {
     const Outer = new DynamicStructBuffer("Outer", {
       head: uint8_t,
       inner: Inner,
-      anon: { a: uint8_t, b: string_t },
+      anon: { a: uint8_t, b: uint16_t },
     });
     type D = InferType<typeof Outer>;
     type _t = [
       Assert<Equals<D["head"], number>>,
       Assert<Equals<D["inner"], { x: number; y: number }>>,
-      Assert<Equals<D["anon"], { a: number; b: string }>>
+      Assert<Equals<D["anon"], { a: number; b: number }>>
     ];
 
-    // head(1) + x(2, 大端) + y(4, 3.0) + anon.a(1) + "A\0"
+    // head(1) + x(2, 大端) + y(4, 3.0) + anon.a(1) + anon.b(2)
     const d = Outer.decode(
-      Uint8Array.from([9, 0, 1, 0x40, 0x40, 0x00, 0x00, 8, 0x41, 0x00])
+      Uint8Array.from([9, 0, 1, 0x40, 0x40, 0x00, 0x00, 8, 0, 0x41])
     );
     expect(d.head).toBe(9);
     expect(d.inner.x).toBe(1);
     expect(d.inner.y).toBe(3);
-    expect(d.anon).toEqual({ a: 8, b: "A" });
+    expect(d.anon).toEqual({ a: 8, b: 0x41 });
   });
 
   it("递归推导: 三层嵌套", () => {
@@ -267,8 +278,8 @@ describe("类型推导", () => {
   });
 
   it("decode() 的结果类型是推导出来的, 字段名拼错编译期就报错", () => {
-    // 定长 8 字节的名字段(没有长度前缀)只能按字节拿: 想解成 GBK 文本得叠
-    // string_t, 而 string_t 是 NUL 结尾的, 覆盖不到全部 8 字节.
+    // 定长 8 字节的名字段(没有长度前缀)只能按字节拿: 库里没有字符串类型, 编码
+    // 归调用方, 拿到的永远是字节
     const Msg = new DynamicStructBuffer(
       "msg",
       {
@@ -278,20 +289,25 @@ describe("类型推导", () => {
         msg: uint8_t[ref("msg_size")],
         name_size: uint8_t,
         name: uint8_t[ref("name_size")],
-        text: string_t,
+        text: blob(1),
       },
       { littleEndian: true }
     );
 
-// uknow1(2) + msg_type(1) + msg_size(2) + msg[] + name_size(1) + name(2) + 1 字符
+    // uknow1(2) + msg_type(1) + msg_size(2) + msg[] + name_size(1) + name(2) + text(1)
     const d = Msg.decode(
       Uint8Array.from([0, 0, 0, 0, 0, 2, 0x41, 0x42, 0x41])
     );
     const n: number = d.msg_type;
     const bytes: number[] = d.msg;
     const name: number[] = d.name;
-    const text: string = d.text;
-    expect([n, bytes.length, name, text]).toEqual([0, 0, [0x41, 0x42], "A"]);
+    const text: Uint8Array = d.text;
+    expect([n, bytes.length, name, Array.from(text)]).toEqual([
+      0,
+      0,
+      [0x41, 0x42],
+      [0x41],
+    ]);
 
     // @ts-expect-error 字段不存在: 推导若退化成 {k: any} 这行不会报错, 断言就失效了
     void d.no_such_field;
@@ -312,12 +328,13 @@ describe("类型推导", () => {
 
   it("InferDef 可以单独用(不经过 DynamicStructBuffer)", () => {
     const c = uint8_t[ref("n")];
+    const b = blob(2);
     type D = InferDef<{
       a: typeof uint8_t;
-      b: typeof string_t[2];
+      b: typeof b;
       c: typeof c;
     }>;
-    type _t = [Assert<Equals<D, { a: number; b: string; c: number[] }>>];
+    type _t = [Assert<Equals<D, { a: number; b: Uint8Array; c: number[] }>>];
 
     const F = new DynamicStructBuffer("F", { n: uint8_t, c });
     type _t2 = [Assert<Equals<InferType<typeof F>["c"], number[]>>];
@@ -372,21 +389,21 @@ describe("类型推导", () => {
     const Pkt = new DynamicStructBuffer("pkt", {
       msg_type: uint8_t,
       body: variant("msg_type", {
-        1: { name: string_t[3] },
+        1: { name: blob(3) },
         2: { x: uint32_t, y: uint32_t },
       }),
     });
     type D = InferType<typeof Pkt>;
     type _t = [
       // 分支字段在父对象上, 不是 body.name
-      Assert<Equals<D["name"], string | undefined>>,
+      Assert<Equals<D["name"], Uint8Array | undefined>>,
       Assert<Equals<D["x"], number | undefined>>
     ];
 
     // 分支字段是父对象的属性, 不是 body 的属性
     expect(Pkt.decode([1, 0x61, 0x62, 0x63])).toEqual({
       msg_type: 1,
-      name: "abc",
+      name: Uint8Array.from([0x61, 0x62, 0x63]),
     });
     expect(hex(Pkt.encode({ msg_type: 2, x: 1, y: 2 }))).toBe(
       "02 00 00 00 01 00 00 00 02"
@@ -406,8 +423,8 @@ describe("类型推导", () => {
     type _t = [
       // 解码是 Uint8Array
       Assert<Equals<D["body"], Uint8Array>>,
-      // 写回去却接受字节数组
-      Assert<Equals<E["body"], Uint8Array | number[]>>
+      // 写回去却还收字节数组和字符串(字符串按 UTF-8)
+      Assert<Equals<E["body"], BlobValue>>
     ];
 
     F.encode({ body: [1, 2, 3] });

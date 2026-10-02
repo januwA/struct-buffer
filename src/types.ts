@@ -1,11 +1,4 @@
-import {
-  DOUBLE_TYPE,
-  FLOAT_TYPE,
-  StringType,
-  registerType,
-} from "./class-type";
-
-export const string_t = new StringType();
+import { DOUBLE_TYPE, FLOAT_TYPE, registerType } from "./class-type";
 
 /**
  * 一个公开类型 = 一次 `registerType`; C / C++ / Windows 的别名收进 `names` 数组,
@@ -18,6 +11,11 @@ export const string_t = new StringType();
  * `int64_t` 之前是从 `longlong` typedef 来的, 而 `longlong` 没显式传 `unsigned`,
  * 落进默认的 `true` —— 于是 `int64_t` 实际是无符号的, 负数解出来是一大坨正数。
  * 现在两个 8 字节类型都显式传 `unsigned`。
+ *
+ * 这里只有**线上的字节形状**才是类型。文本不是: 编码选择(UTF-8 / UTF-16LE / GBK /
+ * Big5 / Shift-JIS / codepage...)是协议属性而不是类型属性, 而本库一行编解码都没实现
+ * —— `TextDecoder` / `TextEncoder` 全程委托给平台, 所以"库里支持哪种编码"这个问题本身
+ * 不成立。文本字段用 `blob(...)` 拿 `Uint8Array`, 编码由调用方自己接。
  */
 export const int8_t = registerType(
   ["int8_t", "__int8", "signed char", "char"],

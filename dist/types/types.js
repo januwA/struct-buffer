@@ -1,5 +1,4 @@
-import { DOUBLE_TYPE, FLOAT_TYPE, StringType, registerType, } from "./class-type";
-export const string_t = new StringType();
+import { DOUBLE_TYPE, FLOAT_TYPE, registerType } from "./class-type";
 export const int8_t = registerType(["int8_t", "__int8", "signed char", "char"], 1, false);
 export const int16_t = registerType(["int16_t", "__int16", "short"], 2, false);
 export const int32_t = registerType(["int32_t", "__int32", "int", "signed"], 4, false);

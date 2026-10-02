@@ -3,7 +3,7 @@ import { StructBuffer, sview, uint16_t } from "../src";
 // https://github.com/januwA/struct-buffer/issues/2
 
 describe("debug", () => {
-  it("string_t", () => {
+  it("littleEndian: 配置优先于参数", () => {
     const s = new StructBuffer(
       "test",
       {

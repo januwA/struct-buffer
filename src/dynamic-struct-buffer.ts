@@ -15,14 +15,7 @@ import {
 } from "./field";
 import { StructBuffer, StructBufferConfig, Type_t } from "./struct-buffer";
 import { InferDef, InferEncodeDef } from "./infer";
-import {
-  arrayProxyNext,
-  COUNT,
-  createTextDecoder,
-  createTextEncoder,
-  isRef,
-  Ref,
-} from "./utils";
+import { arrayProxyNext, COUNT, isRef, Ref } from "./utils";
 
 /**
  * 字段可以是什么. `DynamicStructBuffer` 这里**必须写全三个类型参数**: 裸名字会连带
@@ -43,8 +36,6 @@ class DynamicStructBufferNext {
 }
 
 const KDynamicConfig: StructBufferConfig = {
-  textDecode: createTextDecoder(),
-  textEncoder: createTextEncoder(),
   littleEndian: undefined,
 };
 

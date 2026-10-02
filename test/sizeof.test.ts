@@ -1,5 +1,4 @@
 import {
-  string_t,
   uint8_t,
   uint16_t,
   uint32_t,
@@ -66,11 +65,6 @@ describe("test sizeof", () => {
   it("test double", () => {
     expect(sizeof(double)).toBe(8);
     expect(sizeof(double[10])).toBe(8 * 10);
-  });
-
-  it("test string_t", () => {
-    expect(sizeof(string_t)).toBe(1);
-    expect(sizeof(string_t[10])).toBe(10);
   });
 
   it("同名别名与固定宽度类型是同一个实例", () => {

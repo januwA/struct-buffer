@@ -1,10 +1,9 @@
 import {
+  blob,
   createDataView,
   DynamicStructBuffer,
   makeDataView,
   ref,
-  sbytes,
-  string_t,
   StructBuffer,
   uint16_t,
   uint32_t,
@@ -67,17 +66,17 @@ describe("DynamicStructBuffer", () => {
     expect(decoded.msg).toEqual([0xaa, 0xbb, 0xcc]);
   });
 
-  it("dynamic string field with ref", () => {
+  it("dynamic text field with ref: 长度按字节数回填, 编码归调用方", () => {
     const ChatPacket = new DynamicStructBuffer("chat", {
       channel: uint8_t,
       text_len: uint16_t,
-      text: string_t[ref("text_len")],
+      text: blob(ref("text_len")),
     });
 
     const encoded = ChatPacket.encode({
       channel: 1,
       text: "hello world",
-    } as any);
+    });
 
     // 1 (channel) + 2 (text_len) + 11 (text) = 14 bytes
     expect(encoded.byteLength).toBe(14);
@@ -85,7 +84,9 @@ describe("DynamicStructBuffer", () => {
     const decoded = ChatPacket.decode(encoded);
     expect(decoded.channel).toBe(1);
     expect(decoded.text_len).toBe(11);
-    expect(decoded.text).toBe("hello world");
+    // 长度头写的是**字节数**: "世界" 的 length 是 2, UTF-8 占 6 字节 —— 拿字符数当
+    // 长度会把正文截掉
+    expect(new TextDecoder().decode(decoded.text)).toBe("hello world");
   });
 
   it("dynamic array of nested StructBuffer", () => {

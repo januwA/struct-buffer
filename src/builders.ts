@@ -54,19 +54,27 @@ export function skip(n: number): FieldSpec<never, never> {
 }
 
 /**
- * `blob(ref("len"))` / `blob(16)`.
+ * `blob(ref("len"))` / `blob(16)` / `rest()`.
  *
- * 与 `string_t[n]` 的区别只在输出类型: 这个出 `Uint8Array`, 那个出字符串。
- * 长度一律是**字节数**。
+ * 长度一律是**字节数**, 不是字符数: `"世界"` 的 length 是 2, UTF-8 编码占 6 字节,
+ * GBK 占 4 字节 —— 拿字符数当长度头会把正文截掉.
+ *
+ * 文本字段也走这里, 编码由调用方自己接 `new TextDecoder(...)`。本库一行编解码都没实现,
+ * `TextDecoder`/`TextEncoder` 全程委托平台, 所以不猜编码。
  *
  * ```ts
  * { head: uint8_t, payload: blob(ref("len")) }
  * ```
  */
-export function blob(
-  spec: CountSpec
-): FieldSpec<Uint8Array, Uint8Array | number[]> {
-  return field((b) => new BlobField(b.name, spec, "bytes"));
+/**
+ * encode 入参额外收 `string`, 但**只按 UTF-8 编码** —— 非 UTF-8(GBK / UTF-16LE / ...)
+ * 的正文自己编码好再传 `Uint8Array`。Node 的 `TextEncoder` 按规范只支持 UTF-8,
+ * 别的编码得靠 iconv-lite 之类, 所以这一层不给编码参数。
+ */
+export type BlobValue = Uint8Array | number[] | string;
+
+export function blob(spec: CountSpec): FieldSpec<Uint8Array, BlobValue> {
+  return field((b) => new BlobField(b.name, spec));
 }
 
 /**
@@ -74,11 +82,11 @@ export function blob(
  * 引用的变长正文靠它收尾。
  *
  * ```ts
- * { text_len: uint16_t, text: string_t[ref("text_len")], tail: rest() }
+ * { text_len: uint16_t, text: blob(ref("text_len")), tail: rest() }
  * ```
  */
-export function rest(): FieldSpec<Uint8Array, Uint8Array | number[]> {
-  return field((b) => new BlobField(b.name, { until: "end" }, "bytes"));
+export function rest(): FieldSpec<Uint8Array, BlobValue> {
+  return field((b) => new BlobField(b.name, { until: "end" }));
 }
 
 /**
@@ -96,7 +104,7 @@ export function records<S extends StructSource>(
   spec?: CountSpec
 ): FieldSpec<InferSource<S>[]> {
   return field((b) => {
-    const def = normalizeDef(source, `${b.parentName}.${b.name}`, b.le, b);
+    const def = normalizeDef(source, `${b.parentName}.${b.name}`, b.le);
     if (spec !== undefined) return new StructField(b.name, def, spec, []);
     if (def.fixedSize === undefined) {
       throw new TypeError(
@@ -115,7 +123,7 @@ export function records<S extends StructSource>(
  *
  * ```ts
  * { msg_type: uint8_t, body: variant("msg_type", {
- *     1: { name: string_t[8] },
+ *     1: { name: blob(8) },
  *     2: { x: uint32_t, y: uint32_t },
  *   }) }
  * ```
@@ -133,7 +141,7 @@ export function variant<C extends { [key: string]: StructSource }>(
   return field((b) => {
     const defs: { [k: string]: Def } = {};
     for (const [k, src] of Object.entries(cases)) {
-      defs[k] = normalizeDef(src, `${b.parentName}.${b.name}.${k}`, b.le, b);
+      defs[k] = normalizeDef(src, `${b.parentName}.${b.name}.${k}`, b.le);
     }
     return new VariantField(b.name, keyField, defs, opts?.select);
   }) as VariantSpec<C>;
@@ -156,7 +164,7 @@ export interface VariantSpec<C extends { [key: string]: StructSource }>
  * new DynamicStructBuffer("chat", {
  *   chan: uint8_t,
  *   ...discriminated("body", "msg_type", uint8_t, {
- *     0x0a: { len: uint16_t, text: string_t[ref("len")] },
+ *     0x0a: { len: uint16_t, text: blob(ref("len")) },
  *     0x0b: { id: uint32_t },
  *   }),
  * })

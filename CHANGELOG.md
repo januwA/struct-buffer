@@ -18,14 +18,15 @@ bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那�
   解出来是 `18446744073709551615` 而不是 `-1`
 - **8 字节类型的值类型统一是 `number`**: 之前 decode 把 `bigint` 原样抛给调用方, 声明
   类型和运行时类型对不上。代价是超过 `2^53` 的值会掉精度
-- 定宽文本字段(`string_t[n]`)encode 现在写满 n 字节(短补 NUL / 长截断), decode 在第一个
-  NUL 处截断 —— 之前短字符串会把后面所有字段整体前移, 而 `sizeof()` 报的仍是 n
+- 定长字节字段(`blob(n)`)encode 现在写满 n 字节(短补 NUL / 长截断) —— 之前短值会把后面
+  所有字段整体前移, 而 `sizeof()` 报的仍是 n
 - `frameReader.read` 类型允许返回 `null`(文档一直是这么说的)
 - 判别字段没有对应分支 / `ref` 指向非法值时, 错误消息不再被塞进 `hex:` 槽位
 
 ### 📚 文档
 
-- README 补 `DynamicStructBuffer`、类型推导、11 个类型的对照表与别名归属
+- README 补 `DynamicStructBuffer`、类型推导、10 个类型的对照表与别名归属, 另加一节
+  「文本与编码」说明为什么库里没有字符串类型
 
 ### 💥 破坏性变更
 
@@ -39,9 +40,9 @@ bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那�
 - 去掉 `pack` / `pack_into` / `unpack` / `unpack_from` / `iter_unpack` / `calcsize` /
   `Struct`。格式串表达不了长度前缀、变长正文、未知/保留字节这些真实报文里最常见的形状
 
-**类型导出从 40 个压到 11 个**
+**类型导出从 40 个压到 10 个**
 
-- 只保留 `uint8_t`~`uint64_t`、`int8_t`~`int64_t`、`float`、`double`、`string_t`
+- 只保留 `uint8_t`~`uint64_t`、`int8_t`~`int64_t`、`float`、`double`
 - C / Windows 别名收进类型自己的 `names` 数组, 不再各导出一个实例: `char` / `uchar` /
   `short` / `ushort` / `int` / `uint` / `long` / `ulong` / `long long` / `ulong long` /
   `BYTE` / `WORD` / `DWORD` / `QWORD` / `CHAR`..`ULONGLONG` / `FLOAT` / `DOUBLE`
@@ -51,17 +52,42 @@ bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那�
   `BoolType` 的折算是有损的 —— `[1, 2]` 都解成 `true`(于是 `a === b` 在两种报文字节下都
   成立), 且 `encode` 只认 `0` / `1`, 原始的 `2` 编不回去, 往返即损坏; 它的
   `D extends boolean` 也表达不了三态。删除后整数类型一律保留原始取值
+- **删除 `string_t` / `StringType`**: 类型该是线上的字节形状, 而"这些字节是什么字符"
+  是协议属性。真实报文的编码有 UTF-8 / UTF-16LE / UTF-16BE / GBK / GB18030 / Big5 /
+  Shift-JIS / codepage..., 把其中一种当默认就是在替协议做决定; 而 `string_t` 还在字节之上
+  叠了**第二个**协议假设 —— 定宽字段"遇第一个 NUL 截断"。定宽字段也常见空格补位或满宽
+  正文, 猜错就是静默丢数据。文本字段改用 `blob(n)` / `blob(ref(...))`, 拿到 `Uint8Array`,
+  编码与截断都归调用方
 - 删除 `padding_t`: 它会把跳过的字节解成 uint8 数组塞进结果, 真实项目里协议表一半的字段
   是"未知/保留/填充", 让它们出现在结果里只会污染每一次消费。动态结构体请用 `skip()`
 - 删除 `StructType.is()`: 唯一使用者是被删掉的 `CStruct`
+
+**文本与编码不再是库的事**
+
+本库一行编解码都没实现 —— `TextDecoder` / `TextEncoder` 全程委托平台, 所以"库里支持哪种
+编码"这个问题从来不成立, 解码用平台 `TextDecoder` 就能吃下几十种 label(GBK / UTF-16LE /
+Big5 / Shift-JIS ...)。因此:
+
+- 删掉 `StructBufferConfig` 的 `textDecode` / `textEncoder`, 以及 `BlobField` 的
+  `as: "text"` 形态 —— 解出来的值一律是字节
+- `blob()` / `rest()` 的 encode 入参放宽成 `BlobValue = Uint8Array | number[] | string`,
+  字符串**只按 UTF-8** 编码; 非 UTF-8 自己编码好再传字节。注意 Node 的 `TextEncoder`
+  按规范只支持 UTF-8, 别的编码得靠 iconv-lite 之类
+- `StructType.decode` / `encode` 的第 4 个参数原本是 `textDecode`, 并用
+  `!arg.decode` 这种"位置猜测"兼容两种传法。现在它是 `ctx`, 猜测逻辑删掉 —— 这是所有
+  `StructType` 子类签名的一次简化
+- `InferType` 里的 `IsStringy` 递归只为 `string_t` 存在(把 `string[]` 压成 `string`, 因为
+  引擎下标只定字节数)。没有字符串类型之后整套逻辑连同它的深度上限一起删掉, 推导直接是
+  `V` —— 顺带修掉一个隐患: 那套压平对用户自定义的 `StructType<string>` 其实是错的,
+  引擎真会返回 `string[]`
 
 **其他**
 
 - `DynamicStructBuffer` 泛型顺序变成 `<S, D, E>`(`S` 是字段表)。类的类型参数默认值不能
   引用后声明的参数(TS2744), 而 `D` 的默认值就是 `InferDef<S>`, 想保住老的 `<D, E>` 位置
   就只能让推导失效. 需要显式指定类型时写 `new DynamicStructBuffer<any, MyType>(...)`
-- 引擎里字符串字段一律是 text 形态的字节段: `string_t[n]` 是 n 字节定宽字符串,
-  `string_t[n][m]` 是 n 个字 × m 字节的字符串(不是字符串数组). 类型一律 `string`
+- 定宽字节字段不再在 NUL 处截断, 一律给满宽度。要截自己切 —— NUL 是单字节且不可能出现在
+  多字节序列中间, 所以切在它上面不会劈开 UTF-8 / GBK
 
 ## 5.2.0 2022-9-28
 

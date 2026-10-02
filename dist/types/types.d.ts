@@ -1,5 +1,3 @@
-import { StringType } from "./class-type";
-export declare const string_t: StringType;
 export declare const int8_t: import("./class-type").StructType<number, number>;
 export declare const int16_t: import("./class-type").StructType<number, number>;
 export declare const int32_t: import("./class-type").StructType<number, number>;

@@ -159,9 +159,9 @@ export class Cursor {
     return Number(v);
   }
 
-  /**
+/**
    * 取 n 字节**零拷贝**子视图(借用底层 buffer, 不复制).
-   * blob/text 字段用它把字节交给 textDecoder; 解码源本身是 `readByteArray` 出来的
+   * blob 字段用它把字节直接交出去; 解码源本身是 `readByteArray` 出来的
    * 独立拷贝, 所以子视图的生命周期安全。
    */
   bytes(n: number, field: string): Uint8Array {

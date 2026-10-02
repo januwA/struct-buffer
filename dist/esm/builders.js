@@ -6,14 +6,14 @@ export function skip(n) {
     return field((b) => new SkipField(b.name, n));
 }
 export function blob(spec) {
-    return field((b) => new BlobField(b.name, spec, "bytes"));
+    return field((b) => new BlobField(b.name, spec));
 }
 export function rest() {
-    return field((b) => new BlobField(b.name, { until: "end" }, "bytes"));
+    return field((b) => new BlobField(b.name, { until: "end" }));
 }
 export function records(source, spec) {
     return field((b) => {
-        const def = normalizeDef(source, `${b.parentName}.${b.name}`, b.le, b);
+        const def = normalizeDef(source, `${b.parentName}.${b.name}`, b.le);
         if (spec !== undefined)
             return new StructField(b.name, def, spec, []);
         if (def.fixedSize === undefined) {
@@ -27,7 +27,7 @@ export function variant(keyField, cases, opts) {
     return field((b) => {
         const defs = {};
         for (const [k, src] of Object.entries(cases)) {
-            defs[k] = normalizeDef(src, `${b.parentName}.${b.name}.${k}`, b.le, b);
+            defs[k] = normalizeDef(src, `${b.parentName}.${b.name}.${k}`, b.le);
         }
         return new VariantField(b.name, keyField, defs, opts?.select);
     });

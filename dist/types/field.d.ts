@@ -62,12 +62,10 @@ export declare class TypeField implements Field {
     readonly name: string;
     private readonly le;
     private readonly type;
-    private readonly textDecode?;
-    private readonly textEncoder?;
     readonly fixedSize?: number;
     private readonly spec;
     private readonly refSpec?;
-    constructor(name: string, le: boolean, type: StructType<any, any>, textDecode?: TextDecoder | undefined, textEncoder?: TextEncoder | undefined);
+    constructor(name: string, le: boolean, type: StructType<any, any>);
     resolveLengths(obj: AnyObject, ctx: Ctx): AnyObject;
     decode(c: Cursor, out: AnyObject, ctx: Ctx, sink?: ErrorSink): void;
     encode(w: Writer, value: any, ctx: Ctx): void;
@@ -83,11 +81,8 @@ export declare class SkipField implements Field {
 export declare class BlobField implements Field {
     readonly name: string;
     private readonly spec;
-    private readonly as;
-    private readonly textDecoder?;
-    private readonly textEncoder?;
     readonly fixedSize?: number;
-    constructor(name: string, spec: CountSpec, as: "text" | "bytes", textDecoder?: TextDecoder | undefined, textEncoder?: TextEncoder | undefined);
+    constructor(name: string, spec: CountSpec);
     private encodeValue;
     resolveLengths(obj: AnyObject, ctx: Ctx): AnyObject;
     decode(c: Cursor, out: AnyObject, ctx: Ctx, sink?: ErrorSink): void;
@@ -144,8 +139,6 @@ export interface FieldBuildCtx {
     name: string;
     parentName: string;
     le: boolean;
-    textDecode?: TextDecoder;
-    textEncoder?: TextEncoder;
 }
 export interface FieldSpec<T = any, E = T> {
     readonly __fieldSpec: true;
@@ -154,8 +147,5 @@ export interface FieldSpec<T = any, E = T> {
     build(ctx: FieldBuildCtx): Field;
 }
 export declare function isFieldSpec(x: any): x is FieldSpec;
-export declare function normalizeDef(source: StructSource, name: string, inheritedLE: boolean, codecs?: {
-    textDecode?: TextDecoder;
-    textEncoder?: TextEncoder;
-}): Def;
+export declare function normalizeDef(source: StructSource, name: string, inheritedLE: boolean): Def;
 //# sourceMappingURL=field.d.ts.map

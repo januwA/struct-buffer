@@ -2,15 +2,13 @@ import { Cursor } from "./cursor";
 import { Writer } from "./writer";
 import { Ctx, flatten, nest, normalizeDef, resolveLengths, runFields, } from "./field";
 import { StructBuffer } from "./struct-buffer";
-import { arrayProxyNext, COUNT, createTextDecoder, createTextEncoder, isRef, } from "./utils";
+import { arrayProxyNext, COUNT, isRef } from "./utils";
 class DynamicStructBufferNext {
     constructor() {
         return arrayProxyNext(this, DynamicStructBufferNext);
     }
 }
 const KDynamicConfig = {
-    textDecode: createTextDecoder(),
-    textEncoder: createTextEncoder(),
     littleEndian: undefined,
 };
 export class DynamicStructBuffer extends Array {

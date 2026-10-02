@@ -1,5 +1,5 @@
-import { int32_t, string_t, StructBuffer } from "../src";
-import { bits, BitsType, StringType, StructType } from "../src/class-type";
+import { int32_t, uint8_t, StructBuffer } from "../src";
+import { bits, bitFields, BitsType, BitFieldsType, StructType } from "../src/class-type";
 
 describe("deeps test", () => {
   it("type", () => {
@@ -15,7 +15,8 @@ describe("deeps test", () => {
     expect(c instanceof StructType).toEqual(true);
 
     expect(bits(int32_t, {})[2][2] instanceof BitsType).toEqual(true);
-    expect(string_t[2][2] instanceof StringType).toEqual(true);
+    expect(bitFields(int32_t, {})[2][2] instanceof BitFieldsType).toEqual(true);
+    expect(uint8_t[2][2] instanceof StructType).toEqual(true);
   });
 
   it("struct", () => {

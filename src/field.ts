@@ -1,4 +1,4 @@
-import { StringType, StructType } from "./class-type";
+import { StructType } from "./class-type";
 // VALUE_TYPE/ENCODE_VALUE_TYPE 是 `declare const`(运行时不存在), 必须按类型导入,
 // 否则打包器会把它们当真实导入留下, 运行时报"没有这个导出"
 import type { ENCODE_VALUE_TYPE, VALUE_TYPE } from "./class-type";
@@ -299,7 +299,7 @@ function shapeOf(deeps: (number | Ref)[] | undefined): number[] {
 }
 
 /**
- * 任意 `StructType`: `uint8_t` / `uint16_t` / `string_t` / `bits(...)` / 用户自定义
+ * 任意 `StructType`: `uint8_t` / `uint16_t` / `bits(...)` / 用户自定义
  * codec. 个数语义与旧实现完全一致: **ref 取到的就是元素个数**
  * (`uint8_t[ref("n")]` 的 n 是元素数; 对 u8 来说也就是字节数).
  *
@@ -315,9 +315,7 @@ export class TypeField implements Field {
   constructor(
     readonly name: string,
     private readonly le: boolean,
-    private readonly type: StructType<any, any>,
-    private readonly textDecode?: TextDecoder,
-    private readonly textEncoder?: TextEncoder
+    private readonly type: StructType<any, any>
   ) {
     const deeps = type.deeps ?? [];
     this.spec = countOfDeeps(deeps);
@@ -348,13 +346,7 @@ export class TypeField implements Field {
     const size = this.type.getSize(values);
     c.need(size, this.name);
     const start = c.pos;
-    out[this.name] = this.type.decode(
-      c.view,
-      this.le,
-      start,
-      this.textDecode,
-      values
-    );
+    out[this.name] = this.type.decode(c.view, this.le, start, values);
     c.pos = start + size;
   }
 
@@ -369,14 +361,7 @@ export class TypeField implements Field {
       return;
     }
     const before = w.raw;
-    const after = this.type.encode(
-      value,
-      this.le,
-      w.pos,
-      before,
-      this.textEncoder,
-      values
-    );
+    const after = this.type.encode(value, this.le, w.pos, before, values);
     if (after !== before) w.rebind(after);
     w.advance(size);
   }
@@ -422,47 +407,30 @@ export class SkipField implements Field {
 /**
  * 一段字节, 长度**一律按字节数**.
  *
- * `as:"text"` 走 textDecode/textEncoder, 于是
- * `{text_len: uint16_t, text: string_t[ref("text_len")]}` 配 `text: "世界"`
- * 写出 `len=6` 而不是 `s.length=2` —— 旧实现正是在这里把 UTF-8/GBK 正文截成
- * 2 字节, 而聊天正文恰恰是中文.
+ * 定宽(`spec` 是数字)时 encode 永远写满 `spec` 字节(短补 0 / 长截断). 直接按实际长度
+ * 写会让短值把后面所有字段整体前移, 而 `sizeof()` 报的仍是 `spec` —— 错位要到对端
+ * 才暴露.
  *
- * `spec` 是数字(`string_t[8]`)时是**定宽**字段, 与旧 `string_t[n]` 同一套语义:
- * encode 写满 8 字节(短补 0 / 长截断), decode 在第一个 NUL 处截断. 不这么做的话
- * 短字符串会让后面所有字段整体错位, 而 NUL 补位也会混进字符串里.
+ * 这里**只出字节, 不出字符串**: 定宽字节不做"遇 NUL 截断"。截断是协议约定而不是
+ * 字节属性(定宽字段也常见空格补位或满宽正文), 猜错就是静默丢数据, 需要的话在调用点
+ * 自己 `bytes.indexOf(0)`。文本的编码同理 —— `blob` 给字节, 编码交给
+ * `new TextDecoder(...)`.
  */
 export class BlobField implements Field {
   readonly fixedSize?: number;
 
   constructor(
     readonly name: string,
-    private readonly spec: CountSpec,
-    private readonly as: "text" | "bytes",
-    private readonly textDecoder?: TextDecoder,
-    private readonly textEncoder?: TextEncoder
+    private readonly spec: CountSpec
   ) {
     if (typeof spec === "number") this.fixedSize = spec;
   }
 
   private encodeValue(value: any): Uint8Array {
-    const enc = this.textEncoder ?? new TextEncoder();
     if (value == null) return new Uint8Array(0);
-    if (this.as === "text") {
-      const items = flatten(value);
-      if (items.length === 0) return new Uint8Array(0);
-      const parts = items.map((v) => enc.encode(String(v)));
-      const total = parts.reduce((a, p) => a + p.length, 0);
-      const out = new Uint8Array(total);
-      let o = 0;
-      for (const p of parts) {
-        out.set(p, o);
-        o += p.length;
-      }
-      return out;
-    }
     if (value instanceof Uint8Array) return value;
     if (Array.isArray(value)) return Uint8Array.from(value as number[]);
-    if (typeof value === "string") return enc.encode(value);
+    if (typeof value === "string") return new TextEncoder().encode(value);
     throw new EncodeError(
       "encode",
       `${this.name}: 期望 Uint8Array/number[]/string, 实际 ${typeof value}`
@@ -479,17 +447,7 @@ export class BlobField implements Field {
   decode(c: Cursor, out: AnyObject, ctx: Ctx, sink?: ErrorSink): void {
     const site: Site = { where: c.where, field: this.name, offset: c.pos };
     const n = resolveCount(this.spec, ctx, c.left, site);
-    const raw = c.bytes(n, this.name);
-    if (this.as !== "text") {
-      out[this.name] = raw.slice();
-      return;
-    }
-    // 定宽文本: 第一个 NUL 之后是补位, 丢掉(旧 `string_t` 就是遇 0 截断).
-    // NUL 是单字节且不可能出现在多字节序列中间, 所以切在它上面不会劈开 UTF-8.
-    // 变长文本(ref/rest)按整段解 —— 那里 NUL 属于正文, 截掉等于悄悄丢数据.
-    const nul = this.fixedSize === undefined ? -1 : raw.indexOf(0);
-    const body = nul < 0 ? raw : raw.subarray(0, nul);
-    out[this.name] = (this.textDecoder ?? new TextDecoder()).decode(body);
+    out[this.name] = c.bytes(n, this.name).slice();
   }
 
   encode(w: Writer, value: any, ctx: Ctx): void {
@@ -776,13 +734,11 @@ export interface FieldBuildCtx {
   name: string;
   parentName: string;
   le: boolean;
-  textDecode?: TextDecoder;
-  textEncoder?: TextEncoder;
 }
 
 /**
- * 声明式字段工厂. 之所以做成"延迟构建"而不是直接造 Field: `littleEndian` 与
- * textCodec 要等父级 def 归一化时才知道, 由 makeField 统一注入才不会漏。
+ * 声明式字段工厂. 之所以做成"延迟构建"而不是直接造 Field: `littleEndian` 要等
+ * 父级 def 归一化时才知道, 由 makeField 统一注入才不会漏。
  */
 export interface FieldSpec<T = any, E = T> {
   readonly __fieldSpec: true;
@@ -819,37 +775,20 @@ export function isFieldSpec(x: any): x is FieldSpec {
 export function normalizeDef(
   source: StructSource,
   name: string,
-  inheritedLE: boolean,
-  codecs?: { textDecode?: TextDecoder; textEncoder?: TextEncoder }
+  inheritedLE: boolean
 ): Def {
   if (isDef(source)) return source;
   if (isDefSource(source)) return (source as any).def;
   if (source instanceof StructBuffer) {
     const le = source.config.littleEndian ?? inheritedLE;
-    return buildDef(
-      source.struct,
-      name,
-      le,
-      source.config.textDecode ?? codecs?.textDecode,
-      source.config.textEncoder ?? codecs?.textEncoder
-    );
+    return buildDef(source.struct, name, le);
   }
-  return buildDef(source, name, inheritedLE, codecs?.textDecode, codecs?.textEncoder);
+  return buildDef(source, name, inheritedLE);
 }
 
-function buildDef(
-  struct: InlineDef,
-  name: string,
-  le: boolean,
-  textDecode?: TextDecoder,
-  textEncoder?: TextEncoder
-): Def {
+function buildDef(struct: InlineDef, name: string, le: boolean): Def {
   const fields = Object.entries(struct).map(([key, type]) =>
-    makeField(
-      key,
-      type,
-      { name: key, parentName: name, le, textDecode, textEncoder }
-    )
+    makeField(key, type, { name: key, parentName: name, le })
   );
   return { name, fields, shape: [], le, fixedSize: computeFixedSize(fields) };
 }
@@ -858,37 +797,19 @@ function makeField(key: string, type: any, bctx: FieldBuildCtx): Field {
   if (isFieldSpec(type)) return type.build({ ...bctx, name: key });
 
   if (type instanceof StructBuffer || isDef(type) || isDefSource(type)) {
-    const def = normalizeDef(type, `${bctx.parentName}.${key}`, bctx.le, bctx);
+    const def = normalizeDef(type, `${bctx.parentName}.${key}`, bctx.le);
     const deeps = (type as StructBuffer).deeps ?? [];
     return new StructField(key, def, countOfDeeps(deeps), shapeOf(deeps));
   }
 
   // 内联对象字面量 = 嵌套结构体(变体分支、匿名子结构)
   if (type && typeof type === "object" && !(type instanceof StructType)) {
-    const def = normalizeDef(type, `${bctx.parentName}.${key}`, bctx.le, bctx);
+    const def = normalizeDef(type, `${bctx.parentName}.${key}`, bctx.le);
     return new StructField(key, def, 1, []);
   }
 
-  if (type instanceof StringType) {
-    // 字符串的长度语义是**字节数**, 不能和 uint16_t 共用"元素个数"那套:
-    // `"世界".length` 是 2, UTF-8 编码是 6, GBK 又是 4. 旧实现取 s.length,
-    // 于是中文正文被截成 2 字节, 且长度头写的是 2.
-    return new BlobField(
-      key,
-      countOfDeeps(type.deeps ?? []),
-      "text",
-      bctx.textDecode,
-      bctx.textEncoder
-    );
-  }
   if (type instanceof StructType) {
-    return new TypeField(
-      key,
-      bctx.le,
-      type,
-      bctx.textDecode,
-      bctx.textEncoder
-    );
+    return new TypeField(key, bctx.le, type);
   }
 
   throw new TypeError(

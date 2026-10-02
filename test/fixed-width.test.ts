@@ -10,7 +10,6 @@ import {
   ref,
   rest,
   skip,
-  string_t,
   uint8_t,
   uint16_t,
   uint32_t,
@@ -21,54 +20,55 @@ import type { Field } from "../src/field";
 const bytes = (dv: DataView) => Array.from(new Uint8Array(dv.buffer));
 
 /**
- * 定宽文本字段(`string_t[n]`)必须与旧 `string_t` 一致: encode 写满 n 字节, decode
- * 在第一个 NUL 处截断. 这两件事都不是"顺手就能对"的, 曾经各错过一次:
- * encode 只写实际字节数会让后面所有字段整体前移, 而 sizeof() 报的仍是 n ——
- * 错位要到对端才暴露; decode 不截 NUL 则把补位零留在字符串里.
+ * 定宽字节字段的宽度语义, 以及被**扔掉**的那条约定。
+ *
+ * 保留的一条: encode 必须写满 n 字节(短补 0 / 长截断)。只写实际长度会让后面所有字段
+ * 整体前移, 而 `sizeof()` 报的仍是 n —— 错位要到对端才暴露。
+ *
+ * 扔掉的一条: decode 曾按"第一个 NUL 处截断"处理定宽字段。那是协议约定而不是字节属性
+ * —— 定宽字段也常见空格补位或满宽正文, 猜错就是静默丢数据。截断现在归调用点。
  */
-describe("定宽文本字段", () => {
+describe("定宽字节字段", () => {
   it("encode 写满宽度: 短补 NUL, 长截断", () => {
     const P = new DynamicStructBuffer("p", {
       head: uint8_t,
-      name: string_t[8],
+      name: blob(8),
       tail: uint8_t,
     });
-    expect(bytes(P.encode({ head: 1, name: "ab", tail: 9 }))).toEqual([
+    expect(bytes(P.encode({ head: 1, name: [0x61, 0x62], tail: 9 }))).toEqual([
       1, 0x61, 0x62, 0, 0, 0, 0, 0, 0, 9,
     ]);
-    expect(bytes(P.encode({ head: 1, name: "abcdefghij", tail: 9 }))).toEqual([
-      1, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 9,
-    ]);
+    expect(
+      bytes(P.encode({ head: 1, name: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], tail: 9 }))
+    ).toEqual([1, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
     // 缺省值补满: 长度字段不存在时同样不能少写
     expect(bytes(P.encode({ head: 1 }))).toEqual([1, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
   });
 
-  it("decode 在第一个 NUL 处截断, 且多字节字符不被劈开", () => {
+  it("decode 原样给满宽度, 不替调用方截 NUL", () => {
     const P = new DynamicStructBuffer("p", {
       head: uint8_t,
-      name: string_t[8],
+      name: blob(8),
       tail: uint8_t,
     });
-    const d = P.decode(
+    const d = P.decode(Uint8Array.from([1, 0x61, 0x00, 0, 0, 0, 0, 0, 0, 9]));
+    expect([d.head, Array.from(d.name), d.tail]).toEqual([
+      1,
+      [0x61, 0, 0, 0, 0, 0, 0, 0],
+      9,
+    ]);
+
+    // NUL 补位是 C 风格字符串的约定, 要用的人自己切 —— 多字节序列不会被劈开,
+    // 因为 NUL 是单字节且不可能出现在 UTF-8 / GBK 序列中间
+    const cut = (b: Uint8Array) => {
+      const nul = b.indexOf(0);
+      return new TextDecoder().decode(nul < 0 ? b : b.subarray(0, nul));
+    };
+    const d2 = P.decode(
       Uint8Array.from([1, 0xe4, 0xb8, 0x96, 0, 0, 0, 0, 0, 9])
     );
-    expect([d.head, d.name, d.tail]).toEqual([1, "世", 9]);
-
-    // 无 NUL 时解满整个宽度
-    const d2 = P.decode(
-      Uint8Array.from([1, 0xe4, 0xb8, 0x96, 0xe7, 0x95, 0x8c, 0x21, 0x21, 9])
-    );
-    expect(d2.name).toBe("世界!!");
-  });
-
-  it("变长文本不截 NUL: NUL 属于正文, 截掉等于丢数据", () => {
-    const P = new DynamicStructBuffer("p", {
-      len: uint8_t,
-      text: string_t[ref("len")],
-    });
-    const d = P.decode(Uint8Array.from([3, 0x61, 0x00, 0x62]));
-    expect(d.text).toBe("a\0b");
-    expect(bytes(P.encode({ text: "a\0b" }))).toEqual([3, 0x61, 0x00, 0x62]);
+    expect(cut(d2.name)).toBe("世");
+    expect(d2.tail).toBe(9);
   });
 
   it("定宽 blob 同样写满宽度", () => {
@@ -98,23 +98,23 @@ describe("README 示例", () => {
         type: uint8_t,
         len: uint16_t,
         payload: uint8_t[ref("len")],
-        name: string_t[8],
+        name: blob(8),
       },
       { littleEndian: true }
     );
-    const obj = { type: 1, payload: [0x41, 0x42], name: "abc" };
+    const obj = { type: 1, payload: [0x41, 0x42], name: [0x61, 0x62, 0x63] };
     const dv = Msg.encode(obj);
     expect(bytes(dv)).toEqual([
       1, 2, 0, 0x41, 0x42, 0x61, 0x62, 0x63, 0, 0, 0, 0, 0,
     ]);
-    expect(obj).toEqual({ type: 1, payload: [0x41, 0x42], name: "abc" });
+    expect(obj).toEqual({ type: 1, payload: [0x41, 0x42], name: [0x61, 0x62, 0x63] });
 
     const d = Msg.decode(new Uint8Array(dv.buffer));
-    expect([d.type, d.len, Array.from(d.payload), d.name]).toEqual([
+    expect([d.type, d.len, Array.from(d.payload), Array.from(d.name)]).toEqual([
       1,
       2,
       [0x41, 0x42],
-      "abc",
+      [0x61, 0x62, 0x63, 0, 0, 0, 0, 0],
     ]);
   });
 
@@ -221,13 +221,13 @@ describe("README 示例", () => {
     const V = new DynamicStructBuffer("v", {
       msg_type: uint8_t,
       body: variant("msg_type", {
-        1: { name: string_t[3] },
+        1: { name: blob(3) },
         2: { x: uint32_t, y: uint32_t },
       }),
     });
     expect(V.decode(Uint8Array.from([1, 0x61, 0x62, 0x63]))).toEqual({
       msg_type: 1,
-      name: "abc",
+      name: Uint8Array.from([0x61, 0x62, 0x63]),
     });
     expect(bytes(V.encode({ msg_type: 2, x: 1, y: 2 }))).toEqual([
       2, 0, 0, 0, 1, 0, 0, 0, 2,
@@ -269,7 +269,7 @@ describe("README 示例", () => {
         type: uint8_t,
         len: uint16_t,
         payload: uint8_t[ref("len")],
-        name: string_t[8],
+        name: blob(8),
       },
       { littleEndian: true }
     );

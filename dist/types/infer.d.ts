@@ -4,9 +4,7 @@ import type { Def } from "./field";
 import type { DynamicStructBuffer } from "./dynamic-struct-buffer";
 export type InferType<T> = T extends {
     [VALUE_TYPE]: infer V;
-} ? ValueOf<V> : InferShape<T>;
-type IsStringy<V, Depth extends unknown[] = []> = V extends string ? true : Depth["length"] extends 8 ? false : V extends readonly unknown[] ? IsStringy<V[number], [...Depth, 0]> : false;
-type ValueOf<V> = [V] extends [never] ? never : IsStringy<V> extends true ? string : V;
+} ? V : InferShape<T>;
 export type InferSource<T> = T extends Def ? any : InferShape<T>;
 type InferShape<T> = T extends StructBuffer<infer V, any> ? V : T extends DynamicStructBuffer<any, infer V, any> ? V : T extends object ? {
     [K in keyof T]: InferType<T[K]>;

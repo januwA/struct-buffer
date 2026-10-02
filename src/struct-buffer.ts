@@ -3,8 +3,6 @@ import { AnyObject, DecodeBuffer_t } from "./interfaces";
 import {
   arrayProxyNext,
   createDataView,
-  createTextDecoder,
-  createTextEncoder,
   makeDataView,
   unflattenDeep,
   zeroMemory,
@@ -48,9 +46,6 @@ class StructBufferNext {
 }
 
 export type StructBufferConfig = {
-  textDecode?: TextDecoder;
-  textEncoder?: TextEncoder;
-
   /**
    * Setting littleEndian here will cause the littleEndian parameters of `encode` and `decode` to become invalid
    *
@@ -60,8 +55,6 @@ export type StructBufferConfig = {
 };
 
 const KStructBufferConfig = {
-  textDecode: createTextDecoder(),
-  textEncoder: createTextEncoder(),
   littleEndian: undefined,
 };
 
@@ -138,12 +131,7 @@ export class StructBuffer<
           );
           offset += type.byteLength;
         } else {
-          acc[key] = (type as any).decode(
-            view,
-            littleEndian,
-            offset,
-            this.config.textDecode
-          );
+          acc[key] = (type as any).decode(view, littleEndian, offset);
           offset += sizeof(type);
         }
         return acc;
@@ -183,13 +171,7 @@ export class StructBuffer<
           );
           offset += type.byteLength;
         } else {
-          view = (type as any).encode(
-            value,
-            littleEndian,
-            offset,
-            view,
-            this.config.textEncoder
-          );
+          view = (type as any).encode(value, littleEndian, offset, view);
           offset += sizeof(type);
         }
         return view;

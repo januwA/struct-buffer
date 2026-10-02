@@ -1,4 +1,4 @@
-import { StringType, StructType } from "./class-type";
+import { StructType } from "./class-type";
 import { DecodeError, EncodeError } from "./errors";
 import { StructBuffer } from "./struct-buffer";
 import { isRef, withCount } from "./utils";
@@ -148,12 +148,10 @@ function shapeOf(deeps) {
     return (deeps ?? []).map((d) => (isRef(d) ? -1 : Number(d)));
 }
 export class TypeField {
-    constructor(name, le, type, textDecode, textEncoder) {
+    constructor(name, le, type) {
         this.name = name;
         this.le = le;
         this.type = type;
-        this.textDecode = textDecode;
-        this.textEncoder = textEncoder;
         const deeps = type.deeps ?? [];
         this.spec = countOfDeeps(deeps);
         const only = onlyRef(deeps);
@@ -183,7 +181,7 @@ export class TypeField {
         const size = this.type.getSize(values);
         c.need(size, this.name);
         const start = c.pos;
-        out[this.name] = this.type.decode(c.view, this.le, start, this.textDecode, values);
+        out[this.name] = this.type.decode(c.view, this.le, start, values);
         c.pos = start + size;
     }
     encode(w, value, ctx) {
@@ -197,7 +195,7 @@ export class TypeField {
             return;
         }
         const before = w.raw;
-        const after = this.type.encode(value, this.le, w.pos, before, this.textEncoder, values);
+        const after = this.type.encode(value, this.le, w.pos, before, values);
         if (after !== before)
             w.rebind(after);
         w.advance(size);
@@ -219,39 +217,21 @@ export class SkipField {
     }
 }
 export class BlobField {
-    constructor(name, spec, as, textDecoder, textEncoder) {
+    constructor(name, spec) {
         this.name = name;
         this.spec = spec;
-        this.as = as;
-        this.textDecoder = textDecoder;
-        this.textEncoder = textEncoder;
         if (typeof spec === "number")
             this.fixedSize = spec;
     }
     encodeValue(value) {
-        const enc = this.textEncoder ?? new TextEncoder();
         if (value == null)
             return new Uint8Array(0);
-        if (this.as === "text") {
-            const items = flatten(value);
-            if (items.length === 0)
-                return new Uint8Array(0);
-            const parts = items.map((v) => enc.encode(String(v)));
-            const total = parts.reduce((a, p) => a + p.length, 0);
-            const out = new Uint8Array(total);
-            let o = 0;
-            for (const p of parts) {
-                out.set(p, o);
-                o += p.length;
-            }
-            return out;
-        }
         if (value instanceof Uint8Array)
             return value;
         if (Array.isArray(value))
             return Uint8Array.from(value);
         if (typeof value === "string")
-            return enc.encode(value);
+            return new TextEncoder().encode(value);
         throw new EncodeError("encode", `${this.name}: 期望 Uint8Array/number[]/string, 实际 ${typeof value}`);
     }
     resolveLengths(obj, ctx) {
@@ -266,14 +246,7 @@ export class BlobField {
     decode(c, out, ctx, sink) {
         const site = { where: c.where, field: this.name, offset: c.pos };
         const n = resolveCount(this.spec, ctx, c.left, site);
-        const raw = c.bytes(n, this.name);
-        if (this.as !== "text") {
-            out[this.name] = raw.slice();
-            return;
-        }
-        const nul = this.fixedSize === undefined ? -1 : raw.indexOf(0);
-        const body = nul < 0 ? raw : raw.subarray(0, nul);
-        out[this.name] = (this.textDecoder ?? new TextDecoder()).decode(body);
+        out[this.name] = c.bytes(n, this.name).slice();
     }
     encode(w, value, ctx) {
         resolveCount(this.spec, ctx, Infinity, {
@@ -468,38 +441,35 @@ function countOfDeeps(deeps) {
 export function isFieldSpec(x) {
     return !!x && x.__fieldSpec === true;
 }
-export function normalizeDef(source, name, inheritedLE, codecs) {
+export function normalizeDef(source, name, inheritedLE) {
     if (isDef(source))
         return source;
     if (isDefSource(source))
         return source.def;
     if (source instanceof StructBuffer) {
         const le = source.config.littleEndian ?? inheritedLE;
-        return buildDef(source.struct, name, le, source.config.textDecode ?? codecs?.textDecode, source.config.textEncoder ?? codecs?.textEncoder);
+        return buildDef(source.struct, name, le);
     }
-    return buildDef(source, name, inheritedLE, codecs?.textDecode, codecs?.textEncoder);
+    return buildDef(source, name, inheritedLE);
 }
-function buildDef(struct, name, le, textDecode, textEncoder) {
-    const fields = Object.entries(struct).map(([key, type]) => makeField(key, type, { name: key, parentName: name, le, textDecode, textEncoder }));
+function buildDef(struct, name, le) {
+    const fields = Object.entries(struct).map(([key, type]) => makeField(key, type, { name: key, parentName: name, le }));
     return { name, fields, shape: [], le, fixedSize: computeFixedSize(fields) };
 }
 function makeField(key, type, bctx) {
     if (isFieldSpec(type))
         return type.build({ ...bctx, name: key });
     if (type instanceof StructBuffer || isDef(type) || isDefSource(type)) {
-        const def = normalizeDef(type, `${bctx.parentName}.${key}`, bctx.le, bctx);
+        const def = normalizeDef(type, `${bctx.parentName}.${key}`, bctx.le);
         const deeps = type.deeps ?? [];
         return new StructField(key, def, countOfDeeps(deeps), shapeOf(deeps));
     }
     if (type && typeof type === "object" && !(type instanceof StructType)) {
-        const def = normalizeDef(type, `${bctx.parentName}.${key}`, bctx.le, bctx);
+        const def = normalizeDef(type, `${bctx.parentName}.${key}`, bctx.le);
         return new StructField(key, def, 1, []);
     }
-    if (type instanceof StringType) {
-        return new BlobField(key, countOfDeeps(type.deeps ?? []), "text", bctx.textDecode, bctx.textEncoder);
-    }
     if (type instanceof StructType) {
-        return new TypeField(key, bctx.le, type, bctx.textDecode, bctx.textEncoder);
+        return new TypeField(key, bctx.le, type);
     }
     throw new TypeError(`DynamicStructBuffer: 字段 "${key}" 收到无法识别的类型 ${typeof type}`);
 }

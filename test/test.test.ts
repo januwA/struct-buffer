@@ -1,6 +1,5 @@
 import {
   uint32_t,
-  string_t,
   sizeof,
   int8_t,
   uint8_t,
@@ -21,12 +20,12 @@ describe("test decode and encode", () => {
     const struct = new StructBuffer("Player", {
       hp: uint32_t,
       mp: uint32_t,
-      name: string_t[3],
+      name: uint8_t[3],
     });
     const obj = {
       hp: 10,
       mp: 100,
-      name: "abc",
+      name: [0x61, 0x62, 0x63],
     };
     const view: DataView = makeDataView([
       0, 0, 0, 10, // hp  = 10
@@ -53,31 +52,6 @@ describe("test decode and encode", () => {
   });
 });
 
-describe("test string_t", () => {
-  it("test decode and encode", () => {
-    let struct = new StructBuffer("Test", {
-      a: string_t,
-      b: string_t,
-      c: string_t[2],
-    });
-    const obj = {
-      a: "a",
-      b: "b",
-      c: "cd",
-    };
-    const view = b2("abcd");
-    expect(struct.decode(view)).toEqual(obj);
-    expect(sview(struct.encode(obj))).toBe(sview(view));
-    expect(struct.byteLength).toBe(4);
-  });
-
-  it("test names", () => {
-    const obj = ["abcd", "abce", "abcf"] as any;
-    const view = string_t[3][4].encode(obj);
-    const names = string_t[3][4].decode(view);
-    expect(names).toEqual(obj);
-  });
-});
 
 describe("test int8_t", () => {
   it("test decode and encode", () => {
@@ -237,14 +211,14 @@ describe("test struct list", () => {
   let users: StructBuffer<any>;
   const obj = {
     users: [
-      { name: "a1", name2: "a2" },
-      { name: "b1", name2: "b2" },
+      { name: [0x61, 0x31], name2: [0x61, 0x32] },
+      { name: [0x62, 0x31], name2: [0x62, 0x32] },
     ],
   };
   beforeAll(() => {
     user = new StructBuffer("User", {
-      name: string_t[2],
-      name2: string_t[2],
+      name: uint8_t[2],
+      name2: uint8_t[2],
     });
     users = new StructBuffer("Users", {
       users: user[2],

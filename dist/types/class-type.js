@@ -1,4 +1,4 @@
-import { arrayProxyNext, COUNT, createDataView, createTextDecoder, createTextEncoder, isRef, makeDataView, realloc, unflattenDeep, } from "./utils";
+import { arrayProxyNext, COUNT, createDataView, isRef, makeDataView, realloc, unflattenDeep, } from "./utils";
 export const FLOAT_TYPE = "float";
 export const DOUBLE_TYPE = "double";
 const hData = {
@@ -111,10 +111,9 @@ export class StructType extends Array {
     toRaw(value) {
         return this.isBig ? BigInt(value) : value;
     }
-    decode(view, littleEndian = false, offset = 0, textDecodeOrCtx, ctx) {
+    decode(view, littleEndian = false, offset = 0, ctx) {
         view = makeDataView(view);
-        const actualCtx = ctx ?? (textDecodeOrCtx && !textDecodeOrCtx.decode ? textDecodeOrCtx : undefined);
-        const count = this.getCount(actualCtx);
+        const count = this.getCount(ctx);
         const result = [];
         let i = count;
         while (i--) {
@@ -122,11 +121,11 @@ export class StructType extends Array {
             result.push(this.isBig ? Number(v) : v);
             offset += this.size;
         }
-        const deeps = this.getDeeps(actualCtx);
+        const deeps = this.getDeeps(ctx);
         return this.isList ? unflattenDeep(result, deeps, false) : result[0];
     }
-    encode(obj, littleEndian = false, offset = 0, view, textEncoderOrCtx, ctx) {
-        const actualCtx = ctx ?? (textEncoderOrCtx && !textEncoderOrCtx.encode ? textEncoderOrCtx : obj);
+    encode(obj, littleEndian = false, offset = 0, view, ctx) {
+        const actualCtx = ctx ?? obj;
         const count = this.getCount(actualCtx);
         const v = createDataView(count * this.size, view);
         if (this.isList && Array.isArray(obj))
@@ -144,8 +143,8 @@ export class BitsType extends StructType {
         super("<bits>", size, true);
         this.bits = bits;
     }
-    decode(view, littleEndian = false, offset = 0, textDecodeOrCtx, ctx) {
-        const data = super.decode(view, littleEndian, offset, textDecodeOrCtx, ctx);
+    decode(view, littleEndian = false, offset = 0, ctx) {
+        const data = super.decode(view, littleEndian, offset, ctx);
         if (this.isList && Array.isArray(data)) {
             return data.map((it) => {
                 const result = {};
@@ -163,8 +162,8 @@ export class BitsType extends StructType {
             return result;
         }
     }
-    encode(obj, littleEndian = false, offset = 0, view, textEncoderOrCtx, ctx) {
-        const actualCtx = ctx ?? (textEncoderOrCtx && !textEncoderOrCtx.encode ? textEncoderOrCtx : obj);
+    encode(obj, littleEndian = false, offset = 0, view, ctx) {
+        const actualCtx = ctx ?? obj;
         const count = this.getCount(actualCtx);
         const v = createDataView(count * this.size, view);
         if (this.isList && Array.isArray(obj)) {
@@ -197,8 +196,8 @@ export class BitFieldsType extends StructType {
         super("<bit-fields>", size, true);
         this.bitFields = bitFields;
     }
-    decode(view, littleEndian = false, offset = 0, textDecodeOrCtx, ctx) {
-        const data = super.decode(view, littleEndian, offset, textDecodeOrCtx, ctx);
+    decode(view, littleEndian = false, offset = 0, ctx) {
+        const data = super.decode(view, littleEndian, offset, ctx);
         const _unpack = (data) => {
             let i = 0;
             const out = {};
@@ -215,8 +214,8 @@ export class BitFieldsType extends StructType {
         }
         return _unpack(data);
     }
-    encode(obj, littleEndian = false, offset = 0, view, textEncoderOrCtx, ctx) {
-        const actualCtx = ctx ?? (textEncoderOrCtx && !textEncoderOrCtx.encode ? textEncoderOrCtx : obj);
+    encode(obj, littleEndian = false, offset = 0, view, ctx) {
+        const actualCtx = ctx ?? obj;
         const count = this.getCount(actualCtx);
         const v = createDataView(count * this.size, view);
         const _getValue = (obj) => {
@@ -243,66 +242,19 @@ export class BitFieldsType extends StructType {
         }
     }
 }
-export class StringType extends StructType {
-    constructor() {
-        super("string_t", 1, true);
-        this.textDecode = createTextDecoder();
-        this.textEncoder = createTextEncoder();
-    }
-    decode(view, littleEndian = false, offset = 0, textDecode, ctx) {
-        view = makeDataView(view);
-        textDecode ?? (textDecode = this.textDecode);
-        const count = this.getCount(ctx);
-        const result = [];
-        let i = count;
-        while (i--) {
-            let data = view[this.get](offset, littleEndian);
-            if (data === 0)
-                break;
-            data = textDecode.decode(new Uint8Array([data]));
-            result.push(data);
-            offset += this.size;
-        }
-        const deeps = this.getDeeps(ctx);
-        if (deeps.length < 2)
-            return result.join("");
-        return this.isList ? unflattenDeep(result, deeps, true) : result[0];
-    }
-    encode(obj, littleEndian = false, offset = 0, view, textEncoder, ctx) {
-        const actualCtx = ctx ?? obj;
-        const count = this.getCount(actualCtx);
-        const v = createDataView(count * this.size, view);
-        if (Array.isArray(obj))
-            obj = obj.flat().join("");
-        textEncoder ?? (textEncoder = this.textEncoder);
-        const bytes = textEncoder.encode(obj);
-        for (let i = 0; i < count; i++) {
-            const it = bytes[i] ?? 0;
-            try {
-                v[this.set](offset, it, littleEndian);
-            }
-            catch (error) {
-                v[this.set](offset, BigInt(it), littleEndian);
-            }
-            offset += this.size;
-        }
-        return v;
-    }
-}
 export class Inject extends StructType {
     constructor(hInjectDecode, hInjectEncode) {
         super("inject_t", 0, true);
         this.hInjectDecode = hInjectDecode;
         this.hInjectEncode = hInjectEncode;
     }
-    decode(view, littleEndian = false, offset = 0, textDecodeOrCtx, ctx) {
+    decode(view, littleEndian = false, offset = 0, ctx) {
         if (!this.hInjectDecode)
             return null;
-        const actualCtx = ctx ?? textDecodeOrCtx;
         this.size = 0;
         view = makeDataView(view);
         const result = [];
-        let i = this.getCount(actualCtx);
+        let i = this.getCount(ctx);
         while (i--) {
             const res = this.hInjectDecode(view, offset);
             result.push(res.value);
@@ -311,13 +263,12 @@ export class Inject extends StructType {
         }
         return this.isList ? unflattenDeep(result, this.deeps, false) : result[0];
     }
-    encode(obj, littleEndian = false, offset = 0, view, textEncoderOrCtx, ctx) {
-        const actualCtx = ctx ?? textEncoderOrCtx;
+    encode(obj, littleEndian = false, offset = 0, view, ctx) {
         view = createDataView(0, view);
         if (!this.hInjectEncode)
             return view;
         this.size = 0;
-        for (let i = 0; i < this.getCount(actualCtx); i++) {
+        for (let i = 0; i < this.getCount(ctx ?? obj); i++) {
             const it = this.isList ? obj[i] : obj;
             const buf = makeDataView(this.hInjectEncode(it));
             view = realloc(view, view.byteLength + buf.byteLength, buf, offset);

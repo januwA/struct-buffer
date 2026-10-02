@@ -9,7 +9,6 @@ import {
   records,
   ref,
   rest,
-  string_t,
   StructBuffer,
   uint16_t,
   uint32_t,
@@ -130,16 +129,19 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
     expect("msg_size" in input).toBe(false);
   });
 
-  it("中文文本按字节长度而非字符长度", () => {
+  it("中文正文按字节长度而非字符长度", () => {
     const Chat = new DynamicStructBuffer("chat", {
       text_len: uint16_t,
-      text: string_t[ref("text_len")],
+      text: blob(ref("text_len")),
     });
-    const encoded = Chat.encode({ text: "世界" } as any);
-    // "世界" 的 s.length 是 2, UTF-8 是 6 字节. 旧实现写成 len=2 + 2 字节正文
+    // "世界" 的 length 是 2, UTF-8 是 6 字节 —— 长度头写的是字节数, 拿字符数会把正文截掉
+    const encoded = Chat.encode({ text: "世界" });
     expect(encoded.byteLength).toBe(2 + 6);
     expect(hex(encoded)).toBe("00 06 e4 b8 96 e7 95 8c");
-    expect(Chat.decode(encoded)).toEqual({ text_len: 6, text: "世界" });
+    expect(Chat.decode(encoded)).toEqual({
+      text_len: 6,
+      text: Uint8Array.from([0xe4, 0xb8, 0x96, 0xe7, 0x95, 0x8c]),
+    });
   });
 
   it("畸形长度抛出带结构名/字段名/偏移的 DecodeError", () => {
@@ -246,14 +248,14 @@ describe("声明式字段: rest / blob / records / variant / framed", () => {
   it("rest 与前面的长度前缀字段共存", () => {
     const Pkt = new DynamicStructBuffer("pkt", {
       text_len: uint16_t,
-      text: string_t[ref("text_len")],
+      text: blob(ref("text_len")),
       tail: rest(),
     });
-    const encoded = Pkt.encode({ text: "hi", tail: [0xaa, 0xbb] } as any);
+    const encoded = Pkt.encode({ text: "hi", tail: [0xaa, 0xbb] });
     expect(hex(encoded)).toBe("00 02 68 69 aa bb");
     expect(Pkt.decode(encoded)).toEqual({
       text_len: 2,
-      text: "hi",
+      text: Uint8Array.from([0x68, 0x69]),
       tail: new Uint8Array([0xaa, 0xbb]),
     });
   });
@@ -302,15 +304,17 @@ describe("声明式字段: rest / blob / records / variant / framed", () => {
     const Pkt = new DynamicStructBuffer("pkt", {
       msg_type: uint8_t,
       body: variant("msg_type", {
-        1: { name: string_t[3] },
+        1: { name: blob(3) },
         2: { x: uint32_t, y: uint32_t },
       }),
     });
 
-    expect(hex(Pkt.encode({ msg_type: 1, name: "abc" }))).toBe("01 61 62 63");
+    expect(hex(Pkt.encode({ msg_type: 1, name: new Uint8Array([0x61, 0x62, 0x63]) }))).toBe(
+      "01 61 62 63"
+    );
     expect(Pkt.decode([1, 0x61, 0x62, 0x63])).toEqual({
       msg_type: 1,
-      name: "abc",
+      name: Uint8Array.from([0x61, 0x62, 0x63]),
     });
     expect(Pkt.decode([2, 0, 0, 0, 1, 0, 0, 0, 2])).toEqual({
       msg_type: 2,
@@ -332,17 +336,21 @@ describe("声明式字段: rest / blob / records / variant / framed", () => {
     const Pkt = new DynamicStructBuffer("pkt", {
       chan: uint8_t,
       ...discriminated("body", "msg_type", uint8_t, {
-        0x0a: { len: uint16_t, text: string_t[ref("len")] },
+        0x0a: { len: uint16_t, text: blob(ref("len")) },
         0x0b: { id: uint32_t },
       }),
     });
-    const encoded = Pkt.encode({ chan: 1, msg_type: 0x0a, text: "世界" } as any);
+    const encoded = Pkt.encode({
+      chan: 1,
+      msg_type: 0x0a,
+      text: "世界",
+    } as any);
     expect(hex(encoded)).toBe("01 0a 00 06 e4 b8 96 e7 95 8c");
     expect(Pkt.decode(encoded)).toEqual({
       chan: 1,
       msg_type: 0x0a,
       len: 6,
-      text: "世界",
+      text: Uint8Array.from([0xe4, 0xb8, 0x96, 0xe7, 0x95, 0x8c]),
     });
   });
 

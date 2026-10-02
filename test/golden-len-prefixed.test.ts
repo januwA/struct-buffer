@@ -7,8 +7,8 @@
  * - 布局: uknow1:u16 | msg_type:u8 | msg_size:u16 | msg[u8 x msg_size]
  *         | name_size:u8 | name[u8 x name_size] | uknow3:u8[8]
  * - 全程 little-endian
- * - 正文是 **GBK**, 所以用 `uint8_t` 拿原始字节再自己 GBK 解码 —— 用
- *   `string_t` 会走 UTF-8, 中文全是乱码
+ * - 正文是 **GBK**, 所以按字节拿(`uint8_t` / `blob`)再自己 GBK 解码 —— 库里
+ *   没有字符串类型, 按 UTF-8 解必然乱码
  *
  * 数据是合成的(见 fixtures/len-prefixed.ts), 覆盖长度前缀、自引用长度、
  * 定长尾巴与 GBK 双字节文本。
@@ -82,12 +82,12 @@ describe("golden: 长度前缀 + GBK 文本布局", () => {
     expect(RECORDS.some((r) => r.name_size === 0)).toBe(true);
   });
 
-  it("正文里的 NUL 不截断(变长 blob 不是 C 字符串)", () => {
+  it("正文里的 NUL 不截断(库只给字节, 不当 C 字符串)", () => {
     const rec = RECORDS.find((r) => r.msg.includes("\0"))!;
     const d = MessageStruct.decode(bytesOf(rec.body));
     expect(d.msg).toHaveLength(rec.msg_size);
     expect(gbk.decode(Uint8Array.from(d.msg))).toBe(rec.msg);
-    // 对比: 定宽 string_t 会在 NUL 处停, 所以这里不能用 string_t
+    // 对比: 定宽字段也不截 NUL 了 —— 截断归调用点, 库一律给满宽度
     expect(gbk.decode(Uint8Array.from(d.msg)).split("\0")).toHaveLength(3);
   });
 
@@ -110,7 +110,7 @@ describe("golden: 长度前缀 + GBK 文本布局", () => {
     expect(JSON.stringify(d)).toBe(before);
   });
 
-  it("正文是 GBK, 用 string_t 走 UTF-8 会解出乱码(说明为何用 uint8_t)", () => {
+  it("正文是 GBK, 按 UTF-8 解会乱码(说明为何只拿字节)", () => {
     // 得挑 GBK 与 UTF-8 解码结果不同的样本: 纯 ASCII 两者本来就一样
     const rec = RECORDS.find(
       (r) =>
