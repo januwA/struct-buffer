@@ -1,5 +1,4 @@
 import {
-  DynamicStructBuffer,
   createDataView,
   makeDataView,
   sbytes as b,
@@ -7,6 +6,7 @@ import {
   sview,
   TEXT,
   uint8_t,
+  struct,
 } from "../src";
 
 describe("utils test", () => {
@@ -29,7 +29,7 @@ describe("utils test", () => {
     expect(win.byteLength).toBe(3);
     expect(() => new Uint8Array(win.buffer, win.byteOffset + 3, 1)[0]).not.toThrow();
     // 端到端: decode 只看窗口里的字节
-    const S = new DynamicStructBuffer("s", { a: uint8_t, b: uint8_t, c: uint8_t });
+    const S = struct("s", { a: uint8_t, b: uint8_t, c: uint8_t });
     expect(S.decode(whole.subarray(0, 3))).toEqual({ a: 0xaa, b: 0xbb, c: 1 });
   });
 

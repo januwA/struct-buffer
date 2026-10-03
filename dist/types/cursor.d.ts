@@ -28,6 +28,7 @@ export declare class Cursor {
     f32(field: string, le?: boolean): number;
     f64(field: string, le?: boolean): number;
     u64(field: string, le?: boolean): number;
+    i64(field: string, le?: boolean): number;
     bytes(n: number, field: string): Uint8Array;
     region<T>(n: number, field: string, fn: (c: Cursor) => T): T;
     peek<T>(n: number, field: string, fn: (c: Cursor) => T): {

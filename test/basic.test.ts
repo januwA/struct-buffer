@@ -7,7 +7,9 @@ import {
   int64_t,
   uint64_t,
   double,
-  DynamicStructBuffer,
+  bytes,
+  list,
+  struct,
   makeDataView,
   sview,
   sbytes2 as b2,
@@ -15,10 +17,10 @@ import {
 
 describe("test decode and encode", () => {
   it("test decode and encode", () => {
-    const struct = new DynamicStructBuffer("Player", {
+    const Player = struct("Player", {
       hp: uint32_t,
       mp: uint32_t,
-      name: uint8_t[3],
+      name: bytes(3),
     });
     const obj = {
       hp: 10,
@@ -31,25 +33,24 @@ describe("test decode and encode", () => {
       0x61, 0x62, 0x63, // "abc"
     ]);
 
-    expect(struct.decode(view)).toEqual(obj);
-    expect(sview(struct.encode(obj))).toBe(sview(view));
-    expect(struct.getByteLength()).toBe(11);
+    expect(Player.decode(view)).toEqual(obj);
+    expect(sview(Player.encode(obj))).toBe(sview(view));
+    expect(Player.encode(obj).byteLength).toBe(11);
   });
 
   it("test uint32_t encode", () => {
-    const view = uint32_t[2].encode([1, 2]);
+    const view = list(uint32_t, 2).encode([1, 2]);
     expect(view.byteLength).toBe(8);
     expect(sview(view)).toBe(sview(makeDataView([0, 0, 0, 1, 0, 0, 0, 2])));
   });
 
   it("test uint32_t decode", () => {
-    const data = uint32_t[2].decode(makeDataView([0, 0, 0, 1, 0, 0, 0, 2]));
+    const data = list(uint32_t, 2).decode(makeDataView([0, 0, 0, 1, 0, 0, 0, 2]));
 
     expect(data.length).toBe(2);
     expect(data).toEqual([1, 2]);
   });
 });
-
 
 describe("test int8_t", () => {
   it("test decode and encode", () => {
@@ -59,22 +60,22 @@ describe("test int8_t", () => {
       b: [0x62],
       c: [0x63, 0x64],
     };
-    let struct = new DynamicStructBuffer("Test", {
+    const Test = struct("Test", {
       a: int8_t,
-      b: int8_t[1],
-      c: int8_t[2],
+      b: list(int8_t, 1),
+      c: list(int8_t, 2),
     });
-    expect(struct.decode(view)).toEqual(obj);
-    expect(sview(struct.encode(obj))).toBe(sview(view));
-    expect(struct.getByteLength()).toBe(4);
+    expect(Test.decode(view)).toEqual(obj);
+    expect(sview(Test.encode(obj))).toBe(sview(view));
+    expect(Test.encode(obj).byteLength).toBe(4);
   });
 
   it("test int8_t and uint8_t", () => {
-    const s = new DynamicStructBuffer("Test", {
+    const Test = struct("Test", {
       a: int8_t,
       b: uint8_t,
     });
-    const data = s.decode(makeDataView([0xff, 0xff]));
+    const data = Test.decode(makeDataView([0xff, 0xff]));
     expect(data).toEqual({
       a: -1,
       b: 255,
@@ -84,7 +85,7 @@ describe("test int8_t", () => {
 
 describe("test pos", () => {
   let view: DataView;
-  let struct: DynamicStructBuffer<any, any, any>;
+  let Pos: ReturnType<typeof struct>;
   const obj = {
     pos: [
       [1.23, 22.66],
@@ -101,21 +102,21 @@ describe("test pos", () => {
       (v, i) => view.setFloat64(i * 8, v, false)
     );
 
-    struct = new DynamicStructBuffer("Pos", {
-      pos: double[4][2],
+    Pos = struct("Pos", {
+      pos: list(list(double, 2), 4),
     });
   });
 
   it("test decode", () => {
-    expect(struct.decode(view)).toEqual(obj);
+    expect(Pos.decode(view)).toEqual(obj);
   });
 
   it("test decode", () => {
-    expect(sview(struct.encode(obj))).toBe(sview(view));
+    expect(sview(Pos.encode(obj))).toBe(sview(view));
   });
 
   it("test byteLength", () => {
-    expect(struct.getByteLength()).toBe(2 * 8 * 4);
+    expect(Pos.encode(obj).byteLength).toBe(2 * 8 * 4);
   });
 });
 
@@ -136,10 +137,10 @@ describe("test struct nesting", () => {
       SHORT sThumbRX;
       SHORT sThumbRY;
     } XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
- */
+  */
 
-  let XINPUT_STATE: DynamicStructBuffer<any, any, any>;
-  let XINPUT_GAMEPAD: DynamicStructBuffer<any, any, any>;
+  let XINPUT_STATE: ReturnType<typeof struct>;
+  let XINPUT_GAMEPAD: ReturnType<typeof struct>;
   const obj = {
     dwPacketNumber: 0,
     Gamepad: {
@@ -153,7 +154,7 @@ describe("test struct nesting", () => {
     },
   };
   beforeAll(() => {
-    XINPUT_GAMEPAD = new DynamicStructBuffer("XINPUT_GAMEPAD", {
+    XINPUT_GAMEPAD = struct("XINPUT_GAMEPAD", {
       wButtons: uint16_t,
       bLeftTrigger: uint8_t,
       bRightTrigger: uint8_t,
@@ -162,7 +163,7 @@ describe("test struct nesting", () => {
       sThumbRX: int16_t,
       sThumbRY: int16_t,
     });
-    XINPUT_STATE = new DynamicStructBuffer("XINPUT_STATE", {
+    XINPUT_STATE = struct("XINPUT_STATE", {
       dwPacketNumber: uint32_t,
       Gamepad: XINPUT_GAMEPAD,
     });
@@ -183,22 +184,18 @@ describe("test struct nesting", () => {
   it("test encode", () => {
     const view = XINPUT_STATE.encode(obj);
     expect(sview(view)).toBe(
-      sview(
-        makeDataView([
-          0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0, 3, 0, 4,
-        ])
-      )
+      sview(makeDataView([0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0, 3, 0, 4]))
     );
   });
 
   it("test byteLength", () => {
-    expect(XINPUT_STATE.getByteLength()).toBe(16);
+    expect(XINPUT_STATE.encode(obj).byteLength).toBe(16);
   });
 });
 
 describe("test struct list", () => {
-  let user: DynamicStructBuffer<any, any, any>;
-  let users: DynamicStructBuffer<any, any, any>;
+  let user: ReturnType<typeof struct>;
+  let users: ReturnType<typeof struct>;
   const obj = {
     users: [
       {
@@ -212,18 +209,18 @@ describe("test struct list", () => {
     ],
   };
   beforeAll(() => {
-    user = new DynamicStructBuffer("User", {
-      name: uint8_t[2],
-      name2: uint8_t[2],
+    user = struct("User", {
+      name: bytes(2),
+      name2: bytes(2),
     });
-    users = new DynamicStructBuffer("Users", {
-      users: user[2],
+    users = struct("Users", {
+      users: list(user, 2),
     });
   });
 
   it("test decode", () => {
     expect(users.decode(b2("a1a2b1b2"))).toEqual(obj);
-    expect(user[2].decode(b2("a1a2b1b2")).length).toBe(2);
+    expect(list(user, 2).decode(b2("a1a2b1b2")).length).toBe(2);
   });
 
   it("test encode", () => {
@@ -231,13 +228,13 @@ describe("test struct list", () => {
   });
 
   it("test byteLength", () => {
-    expect(users.getByteLength()).toBe(8);
+    expect(users.encode(obj).byteLength).toBe(8);
   });
 });
 
 describe("test struct Multilevel array", () => {
-  let player: DynamicStructBuffer<any, any, any>;
-  let players: DynamicStructBuffer<any, any, any>;
+  let player: ReturnType<typeof struct>;
+  let players: ReturnType<typeof struct>;
   let view: DataView;
   const obj = {
     players: [
@@ -252,13 +249,13 @@ describe("test struct Multilevel array", () => {
     ],
   };
   beforeAll(() => {
-    player = new DynamicStructBuffer("Player", {
+    player = struct("Player", {
       hp: uint32_t,
       mp: uint32_t,
     });
 
-    players = new DynamicStructBuffer("Players", {
-      players: player[2][2],
+    players = struct("Players", {
+      players: list(list(player, 2), 2),
     });
 
     view = makeDataView([
@@ -276,8 +273,8 @@ describe("test struct Multilevel array", () => {
   });
 
   it("test byteLength", () => {
-    expect(player.getByteLength()).toBe(8);
-    expect(players.getByteLength()).toBe(32);
+    expect(player.encode({ hp: 1, mp: 1 }).byteLength).toBe(8);
+    expect(players.encode(obj).byteLength).toBe(32);
   });
 });
 
@@ -287,7 +284,9 @@ describe("test int64_t / uint64_t", () => {
     // 于是走的是 getBigUint64 —— 0xFFFFFFFFFFFFFFFF 解出来是 18446744073709551615
     const view = makeDataView([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
     expect(int64_t.decode(view)).toBe(-1);
-    expect(int64_t.decode(makeDataView([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe]))).toBe(-2);
+    expect(
+      int64_t.decode(makeDataView([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe]))
+    ).toBe(-2);
   });
 
   it("uint64_t 走无符号解", () => {
@@ -305,8 +304,12 @@ describe("test int64_t / uint64_t", () => {
   });
 
   it("编码接受 number", () => {
-    expect(sview(int64_t.encode(-1))).toBe(sview(makeDataView([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])));
-    expect(sview(uint64_t.encode(256))).toBe(sview(makeDataView([0, 0, 0, 0, 0, 0, 0x01, 0x00])));
+    expect(sview(int64_t.encode(-1))).toBe(
+      sview(makeDataView([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]))
+    );
+    expect(sview(uint64_t.encode(256))).toBe(
+      sview(makeDataView([0, 0, 0, 0, 0, 0, 0x01, 0x00]))
+    );
   });
 
   it("列表往返", () => {
@@ -314,8 +317,8 @@ describe("test int64_t / uint64_t", () => {
       0, 0, 0, 0, 0, 0, 0, 1,
       0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
     ]);
-    expect(int64_t[2].decode(view)).toEqual([1, -2]);
-    expect(sview(int64_t[2].encode([1, -2]))).toBe(sview(view));
+    expect(list(int64_t, 2).decode(view)).toEqual([1, -2]);
+    expect(sview(list(int64_t, 2).encode([1, -2]))).toBe(sview(view));
   });
 });
 
@@ -334,24 +337,25 @@ describe("多层原始类型", () => {
 
   it("三层形状 encode 完整写出, 不再从第 3 层起静默写 0", () => {
     // 旧实现用 obj.flat() 只拍一层 ⇒ 元素变成 [1,2] 这种数组 ⇒ 访问器强转成 0
-    expect(sview((uint16_t[2][2][2] as any).encode(nested))).toBe(sview(wire));
-    expect((uint16_t[2][2][2] as any).decode(wire)).toEqual(nested);
+    const T = list(list(list(uint16_t, 2), 2), 2);
+    expect(sview(T.encode(nested))).toBe(sview(wire));
+    expect(T.decode(wire)).toEqual(nested);
   });
 
   it("作为字段的三层形状同样完整", () => {
-    const S = new DynamicStructBuffer("S", { m: uint16_t[2][2][2] });
-    const view = S.encode({ m: nested } as any);
+    const S = struct("S", { m: list(list(list(uint16_t, 2), 2), 2) });
+    const view = S.encode({ m: nested });
     expect(sview(view)).toBe(sview(wire));
-    expect((S.decode(view) as any).m).toEqual(nested);
+    expect(S.decode(view).m).toEqual(nested);
   });
 });
 
 describe("字节段 encode 只收 Uint8Array", () => {
   it("number[] 直接报错, 不再静默写 0", () => {
-    expect(() => (uint8_t[2] as any).encode([1, 2])).toThrow(/Uint8Array/);
+    expect(() => bytes(2).encode([1, 2] as any)).toThrow(/Uint8Array/);
   });
 
   it("Uint8Array 正常往返", () => {
-    expect(sview(uint8_t[2].encode(new Uint8Array([1, 2])))).toBe("01 02");
+    expect(sview(bytes(2).encode(new Uint8Array([1, 2])))).toBe("01 02");
   });
 });

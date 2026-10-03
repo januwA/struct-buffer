@@ -1,24 +1,26 @@
-import { DynamicStructBuffer, sview, uint16_t } from "../src";
+import { sview, uint16_t, struct } from "../src";
 
 // https://github.com/januwA/struct-buffer/issues/2
 
 describe("littleEndian 配置", () => {
   it("littleEndian: 配置优先于参数", () => {
-    const s = new DynamicStructBuffer(
+    const Inner = struct(
+      "test2",
+      {
+        ip: uint16_t,
+        port: uint16_t,
+      },
+      {
+        littleEndian: false,
+      }
+    );
+
+    const s = struct(
       "test",
       {
         a: uint16_t,
         b: uint16_t,
-        c: new DynamicStructBuffer(
-          "test2",
-          {
-            ip: uint16_t,
-            port: uint16_t,
-          },
-          {
-            littleEndian: false,
-          }
-        ),
+        c: Inner,
       },
       {
         littleEndian: true,
@@ -34,14 +36,5 @@ describe("littleEndian 配置", () => {
       },
     });
     expect(sview(v)).toBe("01 00 02 00 00 0a 00 64");
-  });
-
-  it("子类实例经下标后仍保留自有属性", () => {
-    class X extends DynamicStructBuffer<any, any, any> {
-      a = 10;
-    }
-
-    const s = new X("s", {})[2][2] as any;
-    expect(s.a).toBe(10);
   });
 });

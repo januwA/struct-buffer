@@ -96,6 +96,12 @@ export class Cursor {
         this.pos += 8;
         return Number(v);
     }
+    i64(field, le = false) {
+        this.need(8, field);
+        const v = this.view.getBigInt64(this.pos, le);
+        this.pos += 8;
+        return Number(v);
+    }
     bytes(n, field) {
         this.need(n, field);
         const v = new Uint8Array(this.view.buffer, this.view.byteOffset + this.pos, n);

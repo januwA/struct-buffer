@@ -1,17 +1,10 @@
-import {
-  DynamicStructBuffer,
-  uint32_t,
-  sview,
-  uint8_t,
-  sbytes as b,
-  bitFields,
-} from "../src";
+import { uint32_t, sview, uint8_t, sbytes as b, bitFields, struct } from "../src";
 
 // https://github.com/januwA/struct-buffer/issues/3
 
 describe("test bitFields", () => {
   it("test 1", () => {
-    const s = new DynamicStructBuffer("test", {
+    const s = struct("test", {
       a: bitFields(uint8_t, {
         alpha: 2,
         beta: 4,

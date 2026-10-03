@@ -1,17 +1,18 @@
 import {
-  DynamicStructBuffer,
   InferDef,
   InferEncodeDef,
   InferType,
-  Writer,
   bitFields,
   bits,
+  bytes,
   double,
   float,
   framed,
+  list,
   records,
   ref,
   rest,
+  struct,
   uint16_t,
   uint32_t,
   uint8_t,
@@ -30,7 +31,7 @@ const hex = (dv: DataView) =>
  *
  * - 编译期: `Assert<Equals<...>>` / `@ts-expect-error`. 推导错了 tsc 就编译不过 ——
  *   这类问题只有编译期断言才抓得到(旧版 `ref()` 声明成 `any`, 推导到
- *   `uint8_t[ref("len")]` 就断了, 运行时全对而类型上一个字都查不出来)。
+ *   `bytes(ref("len"))` 就断了, 运行时全对而类型上一个字都查不出来)。
  * - 运行时: 真的解一帧字节, 确认推出来的类型和实际值对得上。
  */
 type Equals<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B
@@ -42,7 +43,7 @@ type Assert<T extends true> = T;
 
 describe("类型推导", () => {
   it("标量", () => {
-    const F = new DynamicStructBuffer("F", {
+    const F = struct("F", {
       u8: uint8_t,
       u32: uint32_t,
       f: float,
@@ -78,7 +79,7 @@ describe("类型推导", () => {
   it("布尔语义的字段推出来是 number, 不是 boolean", () => {
     // 库里没有 bool / BOOL / BoolType: 宽度是 uintN_t 的事, 真值判断是调用方的事。
     // "折成 boolean" 是个只在类型上才看得出来的诱惑, 所以先把类型钉死在 number 上
-    const F = new DynamicStructBuffer("F", {
+    const F = struct("F", {
       ok1: uint8_t,
       ok4: uint32_t,
     });
@@ -97,21 +98,19 @@ describe("类型推导", () => {
     void (d.ok1 === true);
   });
 
-  it("单维 uint8 下标就是字节, 多维保持嵌套", () => {
-    const F = new DynamicStructBuffer("F", {
-      a: uint8_t[3],
-      b: uint8_t[2][2],
-      c: uint16_t[2],
+  it("单维 uint8 是字节段, 多维保持嵌套", () => {
+    const F = struct("F", {
+      a: bytes(3),
+      b: list(list(uint8_t, 2), 2),
+      c: list(uint16_t, 2),
     });
     type D = InferType<typeof F>;
     type _t = [
-      // 连续的 uint8 就是一段字节, 不是数字元组
+      // 字节段是 Uint8Array, 不是数字元组
       Assert<Equals<D["a"], Uint8Array>>,
-      // 元素比 1 字节宽就不是字节
+      // 列表元素是 number
+      Assert<Equals<D["b"], number[][]>>,
       Assert<Equals<D["c"], number[]>>
-      // b 是嵌套形状: 运行时给 number[][], 但**声明类型**只能给 Uint8Array[] ——
-      // 类型层看不到 deeps 的形状(只知道"下标一次"), 分不出 uint8_t[2] 和 uint8_t[2][2]。
-      // 这是已知的精度缺口, 运行时行为才是准的
     ];
 
     const d = F.decode(
@@ -126,19 +125,22 @@ describe("类型推导", () => {
   });
 
   it("ref 能穿过长度前缀(旧版 ref 是 any, 推导到这里就断了)", () => {
-    const F = new DynamicStructBuffer("F", {
+    const F = struct("F", {
       n: uint8_t,
-      body: uint8_t[ref("n")],
+      body: bytes(ref("n")),
     });
     type D = InferType<typeof F>;
-    type _t = [Assert<Equals<D["n"], number>>, Assert<Equals<D["body"], Uint8Array>>];
+    type _t = [
+      Assert<Equals<D["n"], number>>,
+      Assert<Equals<D["body"], Uint8Array>>
+    ];
 
     const d = F.decode(Uint8Array.from([2, 0xaa, 0xbb]));
     expect(d.body).toEqual(Uint8Array.from([0xaa, 0xbb]));
   });
 
   it("bits 是位序号, bitFields 是位宽", () => {
-    const F = new DynamicStructBuffer("F", {
+    const F = struct("F", {
       flags: bits(uint8_t, { a: 0, b: 2 }),
       perms: bitFields(uint8_t, { x: 1, y: 1, z: 1 }),
     });
@@ -155,12 +157,12 @@ describe("类型推导", () => {
     expect(d.perms).toEqual({ x: 1, y: 1, z: 0 });
   });
 
-  it("嵌套 DynamicStructBuffer / 内联对象字面量", () => {
-    const Inner = new DynamicStructBuffer("Inner", { x: uint16_t, y: float });
-    const Outer = new DynamicStructBuffer("Outer", {
+  it("嵌套结构体 / 内联结构体", () => {
+    const Inner = struct("Inner", { x: uint16_t, y: float });
+    const Outer = struct("Outer", {
       head: uint8_t,
       inner: Inner,
-      anon: { a: uint8_t, b: uint16_t },
+      anon: struct("anon", { a: uint8_t, b: uint16_t }),
     });
     type D = InferType<typeof Outer>;
     type _t = [
@@ -180,14 +182,10 @@ describe("类型推导", () => {
   });
 
   it("递归推导: 三层嵌套", () => {
-    const L3 = new DynamicStructBuffer("L3", { v: uint8_t });
-    const L2 = new DynamicStructBuffer("L2", { leaf: L3, tag: uint8_t });
-    const L1 = new DynamicStructBuffer("L1", { mid: L2, id: uint32_t });
-    type Def1 = InferType<
-      typeof L1 extends DynamicStructBuffer<infer S, any, any> ? S : never
-    >;
-    // Def1 已经是解码结果形状, InferDef 对形状是幂等的
-    type D = InferDef<Def1>;
+    const L3 = struct("L3", { v: uint8_t });
+    const L2 = struct("L2", { leaf: L3, tag: uint8_t });
+    const L1 = struct("L1", { mid: L2, id: uint32_t });
+    type D = InferDef<typeof L1.struct>;
     type _t = [
       Assert<
         Equals<D, { mid: { leaf: { v: number }; tag: number }; id: number }>
@@ -202,9 +200,9 @@ describe("类型推导", () => {
   });
 
   it("声明式字段: 字节段 / rest", () => {
-    const F = new DynamicStructBuffer("F", {
+    const F = struct("F", {
       n: uint8_t,
-      payload: uint8_t[ref("n")],
+      payload: bytes(ref("n")),
       tail: rest(),
     });
     type D = InferType<typeof F>;
@@ -220,8 +218,8 @@ describe("类型推导", () => {
   });
 
   it("records 的值类型跟着子结构体走, 且恒为数组", () => {
-    const Ent = new DynamicStructBuffer("Ent", { id: uint32_t, hp: uint16_t });
-    const F = new DynamicStructBuffer("F", { ents: records(Ent) });
+    const Ent = struct("Ent", { id: uint32_t, hp: uint16_t });
+    const F = struct("F", { ents: records(Ent) });
     type _t = [
       Assert<Equals<InferType<typeof F>["ents"], { id: number; hp: number }[]>>
     ];
@@ -240,23 +238,19 @@ describe("类型推导", () => {
       op: number;
       body: Uint8Array;
     }
-    const F = new DynamicStructBuffer("F", {
-      ops: framed<Op>(
-        {
-          read(c) {
-            const op = c.u8("op");
-            const n = c.u8("n");
-            return { op, body: c.bytes(n, "body") };
-          },
+    const F = struct("F", {
+      ops: framed<Op>({
+        read(c) {
+          const op = c.u8("op");
+          const n = c.u8("n");
+          return { op, body: c.bytes(n, "body") };
         },
-        {
-          write(w, v) {
-            w.u8(v.op);
-            w.u8(v.body.length);
-            w.bytes(v.body);
-          },
-        }
-      ),
+        write(w, v) {
+          w.u8(v.op);
+          w.u8(v.body.length);
+          w.bytes(v.body);
+        },
+      }),
     });
     type _t = [Assert<Equals<InferType<typeof F>["ops"], Op[]>>];
 
@@ -270,16 +264,16 @@ describe("类型推导", () => {
   it("decode() 的结果类型是推导出来的, 字段名拼错编译期就报错", () => {
     // 定长 8 字节的名字段(没有长度前缀)只能按字节拿: 库里没有字符串类型, 编码
     // 归调用方, 拿到的永远是字节
-    const Msg = new DynamicStructBuffer(
+    const Msg = struct(
       "msg",
       {
         uknow1: uint16_t,
         msg_type: uint8_t,
         msg_size: uint16_t,
-        msg: uint8_t[ref("msg_size")],
+        msg: bytes(ref("msg_size")),
         name_size: uint8_t,
-        name: uint8_t[ref("name_size")],
-        text: uint8_t[1],
+        name: bytes(ref("name_size")),
+        text: bytes(1),
       },
       { littleEndian: true }
     );
@@ -289,10 +283,10 @@ describe("类型推导", () => {
       Uint8Array.from([0, 0, 0, 0, 0, 2, 0x41, 0x42, 0x41])
     );
     const n: number = d.msg_type;
-    const bytes: Uint8Array = d.msg;
+    const msgBytes: Uint8Array = d.msg;
     const name: Uint8Array = d.name;
     const text: Uint8Array = d.text;
-    expect([n, bytes.length, Array.from(name), Array.from(text)]).toEqual([
+    expect([n, msgBytes.length, Array.from(name), Array.from(text)]).toEqual([
       0,
       0,
       [0x41, 0x42],
@@ -304,9 +298,9 @@ describe("类型推导", () => {
   });
 
   it("encode() 的入参是 Partial, 长度字段可以不带", () => {
-    const Msg = new DynamicStructBuffer("msg", {
+    const Msg = struct("msg", {
       len: uint8_t,
-      body: uint8_t[ref("len")],
+      body: bytes(ref("len")),
     });
     const dv = Msg.encode({ body: new Uint8Array([1, 2, 3]) });
     expect(Array.from(new Uint8Array(dv.buffer))).toEqual([3, 1, 2, 3]);
@@ -316,31 +310,29 @@ describe("类型推导", () => {
     void (() => Msg.encode({ bodyd: [1] }));
   });
 
-  it("InferDef 可以单独用(不经过 DynamicStructBuffer)", () => {
-    const c = uint8_t[ref("n")];
-    const b = uint8_t[2];
+  it("InferDef 可以单独用(不经过 struct)", () => {
+    const c = bytes(ref("n"));
+    const b = bytes(2);
     type D = InferDef<{
       a: typeof uint8_t;
       b: typeof b;
       c: typeof c;
     }>;
-    type _t = [
-      Assert<Equals<D, { a: number; b: Uint8Array; c: Uint8Array }>>
-    ];
+    type _t = [Assert<Equals<D, { a: number; b: Uint8Array; c: Uint8Array }>>];
 
-    const F = new DynamicStructBuffer("F", { n: uint8_t, c });
+    const F = struct("F", { n: uint8_t, c });
     type _t2 = [Assert<Equals<InferType<typeof F>["c"], Uint8Array>>];
     expect(F.decode(Uint8Array.from([2, 7, 8])).c).toEqual(
       Uint8Array.from([7, 8])
     );
   });
 
-  it("子结构体的下标就是数组(deeps 的层数)", () => {
-    const Item = new DynamicStructBuffer("item", { id: uint8_t });
-    const F = new DynamicStructBuffer("F", {
+  it("子结构体列表就是数组(层数由 list 嵌套决定)", () => {
+    const Item = struct("item", { id: uint8_t });
+    const F = struct("F", {
       one: Item,
-      list: Item[2],
-      grid: Item[2][2],
+      list: list(Item, 2),
+      grid: list(list(Item, 2), 2),
     });
     type D = InferType<typeof F>;
     type _t = [
@@ -349,9 +341,7 @@ describe("类型推导", () => {
       Assert<Equals<D["grid"], { id: number }[][]>>
     ];
 
-    const d = F.decode(
-      Uint8Array.from([1, 2, 3, 4, 5, 6, 7])
-    );
+    const d = F.decode(Uint8Array.from([1, 2, 3, 4, 5, 6, 7]));
     expect([d.one, d.list, d.grid]).toEqual([
       { id: 1 },
       [{ id: 2 }, { id: 3 }],
@@ -361,16 +351,16 @@ describe("类型推导", () => {
       ],
     ]);
 
-    // 长度为 1 也保持数组: 与 `uint8_t[1]` 的字节段形状一致, 不再特判塌成标量
-    const one = new DynamicStructBuffer("one", { list: Item[1] });
+    // 长度为 1 也保持数组: 与字节段的形状一致, 不再特判塌成标量
+    const one = struct("one", { list: list(Item, 1) });
     expect(one.decode(Uint8Array.from([9]))).toEqual({ list: [{ id: 9 }] });
   });
 
   it("variant 的分支字段并进父对象, 且都是可选的", () => {
-    const Pkt = new DynamicStructBuffer("pkt", {
+    const Pkt = struct("pkt", {
       msg_type: uint8_t,
       body: variant("msg_type", {
-        1: { name: uint8_t[3] },
+        1: { name: bytes(3) },
         2: { x: uint32_t, y: uint32_t },
       }),
     });
@@ -395,7 +385,7 @@ describe("类型推导", () => {
   });
 
   it("字节段的 decode 值和 encode 入参是同一种类型", () => {
-    const F = new DynamicStructBuffer("F", {
+    const F = struct("F", {
       op: uint8_t,
       body: rest(),
     });

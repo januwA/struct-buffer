@@ -1,14 +1,15 @@
 import {
   bitFields,
+  bytes,
   Cursor,
   DecodeError,
-  discriminated,
   EncodeError,
-  DynamicStructBuffer,
   framed,
+  list,
   records,
   ref,
   rest,
+  struct,
   uint16_t,
   uint32_t,
   uint8_t,
@@ -21,19 +22,12 @@ const hex = (dv: DataView) =>
     dv.getUint8(i).toString(16).padStart(2, "0")
   ).join(" ");
 
-type Equals<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B
-  ? 1
-  : 2
-  ? true
-  : false;
-type Assert<T extends true> = T;
-
-describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
-  it("嵌套 DynamicStructBuffer 列表 encode/decode 往返", () => {
-    const Item = new DynamicStructBuffer("item", { id: uint32_t, n: uint8_t });
-    const Bag = new DynamicStructBuffer("bag", {
+describe("单引擎回归(实测 8 个 bug)", () => {
+  it("嵌套结构体列表 encode/decode 往返", () => {
+    const Item = struct("item", { id: uint32_t, n: uint8_t });
+    const Bag = struct("bag", {
       item_count: uint8_t,
-      items: Item[ref("item_count")],
+      items: list(Item, ref("item_count")),
     });
 
     const encoded = Bag.encode({
@@ -57,24 +51,18 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
     });
   });
 
-  it("嵌套结构体多维 deeps 往返", () => {
-    const Item = new DynamicStructBuffer("item", { id: uint8_t });
-    const Deep = new DynamicStructBuffer("deep", {
+  it("嵌套结构体多维列表往返", () => {
+    const Item = struct("item", { id: uint8_t });
+    const Deep = struct("deep", {
       tag: uint8_t,
-      items: Item[2][2],
+      items: list(list(Item, 2), 2),
     });
 
     const encoded = Deep.encode({
       tag: 3,
       items: [
-        [
-          { id: 1 },
-          { id: 2 },
-        ],
-        [
-          { id: 3 },
-          { id: 4 },
-        ],
+        [{ id: 1 }, { id: 2 }],
+        [{ id: 3 }, { id: 4 }],
       ],
     });
     expect(encoded.byteLength).toBe(1 + 4);
@@ -82,21 +70,15 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
     expect(Deep.decode(encoded)).toEqual({
       tag: 3,
       items: [
-        [
-          { id: 1 },
-          { id: 2 },
-        ],
-        [
-          { id: 3 },
-          { id: 4 },
-        ],
+        [{ id: 1 }, { id: 2 }],
+        [{ id: 3 }, { id: 4 }],
       ],
     });
   });
 
   it("前向 ref 的 encode 仍然可用(长度头可以声明在数据之后)", () => {
-    const Fwd = new DynamicStructBuffer("fwd", {
-      data: uint8_t[ref("len")],
+    const Fwd = struct("fwd", {
+      data: bytes(ref("len")),
       len: uint8_t,
     });
     const encoded = Fwd.encode({
@@ -106,8 +88,8 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
   });
 
   it("前向 ref 的 decode 明确报错, 不再静默产出垃圾", () => {
-    const Fwd = new DynamicStructBuffer("fwd", {
-      data: uint8_t[ref("len")],
+    const Fwd = struct("fwd", {
+      data: bytes(ref("len")),
       len: uint8_t,
     });
     // 旧实现 decode 出 {data: [], len: 1} —— 看起来成功, 实际完全错
@@ -115,20 +97,23 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
     expect(() => Fwd.decode([0, 1])).toThrow(/尚未解析/);
   });
 
-  it("ref 驱动的列表不再静默返回空数组", () => {
-    const Padded = new DynamicStructBuffer("padded", {
+  it("ref 驱动的字节段不再静默返回空", () => {
+    const Padded = struct("padded", {
       n: uint8_t,
-      pad: uint8_t[ref("n")],
+      pad: bytes(ref("n")),
     });
-    const encoded = Padded.encode({ n: 3 });
+    const encoded = Padded.encode({ n: 3 } as any);
     expect(encoded.byteLength).toBe(4);
-    expect(Padded.decode(encoded)).toEqual({ n: 3, pad: Uint8Array.from([0, 0, 0]) });
+    expect(Padded.decode(encoded)).toEqual({
+      n: 3,
+      pad: Uint8Array.from([0, 0, 0]),
+    });
   });
 
   it("encode 不修改调用方对象", () => {
-    const Msg = new DynamicStructBuffer("msg", {
+    const Msg = struct("msg", {
       msg_size: uint16_t,
-      msg: uint8_t[ref("msg_size")],
+      msg: bytes(ref("msg_size")),
     });
     const input = { msg: new Uint8Array([1, 2, 3]) } as any;
     const snapshot = JSON.stringify(input);
@@ -138,13 +123,13 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
   });
 
   it("中文正文按字节长度而非字符长度", () => {
-    const Chat = new DynamicStructBuffer("chat", {
+    const Chat = struct("chat", {
       text_len: uint16_t,
-      text: uint8_t[ref("text_len")],
+      text: bytes(ref("text_len")),
     });
     // "世界" 的 length 是 2, UTF-8 是 6 字节 —— 长度头写的是字节数, 拿字符数会把正文截掉.
     // 编码是调用方的事: 库只看到 6 个字节, 不知道它们是"世界"
-    const encoded = Chat.encode({ text: new TextEncoder().encode("世界") });
+    const encoded = Chat.encode({ text: new TextEncoder().encode("世界") } as any);
     expect(encoded.byteLength).toBe(2 + 6);
     expect(hex(encoded)).toBe("00 06 e4 b8 96 e7 95 8c");
     expect(Chat.decode(encoded)).toEqual({
@@ -154,9 +139,9 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
   });
 
   it("畸形长度抛出带结构名/字段名/偏移的 DecodeError", () => {
-    const Msg = new DynamicStructBuffer("msg", {
+    const Msg = struct("msg", {
       msg_size: uint16_t,
-      msg: uint8_t[ref("msg_size")],
+      msg: bytes(ref("msg_size")),
     });
     let err: any;
     try {
@@ -173,17 +158,14 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
   });
 
   it("bitFields 列表的每个元素是独立对象", () => {
-    const Rec = new DynamicStructBuffer("rec", {
+    const Rec = struct("rec", {
       count: uint8_t,
       // bitFields 的值是"该字段占几位"(连续位域), 不是位号; 这里三个都占 1 位
-      flags: bitFields(uint8_t, { a: 1, b: 1, c: 1 })[ref("count")],
+      flags: list(bitFields(uint8_t, { a: 1, b: 1, c: 1 }), ref("count")),
     });
     const rec = Rec.encode({
       count: 2,
-      flags: [
-        { a: 1, c: 1 },
-        { b: 1 },
-      ],
+      flags: [{ a: 1, c: 1 }, { b: 1 }],
     } as any);
     const out = Rec.decode(rec);
     expect(out.flags).toEqual([
@@ -195,12 +177,12 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
   });
 
   it("嵌套子结构体的 littleEndian 由子结构体自己决定", () => {
-    const Child = new DynamicStructBuffer(
+    const Child = struct(
       "child",
       { a: uint16_t, b: uint16_t },
       { littleEndian: true }
     );
-    const Parent = new DynamicStructBuffer("parent", {
+    const Parent = struct("parent", {
       c: uint16_t,
       child: Child,
     });
@@ -218,8 +200,8 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
   });
 
   it("父级 littleEndian 会向下继承", () => {
-    const Child = new DynamicStructBuffer("child", { a: uint16_t });
-    const Parent = new DynamicStructBuffer(
+    const Child = struct("child", { a: uint16_t });
+    const Parent = struct(
       "parent",
       { c: uint16_t, child: Child },
       { littleEndian: true }
@@ -231,32 +213,28 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
 
   it("同一个子结构体放进不同字节序的父级, 各自按自己的父级走", () => {
     // 子结构体自己没配字节序, 它的字节序只能由**放它的那个父级**决定。
-    // 这条曾经是坏的: DynamicStructBuffer 会直接复用自己构造期算好的 def,
+    // 这条曾经是坏的: 子结构体会直接复用自己构造期算好的 def,
     // 而那份 def 是拿 `littleEndian ?? false` 算的 —— "没配" 被焊死成大端,
     // 父级之后再怎么配都传不进去
-    const Child = new DynamicStructBuffer("child", { a: uint16_t });
-    const BE = new DynamicStructBuffer("be", { child: Child });
-    const LE = new DynamicStructBuffer("le", { child: Child }, { littleEndian: true });
+    const Child = struct("child", { a: uint16_t });
+    const BE = struct("be", { child: Child });
+    const LE = struct("le", { child: Child }, { littleEndian: true });
 
     expect(hex(BE.encode({ child: { a: 0x0304 } }))).toBe("03 04");
     expect(hex(LE.encode({ child: { a: 0x0304 } }))).toBe("04 03");
 
     // 子结构体自己配了就谁也不听 —— 两条父级下都一样
-    const Own = new DynamicStructBuffer(
-      "own",
-      { a: uint16_t },
-      { littleEndian: true }
-    );
-    const P1 = new DynamicStructBuffer("p1", { c: Own }, { littleEndian: false });
-    const P2 = new DynamicStructBuffer("p2", { c: Own }, { littleEndian: true });
+    const Own = struct("own", { a: uint16_t }, { littleEndian: true });
+    const P1 = struct("p1", { c: Own }, { littleEndian: false });
+    const P2 = struct("p2", { c: Own }, { littleEndian: true });
     expect(hex(P1.encode({ c: { a: 0x0304 } }))).toBe("04 03");
     expect(hex(P2.encode({ c: { a: 0x0304 } }))).toBe("04 03");
   });
 
   it("字节序穿透多层嵌套", () => {
-    const L3 = new DynamicStructBuffer("l3", { v: uint16_t });
-    const L2 = new DynamicStructBuffer("l2", { deep: L3 });
-    const L1 = new DynamicStructBuffer(
+    const L3 = struct("l3", { v: uint16_t });
+    const L2 = struct("l2", { deep: L3 });
+    const L1 = struct(
       "l1",
       { mid: L2, v: uint16_t },
       { littleEndian: true }
@@ -267,9 +245,9 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
   });
 
   it("encode 写进调用方给的定长 buffer", () => {
-    const Msg = new DynamicStructBuffer("msg", {
+    const Msg = struct("msg", {
       msg_size: uint16_t,
-      msg: uint8_t[ref("msg_size")],
+      msg: bytes(ref("msg_size")),
     });
     const view = new DataView(new ArrayBuffer(16));
     const ret = Msg.encode(
@@ -287,25 +265,28 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
 
 describe("声明式字段: rest / records / variant / framed", () => {
   it("rest 吃掉剩余全部字节", () => {
-    const Pkt = new DynamicStructBuffer("pkt", {
+    const Pkt = struct("pkt", {
       op: uint8_t,
       body: rest(),
     });
     const encoded = Pkt.encode({ op: 9, body: new Uint8Array([1, 2, 3, 4]) });
     expect(hex(encoded)).toBe("09 01 02 03 04");
-    expect(Pkt.decode(encoded)).toEqual({ op: 9, body: new Uint8Array([1, 2, 3, 4]) });
+    expect(Pkt.decode(encoded)).toEqual({
+      op: 9,
+      body: new Uint8Array([1, 2, 3, 4]),
+    });
   });
 
   it("rest 与前面的长度前缀字段共存", () => {
-    const Pkt = new DynamicStructBuffer("pkt", {
+    const Pkt = struct("pkt", {
       text_len: uint16_t,
-      text: uint8_t[ref("text_len")],
+      text: bytes(ref("text_len")),
       tail: rest(),
     });
     const encoded = Pkt.encode({
       text: new TextEncoder().encode("hi"),
       tail: new Uint8Array([0xaa, 0xbb]),
-    });
+    } as any);
     expect(hex(encoded)).toBe("00 02 68 69 aa bb");
     expect(Pkt.decode(encoded)).toEqual({
       text_len: 2,
@@ -314,10 +295,10 @@ describe("声明式字段: rest / records / variant / framed", () => {
     });
   });
 
-  it("uint8_t[ref(..)] 出 Uint8Array 而不是 number[]", () => {
-    const Pkt = new DynamicStructBuffer("pkt", {
+  it("bytes(ref) 出 Uint8Array 而不是 number[]", () => {
+    const Pkt = struct("pkt", {
       len: uint8_t,
-      raw: uint8_t[ref("len")],
+      raw: bytes(ref("len")),
     });
     const out = Pkt.decode([3, 1, 2, 3]);
     expect(out.raw).toBeInstanceOf(Uint8Array);
@@ -325,9 +306,9 @@ describe("声明式字段: rest / records / variant / framed", () => {
   });
 
   it("字节段只收字节: string 既不在类型里, 运行时也直接拒绝", () => {
-    const Pkt = new DynamicStructBuffer("pkt", {
+    const Pkt = struct("pkt", {
       len: uint8_t,
-      raw: uint8_t[ref("len")],
+      raw: bytes(ref("len")),
     });
 
     // 编码归调用方 —— 下面这行过不去, 因为库不认识"文本"这个概念
@@ -339,8 +320,8 @@ describe("声明式字段: rest / records / variant / framed", () => {
   });
 
   it("records 把定长子记录填到末尾", () => {
-    const Ent = new DynamicStructBuffer("ent", { id: uint16_t, hp: uint16_t });
-    const Pkt = new DynamicStructBuffer("pkt", { ents: records(Ent) });
+    const Ent = struct("ent", { id: uint16_t, hp: uint16_t });
+    const Pkt = struct("pkt", { ents: records(Ent) });
     const encoded = Pkt.encode({
       ents: [
         { id: 1, hp: 10 },
@@ -359,18 +340,16 @@ describe("声明式字段: rest / records / variant / framed", () => {
   });
 
   it("records 遇到变长子结构体直接报错而不是猜尺寸", () => {
-    const Bad = new DynamicStructBuffer("bad", {
+    const Bad = struct("bad", {
       len: uint8_t,
-      data: uint8_t[ref("len")],
+      data: bytes(ref("len")),
     });
-    expect(() => new DynamicStructBuffer("p", { x: records(Bad) })).toThrow(
-      /变长字段/
-    );
+    expect(() => struct("p", { x: records(Bad) })).toThrow(/变长字段/);
   });
 
   it("records 带显式 spec 也恒为数组, 不再只留第一个元素", () => {
-    const Ent = new DynamicStructBuffer("ent", { id: uint16_t });
-    const Pkt = new DynamicStructBuffer("pkt", {
+    const Ent = struct("ent", { id: uint16_t });
+    const Pkt = struct("pkt", {
       n: uint8_t,
       ents: records(Ent, ref("n")),
     });
@@ -380,18 +359,18 @@ describe("声明式字段: rest / records / variant / framed", () => {
       ents: [{ id: 10 }, { id: 20 }, { id: 30 }],
     });
 
-    const Fixed = new DynamicStructBuffer("fixed", { ents: records(Ent, 2) });
+    const Fixed = struct("fixed", { ents: records(Ent, 2) });
     expect(Fixed.decode([0, 1, 0, 2])).toEqual({
       ents: [{ id: 1 }, { id: 2 }],
     });
   });
 
   it("records 带变长子结构体 + ref spec 也能解成数组", () => {
-    const Ent = new DynamicStructBuffer("ent", {
+    const Ent = struct("ent", {
       len: uint8_t,
-      data: uint8_t[ref("len")],
+      data: bytes(ref("len")),
     });
-    const Pkt = new DynamicStructBuffer("pkt", {
+    const Pkt = struct("pkt", {
       n: uint8_t,
       ents: records(Ent, ref("n")),
     });
@@ -405,17 +384,17 @@ describe("声明式字段: rest / records / variant / framed", () => {
   });
 
   it("variant 按判别字段平铺展开分支", () => {
-    const Pkt = new DynamicStructBuffer("pkt", {
+    const Pkt = struct("pkt", {
       msg_type: uint8_t,
       body: variant("msg_type", {
-        1: { name: uint8_t[3] },
+        1: { name: bytes(3) },
         2: { x: uint32_t, y: uint32_t },
       }),
     });
 
-    expect(hex(Pkt.encode({ msg_type: 1, name: new Uint8Array([0x61, 0x62, 0x63]) }))).toBe(
-      "01 61 62 63"
-    );
+    expect(
+      hex(Pkt.encode({ msg_type: 1, name: new Uint8Array([0x61, 0x62, 0x63]) }))
+    ).toBe("01 61 62 63");
     expect(Pkt.decode([1, 0x61, 0x62, 0x63])).toEqual({
       msg_type: 1,
       name: Uint8Array.from([0x61, 0x62, 0x63]),
@@ -428,7 +407,7 @@ describe("声明式字段: rest / records / variant / framed", () => {
   });
 
   it("variant 未知判别值报错时列出已有分支", () => {
-    const Pkt = new DynamicStructBuffer("pkt", {
+    const Pkt = struct("pkt", {
       msg_type: uint8_t,
       body: variant("msg_type", { 1: { a: uint8_t } }),
     });
@@ -437,7 +416,7 @@ describe("声明式字段: rest / records / variant / framed", () => {
   });
 
   it("variant 未知判别值在 encode 方向抛 EncodeError, 不是 DecodeError", () => {
-    const Pkt = new DynamicStructBuffer("pkt", {
+    const Pkt = struct("pkt", {
       msg_type: uint8_t,
       body: variant("msg_type", { 1: { a: uint8_t } }),
     });
@@ -447,11 +426,12 @@ describe("声明式字段: rest / records / variant / framed", () => {
     );
   });
 
-  it("discriminated 把判别字段排在 variant 之前", () => {
-    const Pkt = new DynamicStructBuffer("pkt", {
+  it("variant 的判别字段排在 variant 之前(替代 discriminated)", () => {
+    const Pkt = struct("pkt", {
       chan: uint8_t,
-      ...discriminated("body", "msg_type", uint8_t, {
-        0x0a: { len: uint16_t, text: uint8_t[ref("len")] },
+      msg_type: uint8_t,
+      body: variant("msg_type", {
+        0x0a: { len: uint16_t, text: bytes(ref("len")) },
         0x0b: { id: uint32_t },
       }),
     });
@@ -471,23 +451,19 @@ describe("声明式字段: rest / records / variant / framed", () => {
   });
 
   it("framed 逐个读自定界子帧直到字节耗尽", () => {
-    const Stream = new DynamicStructBuffer("stream", {
-      ops: framed(
-        {
-          read: (c) => {
-            const op = c.u8("op");
-            const n = c.u8("flen");
-            return { op, body: c.bytes(n, "body") };
-          },
+    const Stream = struct("stream", {
+      ops: framed({
+        read: (c) => {
+          const op = c.u8("op");
+          const n = c.u8("flen");
+          return { op, body: c.bytes(n, "body") };
         },
-        {
-          write: (w, v) => {
-            w.u8(v.op);
-            w.u8(v.body.length);
-            w.bytes(v.body);
-          },
-        }
-      ),
+        write: (w, v) => {
+          w.u8(v.op);
+          w.u8(v.body.length);
+          w.bytes(v.body);
+        },
+      }),
     });
 
     const wire = [0x01, 0x02, 0xaa, 0xbb, 0x02, 0x01, 0xcc];
@@ -512,22 +488,18 @@ describe("声明式字段: rest / records / variant / framed", () => {
   });
 
   it("framed 子帧用 region 划窗, 帧尾残余不漏进父结构", () => {
-    const Stream = new DynamicStructBuffer("stream", {
+    const Stream = struct("stream", {
       tail: uint8_t,
-      ops: framed(
-        {
-          read: (c) => {
-            const n = c.u8("n");
-            return c.region(n, "frame", (f) => f.rest(""));
-          },
+      ops: framed({
+        read: (c) => {
+          const n = c.u8("n");
+          return c.region(n, "frame", (f) => f.rest(""));
         },
-        {
-          write: (w, v) => {
-            w.u8(v.length);
-            w.bytes(v);
-          },
-        }
-      ),
+        write: (w, v) => {
+          w.u8(v.length);
+          w.bytes(v);
+        },
+      }),
     });
     // 第一个子帧声明 4 字节但只给 2 字节有效数据 + 2 字节填充
     const out = Stream.decode([0xff, 0x04, 0x11, 0x22, 0x00, 0x00, 0x01, 0x33]);

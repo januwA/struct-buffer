@@ -1,4 +1,12 @@
-import { uint32_t, bits, DynamicStructBuffer, uint16_t, uint8_t, uint64_t } from "../src";
+import {
+  uint32_t,
+  bits,
+  uint16_t,
+  uint8_t,
+  uint64_t,
+  list,
+  struct,
+} from "../src";
 
 describe("bits test", () => {
   it("decode and encode", () => {
@@ -32,17 +40,20 @@ describe("bits test", () => {
   });
 
   it("test struct", () => {
-    const struct = new DynamicStructBuffer("Test", {
+    const Test = struct("Test", {
       id: uint16_t,
-      eflag: bits(uint32_t, {
-        PF: 2,
-        ZF: 6,
-        TF: 8,
-        IF: 9,
-      })[2],
+      eflag: list(
+        bits(uint32_t, {
+          PF: 2,
+          ZF: 6,
+          TF: 8,
+          IF: 9,
+        }),
+        2
+      ),
     });
 
-    const data = struct.decode([
+    const data = Test.decode([
       0, 1, 0x00, 0x00, 0x02, 0x46, 0x00, 0x00, 0x02, 0x46,
     ]);
     expect(data.eflag.length).toBe(2);
@@ -50,12 +61,12 @@ describe("bits test", () => {
 
   it("列表里的空洞元素补 0, 不再抛裸 TypeError", () => {
     const EFLAG = bits(uint8_t, { a: 0, b: 1 });
-    expect(EFLAG[2].decode([0b10, 0b01])).toEqual([
+    expect(list(EFLAG, 2).decode([0b10, 0b01])).toEqual([
       { a: 0, b: 1 },
       { a: 1, b: 0 },
     ]);
     // 第二个元素缺位: 旧实现直接 `Object.entries(undefined[i])` ⇒ TypeError
-    const view = (EFLAG[2] as any).encode([{ a: 1, b: 0 }, undefined]);
+    const view = list(EFLAG, 2).encode([{ a: 1, b: 0 }, undefined] as any);
     expect(Array.from(new Uint8Array(view.buffer))).toEqual([0b01, 0b00]);
   });
 

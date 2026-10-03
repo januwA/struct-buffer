@@ -1,21 +1,23 @@
 import {
+  bytes,
   createDataView,
-  DynamicStructBuffer,
+  list,
   makeDataView,
   ref,
+  struct,
   uint16_t,
   uint32_t,
   uint8_t,
 } from "../src";
 
-describe("DynamicStructBuffer", () => {
+describe("struct", () => {
   it("user message packet: decode and encode", () => {
-    const MessageStruct = new DynamicStructBuffer("msg", {
+    const MessageStruct = struct("msg", {
       size: uint16_t,
       uknow1: uint8_t,
       uknow2: uint16_t,
       msg_size: uint16_t,
-      msg: uint8_t[ref("msg_size")],
+      msg: bytes(ref("msg_size")),
     });
 
     const payload = new Uint8Array([0x11, 0x22, 0x33, 0x44]);
@@ -41,12 +43,12 @@ describe("DynamicStructBuffer", () => {
   });
 
   it("auto-fill ref field length during encode", () => {
-    const MessageStruct = new DynamicStructBuffer("msg", {
+    const MessageStruct = struct("msg", {
       size: uint16_t,
       uknow1: uint8_t,
       uknow2: uint16_t,
       msg_size: uint16_t,
-      msg: uint8_t[ref("msg_size")],
+      msg: bytes(ref("msg_size")),
     });
 
     // Omit msg_size; it should be auto-derived from msg.length
@@ -65,10 +67,10 @@ describe("DynamicStructBuffer", () => {
   });
 
   it("dynamic text field with ref: 长度按字节数回填, 编码归调用方", () => {
-    const ChatPacket = new DynamicStructBuffer("chat", {
+    const ChatPacket = struct("chat", {
       channel: uint8_t,
       text_len: uint16_t,
-      text: uint8_t[ref("text_len")],
+      text: bytes(ref("text_len")),
     });
 
     const encoded = ChatPacket.encode({
@@ -89,14 +91,14 @@ describe("DynamicStructBuffer", () => {
   });
 
   it("dynamic array of nested struct", () => {
-    const Item = new DynamicStructBuffer("item", {
+    const Item = struct("item", {
       id: uint32_t,
       count: uint16_t,
     });
 
-    const Bag = new DynamicStructBuffer("bag", {
+    const Bag = struct("bag", {
       item_count: uint8_t,
-      items: Item[ref("item_count")],
+      items: list(Item, ref("item_count")),
     });
 
     const encoded = Bag.encode({
@@ -120,9 +122,9 @@ describe("DynamicStructBuffer", () => {
 
   it("ref with transform function", () => {
     // Length header represents byte length + 2
-    const Transformed = new DynamicStructBuffer("tf", {
+    const Transformed = struct("tf", {
       hdr_len: uint16_t,
-      data: uint8_t[ref("hdr_len", (v) => v - 2)],
+      data: bytes(ref("hdr_len", (v) => v - 2)),
     });
 
     const encoded = Transformed.encode({
@@ -135,5 +137,11 @@ describe("DynamicStructBuffer", () => {
     const decoded = Transformed.decode(encoded);
     expect(decoded.hdr_len).toBe(5);
     expect(decoded.data).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  it("makeDataView 可用作编码缓冲(不再依赖 DynamicStructBuffer)", () => {
+    expect(createDataView(3).byteLength).toBe(3);
+    const buf = makeDataView([0, 0, 0]);
+    expect(buf.byteLength).toBe(3);
   });
 });

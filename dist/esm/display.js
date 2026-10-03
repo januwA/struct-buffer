@@ -1,26 +1,21 @@
 export function display(view, type, options) {
-    options = Object.assign({
-        hex: true,
-        littleEndian: false,
-    }, options);
+    const node = type.node;
+    const opts = Object.assign({ hex: true, littleEndian: false }, options);
     let offset = 0;
     const result = [];
     while (true) {
         try {
-            let value = view[type.get](offset, options.littleEndian);
-            if (options.hex) {
+            let value = view[node.get](offset, opts.littleEndian);
+            if (opts.hex) {
                 value = value
                     .toString(16)
                     .toUpperCase()
-                    .padStart(type.size * 2, "0");
+                    .padStart(node.size * 2, "0");
             }
-            result.push({
-                offset,
-                value,
-            });
-            offset += type.size;
+            result.push({ offset, value });
+            offset += node.size;
         }
-        catch (error) {
+        catch {
             break;
         }
     }

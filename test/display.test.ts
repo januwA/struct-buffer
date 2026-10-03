@@ -1,4 +1,14 @@
-import { uint32_t, uint8_t, uint16_t, uint64_t, float, double, display, makeDataView } from "../src";
+import {
+  uint32_t,
+  uint8_t,
+  uint16_t,
+  uint64_t,
+  float,
+  double,
+  list,
+  display,
+  makeDataView,
+} from "../src";
 
 describe("test display", () => {
   const view: DataView = makeDataView([1, 2, 3, 4, 5, 6, 7, 8]);
@@ -22,7 +32,9 @@ describe("test display", () => {
   });
 
   it("test float", () => {
-    const data = display(float[2].encode([22.2, 10.1]), float, { hex: false });
+    const data = display(list(float, 2).encode([22.2, 10.1]), float, {
+      hex: false,
+    });
     expect(Math.round(data[0].value)).toBe(22);
     expect(data[1].offset).toBe(4);
     expect(Math.round(data[1].value)).toBe(10);

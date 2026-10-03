@@ -87,6 +87,16 @@ export class Writer {
         this.buf.setBigUint64(this.pos, BigInt(v), this.opts.littleEndian);
         this.pos += 8;
     }
+    i64(v) {
+        this.grow(8);
+        this.buf.setBigInt64(this.pos, BigInt(v), this.opts.littleEndian);
+        this.pos += 8;
+    }
+    accessor(size, set, isBig, value, le) {
+        this.grow(size);
+        this.buf[set](this.pos, isBig ? BigInt(value) : value, le);
+        this.pos += size;
+    }
     bytes(src) {
         this.grow(src.length);
         for (let i = 0; i < src.length; i++)

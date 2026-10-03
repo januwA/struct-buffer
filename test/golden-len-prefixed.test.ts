@@ -7,25 +7,25 @@
  * - 布局: uknow1:u16 | msg_type:u8 | msg_size:u16 | msg[u8 x msg_size]
  *         | name_size:u8 | name[u8 x name_size] | uknow3:u8[8]
  * - 全程 little-endian
- * - 正文是 **GBK**, 所以按字节拿(`uint8_t[n]`)再自己 GBK 解码 —— 库里
+ * - 正文是 **GBK**, 所以按字节拿(`bytes(n)`)再自己 GBK 解码 —— 库里
  *   没有字符串类型, 按 UTF-8 解必然乱码
  *
  * 数据是合成的(见 fixtures/len-prefixed.ts), 覆盖长度前缀、自引用长度、
  * 定长尾巴与 GBK 双字节文本。
  */
-import { DynamicStructBuffer, ref, uint16_t, uint8_t } from "../src";
+import { bytes, ref, struct, uint16_t, uint8_t } from "../src";
 import { LEN_PREFIXED } from "./fixtures/len-prefixed";
 
-const MessageStruct = new DynamicStructBuffer(
+const MessageStruct = struct(
   "msg",
   {
     uknow1: uint16_t,
     msg_type: uint8_t, // 1 玩家消息, 2 系统消息, ...
     msg_size: uint16_t,
-    msg: uint8_t[ref("msg_size")],
+    msg: bytes(ref("msg_size")),
     name_size: uint8_t,
-    name: uint8_t[ref("name_size")],
-    uknow3: uint8_t[8],
+    name: bytes(ref("name_size")),
+    uknow3: bytes(8),
   },
   { littleEndian: true }
 );
@@ -77,7 +77,9 @@ describe("golden: 长度前缀 + GBK 文本布局", () => {
       expect(5 + rec.msg_size + 1 + rec.name_size + 8).toBe(rec.size);
     }
     // 覆盖多种 msg_type, 别只测一种; 同时要含空 msg / 空 name 的边界
-    expect(new Set(RECORDS.map((r) => r.msg_type))).toEqual(new Set([0, 1, 2, 4, 7, 255]));
+    expect(new Set(RECORDS.map((r) => r.msg_type))).toEqual(
+      new Set([0, 1, 2, 4, 7, 255])
+    );
     expect(RECORDS.some((r) => r.msg_size === 0)).toBe(true);
     expect(RECORDS.some((r) => r.name_size === 0)).toBe(true);
   });

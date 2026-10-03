@@ -1,22 +1,23 @@
 import {
+  bytes,
+  codec,
   Cursor,
   DecodeError,
-  DynamicStructBuffer,
-  InferType,
-  field,
   float,
   framed,
+  InferType,
+  list,
   ref,
   rest,
   skip,
+  struct,
   uint8_t,
   uint16_t,
   uint32_t,
   variant,
 } from "../src";
-import type { Field } from "../src/field";
 
-const bytes = (dv: DataView) => Array.from(new Uint8Array(dv.buffer));
+const bytesOf = (dv: DataView) => Array.from(new Uint8Array(dv.buffer));
 
 /**
  * 定宽字节字段的宽度语义, 以及被**扔掉**的那条约定。
@@ -29,18 +30,16 @@ const bytes = (dv: DataView) => Array.from(new Uint8Array(dv.buffer));
  */
 describe("定宽字节字段", () => {
   it("encode 写满宽度: 短补 NUL, 长截断", () => {
-    const P = new DynamicStructBuffer("p", {
+    const P = struct("p", {
       head: uint8_t,
-      name: uint8_t[8],
+      name: bytes(8),
       tail: uint8_t,
     });
     expect(
-      bytes(P.encode({ head: 1, name: new Uint8Array([0x61, 0x62]), tail: 9 }))
-    ).toEqual([
-      1, 0x61, 0x62, 0, 0, 0, 0, 0, 0, 9,
-    ]);
+      bytesOf(P.encode({ head: 1, name: new Uint8Array([0x61, 0x62]), tail: 9 }))
+    ).toEqual([1, 0x61, 0x62, 0, 0, 0, 0, 0, 0, 9]);
     expect(
-      bytes(
+      bytesOf(
         P.encode({
           head: 1,
           name: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
@@ -49,13 +48,15 @@ describe("定宽字节字段", () => {
       )
     ).toEqual([1, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
     // 缺省值补满: 长度字段不存在时同样不能少写
-    expect(bytes(P.encode({ head: 1 }))).toEqual([1, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(bytesOf(P.encode({ head: 1 } as any))).toEqual([
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
   });
 
   it("decode 原样给满宽度, 不替调用方截 NUL", () => {
-    const P = new DynamicStructBuffer("p", {
+    const P = struct("p", {
       head: uint8_t,
-      name: uint8_t[8],
+      name: bytes(8),
       tail: uint8_t,
     });
     const d = P.decode(Uint8Array.from([1, 0x61, 0x00, 0, 0, 0, 0, 0, 0, 9]));
@@ -79,37 +80,35 @@ describe("定宽字节字段", () => {
   });
 
   it("定宽字节段同样写满宽度", () => {
-    const P = new DynamicStructBuffer("p", {
+    const P = struct("p", {
       head: uint8_t,
-      pad: uint8_t[4],
+      pad: bytes(4),
       tail: uint8_t,
     });
     expect(
-      bytes(P.encode({ head: 1, pad: new Uint8Array([0xaa]), tail: 9 }))
-    ).toEqual([
-      1, 0xaa, 0, 0, 0, 9,
-    ]);
+      bytesOf(P.encode({ head: 1, pad: new Uint8Array([0xaa]), tail: 9 }))
+    ).toEqual([1, 0xaa, 0, 0, 0, 9]);
     expect(
-      bytes(P.encode({ head: 1, pad: new Uint8Array([1, 2, 3, 4, 5]), tail: 9 }))
-    ).toEqual([
-      1, 1, 2, 3, 4, 9,
-    ]);
-    expect(Array.from(P.decode(Uint8Array.from([1, 0xaa, 0, 0, 0, 9])).pad)).toEqual([
-      0xaa, 0, 0, 0,
-    ]);
+      bytesOf(
+        P.encode({ head: 1, pad: new Uint8Array([1, 2, 3, 4, 5]), tail: 9 })
+      )
+    ).toEqual([1, 1, 2, 3, 4, 9]);
+    expect(
+      Array.from(P.decode(Uint8Array.from([1, 0xaa, 0, 0, 0, 9])).pad)
+    ).toEqual([0xaa, 0, 0, 0]);
   });
 });
 
 /** README 里的示例必须真的跑得起来 —— 文档跟实现各说各话是最贵的坑 */
 describe("README 示例", () => {
   it("变长字段: encode 回填长度且不改入参", () => {
-    const Msg = new DynamicStructBuffer(
+    const Msg = struct(
       "msg",
       {
         type: uint8_t,
         len: uint16_t,
-        payload: uint8_t[ref("len")],
-        name: uint8_t[8],
+        payload: bytes(ref("len")),
+        name: bytes(8),
       },
       { littleEndian: true }
     );
@@ -119,7 +118,7 @@ describe("README 示例", () => {
       name: new Uint8Array([0x61, 0x62, 0x63]),
     };
     const dv = Msg.encode(obj);
-    expect(bytes(dv)).toEqual([
+    expect(bytesOf(dv)).toEqual([
       1, 2, 0, 0x41, 0x42, 0x61, 0x62, 0x63, 0, 0, 0, 0, 0,
     ]);
     // encode 在副本上回填长度, 原来的 Uint8Array 一个都没被换掉
@@ -139,11 +138,11 @@ describe("README 示例", () => {
   });
 
   it("嵌套列表: ref 决定个数, 固定 2x2", () => {
-    const Item = new DynamicStructBuffer("item", { id: uint32_t });
-    const Grid = new DynamicStructBuffer("grid", {
+    const Item = struct("item", { id: uint32_t });
+    const Grid = struct("grid", {
       n: uint8_t,
-      rows: Item[ref("n")],
-      pairs: Item[2][2],
+      rows: list(Item, ref("n")),
+      pairs: list(list(Item, 2), 2),
     });
     type _t = [
       Assert<
@@ -153,9 +152,23 @@ describe("README 示例", () => {
         >
       >
     ];
-    const u32 = (n: number) => [n >>> 24, (n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
+    const u32 = (n: number) => [
+      n >>> 24,
+      (n >> 16) & 0xff,
+      (n >> 8) & 0xff,
+      n & 0xff,
+    ];
     const d = Grid.decode(
-      Uint8Array.from([2, ...u32(1), ...u32(2), ...u32(3), ...u32(4), ...u32(5), ...u32(6), ...u32(7)])
+      Uint8Array.from([
+        2,
+        ...u32(1),
+        ...u32(2),
+        ...u32(3),
+        ...u32(4),
+        ...u32(5),
+        ...u32(6),
+        ...u32(7),
+      ])
     );
     expect(d.n).toBe(2);
     expect(d.rows.map((r) => r.id)).toEqual([1, 2]);
@@ -168,7 +181,7 @@ describe("README 示例", () => {
 
   it("skip(n): 占住位置但结果里没有这个字段", () => {
     // 典型的二进制协议布局: 定长记录里夹着未知/保留字节
-    const EntMove = new DynamicStructBuffer(
+    const EntMove = struct(
       "ent",
       {
         _unk0: skip(1),
@@ -210,9 +223,7 @@ describe("README 示例", () => {
       y: -7.650000095367432,
     });
     // encode 时填充位写 0, 长度不变
-    const enc = bytes(
-      EntMove.encode({ sel: 1, tag: 2, cnt: 3, x: 1, y: 2 })
-    );
+    const enc = bytesOf(EntMove.encode({ sel: 1, tag: 2, cnt: 3, x: 1, y: 2 }));
     expect(enc.length).toBe(20);
     expect(enc).toEqual([
       0, 1, 0, 0, 0, 0, 2, 3, 0, 0, 0, 0, 0, 0, 0x80, 0x3f, 0, 0, 0, 0x40,
@@ -222,11 +233,11 @@ describe("README 示例", () => {
   });
 
   it("字节段 / rest / variant", () => {
-    const Pkt = new DynamicStructBuffer(
+    const Pkt = struct(
       "pkt",
       {
         len: uint16_t,
-        payload: uint8_t[ref("len")],
+        payload: bytes(ref("len")),
         tail: rest(),
       },
       { littleEndian: true }
@@ -238,10 +249,10 @@ describe("README 示例", () => {
       [0x63],
     ]);
 
-    const V = new DynamicStructBuffer("v", {
+    const V = struct("v", {
       msg_type: uint8_t,
       body: variant("msg_type", {
-        1: { name: uint8_t[3] },
+        1: { name: bytes(3) },
         2: { x: uint32_t, y: uint32_t },
       }),
     });
@@ -249,65 +260,63 @@ describe("README 示例", () => {
       msg_type: 1,
       name: Uint8Array.from([0x61, 0x62, 0x63]),
     });
-    expect(bytes(V.encode({ msg_type: 2, x: 1, y: 2 }))).toEqual([
+    expect(bytesOf(V.encode({ msg_type: 2, x: 1, y: 2 }))).toEqual([
       2, 0, 0, 0, 1, 0, 0, 0, 2,
     ]);
 
-    const F = new DynamicStructBuffer("f", {
-      ops: framed<{ op: number; body: Uint8Array }>(
-        {
-          read: (c) => {
-            if (c.left < 2) return null; // 不够一个头 ⇒ 流结束
-            const op = c.u8("op");
-            const n = c.u8("flen");
-            return { op, body: c.bytes(n, "body") };
-          },
+    const F = struct("f", {
+      ops: framed<{ op: number; body: Uint8Array }>({
+        read: (c) => {
+          if (c.left < 2) return null; // 不够一个头 ⇒ 流结束
+          const op = c.u8("op");
+          const n = c.u8("flen");
+          return { op, body: c.bytes(n, "body") };
         },
-        {
-          write: (w, v) => {
-            w.u8(v.op);
-            w.u8(v.body.length);
-            w.bytes(v.body);
-          },
-        }
-      ),
+        write: (w, v) => {
+          w.u8(v.op);
+          w.u8(v.body.length);
+          w.bytes(v.body);
+        },
+      }),
     });
     const fd = F.decode(Uint8Array.from([1, 2, 0x61, 0x62, 3, 1, 0x63]));
     expect(fd.ops.map((o) => [o.op, Array.from(o.body)])).toEqual([
       [1, [0x61, 0x62]],
       [3, [0x63]],
     ]);
-    expect(
-      bytes(F.encode({ ops: [{ op: 9, body: Uint8Array.from([7]) }] }))
-    ).toEqual([9, 1, 7]);
+    expect(bytesOf(F.encode({ ops: [{ op: 9, body: Uint8Array.from([7]) }] }))).toEqual([
+      9, 1, 7,
+    ]);
   });
 
   it("宽松解码: 变长字段失败即停, 位置已不可信", () => {
-    const Msg = new DynamicStructBuffer(
+    const Msg = struct(
       "msg",
       {
         type: uint8_t,
         len: uint16_t,
-        payload: uint8_t[ref("len")],
-        name: uint8_t[8],
+        payload: bytes(ref("len")),
+        name: bytes(8),
       },
       { littleEndian: true }
     );
-const view = Uint8Array.from([1, 0xff, 0xff]);
+    const view = Uint8Array.from([1, 0xff, 0xff]);
     const { value, errors, consumed } = Msg.decodeLenient(view);
     expect(value).toEqual({ type: 1, len: 65535, payload: undefined });
     expect(errors).toHaveLength(1);
     expect(errors[0].where).toBe("msg.payload");
-    expect(errors[0].message).toBe("DecodeError: msg.payload @3 需要 65535B, 只剩 0B");
+    expect(errors[0].message).toBe(
+      "DecodeError: msg.payload @3 需要 65535B, 只剩 0B"
+    );
     // 失败字段的半截推进先回滚, 于是 consumed 正好停在"从哪开始不可信"的位置
     expect(consumed).toBe(3);
 
     // 失败字段的半截推进先回滚; 字节根本不够时直接停 —— 位置已经不可信
-const Short = new DynamicStructBuffer("short", { a: uint32_t, b: uint8_t });
-const r = Short.decodeLenient(Uint8Array.from([1, 2]));
-expect(r.errors.map((e) => e.where)).toEqual(["short.a"]);
-expect(r.value.a).toBeUndefined();
-expect(r.consumed).toBe(0);
+    const Short = struct("short", { a: uint32_t, b: uint8_t });
+    const r = Short.decodeLenient(Uint8Array.from([1, 2]));
+    expect(r.errors.map((e) => e.where)).toEqual(["short.a"]);
+    expect(r.value.a).toBeUndefined();
+    expect(r.consumed).toBe(0);
 
     // 类型层面 LenientResult 的 value 就是 D
     type _t = [Assert<Equals<typeof value, InferType<typeof Msg>>>];
@@ -319,24 +328,19 @@ expect(r.consumed).toBe(0);
    * 分支); 内置字段的越界本来就意味着后面全不可信.
    */
   it("定长字段因 codec 抛错时跳过继续", () => {
-    const checked = field<number>((b) => {
-      // 自定义 codec 自己拼字段路径: c.where 只有结构名, 定位不到具体字段
-      const where = `${b.parentName}.${b.name}`;
-      return {
-        name: b.name,
-        fixedSize: 1,
-        decode(c: Cursor, out: Record<string, unknown>) {
-          const v = c.u8(b.name);
-          if (v > 200) throw DecodeError.reason(where, c.pos, `值 ${v} 超过 200`);
-          out[b.name] = v;
-        },
-        encode(w, v) {
-          w.u8(v as number);
-        },
-        resolveLengths: (o: Record<string, unknown>) => o,
-      };
+    const checked = codec<number>({
+      fixedSize: 1,
+      read(c: Cursor, name: string) {
+        const v = c.u8(name);
+        if (v > 200)
+          throw DecodeError.reason(c.label(name), c.pos, `值 ${v} 超过 200`);
+        return v;
+      },
+      write(w, v) {
+        w.u8(v);
+      },
     });
-    const P = new DynamicStructBuffer("p", {
+    const P = struct("p", {
       a: checked,
       b: uint8_t,
       c: uint8_t,

@@ -26,6 +26,8 @@ export declare class Writer {
     f32(v: number): void;
     f64(v: number): void;
     u64(v: number): void;
+    i64(v: number): void;
+    accessor(size: number, set: string, isBig: boolean, value: number, le: boolean): void;
     bytes(src: Uint8Array): void;
     zero(n: number): void;
     get written(): number;

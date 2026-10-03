@@ -9,50 +9,41 @@ $ npm i struct-buffer
 
 ## how to use
 ```ts
-import { uint32_t, uint8_t, DynamicStructBuffer, sbytes } from "struct-buffer";
+import { bytes, struct, uint32_t, uint8_t, sbytes } from "struct-buffer";
 
-const struct = new DynamicStructBuffer("Player", {
+const Player = struct("Player", {
   hp: uint32_t,
   mp: uint32_t,
-  name: uint8_t[3],
+  name: bytes(3),
 });
 
-const buffer: DataView = sbytes("41 20 00 00 42 c8 00 00 61 62 63");
+const view: DataView = sbytes("41 20 00 00 42 c8 00 00 61 62 63");
 
 // decode
-const data = struct.decode(buffer);
+const data = Player.decode(view);
 // data => { hp: 10, mp: 100, name: Uint8Array [0x61, 0x62, 0x63] }
 
 // encode
-const view = struct.encode({
+const out = Player.encode({
   hp: 10,
   mp: 100,
   name: new Uint8Array([0x61, 0x62, 0x63]),
 });
-// view => <41 20 00 00 42 c8 00 00 61 62 63>
+// out => <41 20 00 00 42 c8 00 00 61 62 63>
 ```
+
+`struct(...)` 返回一个 codec: 它自己带 `decode` / `decodeLenient` / `encode`, 也能直接嵌进
+别的结构体当字段。整个库只有一套 AST 和一台引擎 —— schema 就是那棵 AST。
 
 ## Use in browser
 ```html
 <script src="struct-buffer.js"></script>
 <script>
-  const { uint32_t, uint8_t, DynamicStructBuffer } = window.StructBuffer;
+  const { struct, bytes, uint32_t } = window.StructBuffer;
 </script>
 ```
 
-## Use ["type"](https://github.com/januwA/struct-buffer/blob/main/src/types.ts) for conversion
-
-```ts
-import { uint32_t } from "struct-buffer";
-
-// encode
-const view = uint32_t[2].encode([1, 2]); 
-// view => <00 00 00 01 00 00 00 02>
-
-// decode
-const data = uint32_t[2].decode(view);
-// data => [ 1, 2 ]
-```
+## 标量类型
 
 类型就是线上的字节形状 `(size, unsigned, kind)`, 没有名字 —— 同宽同符号的 C 别名本来就是同一个
 类型, 多导一份只会让人在"该用哪个"上纠结, 而名字对编解码又毫无用处:
@@ -72,36 +63,26 @@ const data = uint32_t[2].decode(view);
 
 - `int64_t` 之前走的是无符号的 `getBigUint64`，负数解出来是一大坨正数。现在按有符号解。
 - 8 字节类型的**值类型统一是 `number`**，不再把 `bigint` 抛给调用方。代价是超过
-   `2^53` 的值会掉精度（协议里的 64 位计数/时间戳基本够用，文件偏移请自己确认）。
+  `2^53` 的值会掉精度（协议里的 64 位计数/时间戳基本够用，文件偏移请自己确认）。
 
 ## register Type
 类型就是线上的字节形状 `(size, unsigned, kind)`, 没有名字:
 
 ```ts
+import { registerType, struct } from "struct-buffer";
+
 const myShort = registerType(2, false);
 const myFloat = registerType(4, true, "float"); // kind 默认 "int"
 
-const struct = new DynamicStructBuffer("Player", {
+const Player = struct("Player", {
   hp: myShort,
   mp: myShort,
-  pos: myShort[2],
+  pos: list(myShort, 2),
 });
 
-// encode
-const view = struct.encode({
-  hp: 2,
-  mp: 10,
-  pos: [100, 200],
-});
-// view => <00 02 00 0a 00 64 00 c8>
-
-// decode
-const data = struct.decode(view);
+const data = Player.decode(sbytes("00 02 00 0a 00 64 00 c8"));
 // data => { hp: 2, mp: 10, pos: [ 100, 200 ] }
 ```
-
-C / C++ / Windows 的别名(`BYTE`、`DWORD`、`long long`...)一个都不导出 —— 它们对
-编解码没有任何影响。想表达"C 里的那个 DWORD", 直接写 `uint32_t`。
 
 `kind` 决定整数还是浮点, 历史上这里靠"名字里有没有 float"猜 —— 代价是任何 float 别名都会
 掉队: `size=4` + `unsigned=true` 只能落到 `getUint32`, 于是 `1.5` 被静默编成 `00 00 00 01`,
@@ -114,20 +95,11 @@ typedef struct _XINPUT_STATE {
   DWORD          dwPacketNumber;
   XINPUT_GAMEPAD Gamepad;
 } XINPUT_STATE, *PXINPUT_STATE;
-
-
-typedef struct _XINPUT_GAMEPAD {
-  WORD  wButtons;
-  BYTE  bLeftTrigger;
-  BYTE  bRightTrigger;
-  SHORT sThumbLX;
-  SHORT sThumbLY;
-  SHORT sThumbRX;
-  SHORT sThumbRY;
-} XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
 */
 
-XINPUT_GAMEPAD = new DynamicStructBuffer("XINPUT_GAMEPAD", {
+import { int16_t, struct, uint16_t, uint32_t, uint8_t } from "struct-buffer";
+
+const XINPUT_GAMEPAD = struct("XINPUT_GAMEPAD", {
   wButtons: uint16_t,
   bLeftTrigger: uint8_t,
   bRightTrigger: uint8_t,
@@ -137,23 +109,23 @@ XINPUT_GAMEPAD = new DynamicStructBuffer("XINPUT_GAMEPAD", {
   sThumbRY: int16_t,
 });
 
-XINPUT_STATE = new DynamicStructBuffer("XINPUT_STATE", {
+const XINPUT_STATE = struct("XINPUT_STATE", {
   dwPacketNumber: uint32_t,
   Gamepad: XINPUT_GAMEPAD,
 });
 
 // decode
 XINPUT_STATE.decode(
-    new Uint8Array([
-      0, 0, 0, 0, // dwPacketNumber
-      0, 1, // wButtons
-      0,    // bLeftTrigger
-      0,    // bRightTrigger
-      0, 1, // sThumbLX
-      0, 2, // sThumbLY
-      0, 3, // sThumbRX
-      0, 4, // sThumbRY
-    ])
+  new Uint8Array([
+    0, 0, 0, 0, // dwPacketNumber
+    0, 1,       // wButtons
+    0,          // bLeftTrigger
+    0,          // bRightTrigger
+    0, 1,       // sThumbLX
+    0, 2,       // sThumbLY
+    0, 3,       // sThumbRX
+    0, 4,       // sThumbRY
+  ])
 );
 
 // encode
@@ -173,13 +145,15 @@ XINPUT_STATE.encode({
 
 ## struct list
 ```ts
-const User = new DynamicStructBuffer("User", {
-  name: uint8_t[2],
-  name2: uint8_t[2],
+import { bytes, list, struct } from "struct-buffer";
+
+const User = struct("User", {
+  name: bytes(2),
+  name2: bytes(2),
 });
 
-const Users = new DynamicStructBuffer("Users", {
-  users: User[2],
+const Users = struct("Users", {
+  users: list(User, 2),
 });
 
 const data = Users.decode(
@@ -190,33 +164,26 @@ const data = Users.decode(
 // data.users[1] => { name: Uint8Array([0x62, 0x31]), name2: Uint8Array([0x62, 0x32]) }
 
 // or
-
-const users = User[2].decode(
+const users = list(User, 2).decode(
   new Uint8Array([0x61, 0x31, 0x61, 0x32, 0x62, 0x31, 0x62, 0x32])
 );
-// users => [ { name: Uint8Array([0x61,0x31]), name2: Uint8Array([0x61,0x32]) }, ... ]
 ```
 
-## DynamicStructBuffer
+## 变长报文
 
-`DynamicStructBuffer` 是给带长度前缀的变长报文用的: 字段按声明顺序消费一段游标, 长度可来自
-前面任意字段, 嵌套结构体可递归, `ref()` 在 encode 时把实际长度回填回长度字段。
+`struct` 是给带长度前缀的变长报文用的: 字段按声明顺序消费一段游标, 长度可来自前面任意字段,
+嵌套结构体可递归, `ref()` 在 encode 时把实际长度回填回长度字段。
 
 ```ts
-import {
-  DynamicStructBuffer,
-  ref,
-  uint8_t,
-  uint16_t,
-} from "struct-buffer";
+import { bytes, ref, struct, uint16_t, uint8_t } from "struct-buffer";
 
-const Msg = new DynamicStructBuffer(
+const Msg = struct(
   "msg",
   {
     type: uint8_t,
     len: uint16_t, // 后面 payload 的字节数
-    payload: uint8_t[ref("len")],
-    name: uint8_t[8],
+    payload: bytes(ref("len")),
+    name: bytes(8),
   },
   { littleEndian: true }
 );
@@ -232,82 +199,61 @@ Msg.encode({
 // len 不用给: encode 会把 payload 实际字节数回填进 len, 而且**不改你的入参对象**
 ```
 
+`littleEndian` 省略则逐级继承父级, 最近的显式配置赢; 不给就是大端。
+
 decode 结果和 encode 入参的类型都是推出来的, 不用手写(见下面的[类型推导](#类型推导))。
 
 ### 嵌套列表
 
-下标就是维度, `ref` 长度就是"几个":
+`list` 就是数组, 维度靠嵌套, 不再有 `T[n]` 下标魔法:
 
 ```ts
-const Item = new DynamicStructBuffer("item", { id: uint32_t });
-const Grid = new DynamicStructBuffer("grid", {
+import { list, ref, struct, uint32_t, uint8_t } from "struct-buffer";
+
+const Item = struct("item", { id: uint32_t });
+const Grid = struct("grid", {
   n: uint8_t,
-  rows: Item[ref("n")], // 由 n 决定个数
-  pairs: Item[2][2], // 固定 2 x 2
+  rows: list(Item, ref("n")),   // 由 n 决定个数
+  pairs: list(list(Item, 2), 2), // 固定 2 x 2
 });
 Grid.decode(view);
 // => { n: 2, rows: [{ id }, { id }], pairs: [[{ id }, { id }], [{ id }, { id }]] }
 ```
 
-> 某维长度为 1 也不塌成单值: `Item[1]` 解成数组, 与 `uint8_t[1]` 一致。
+> 某维长度为 1 也不塌成单值: `list(Item, 1)` 解成数组, 与 `bytes(1)` 的"恒为字节"一致。
 
 ### 变长字段工厂
 
-`uint8_t[ref(...)]` 和 `uint8_t[n]` 就是字节字段(连续的 1 字节无符号元素), 只有"剩下的
-全部字节"要显式说:
-
 ```ts
-import { rest, records, variant, framed } from "struct-buffer";
+import { bytes, list, records, ref, rest, struct, uint16_t, uint8_t } from "struct-buffer";
 
-new DynamicStructBuffer("pkt", {
+struct("pkt", {
   len: uint16_t,
-  payload: uint8_t[ref("len")], // Uint8Array
-  tail: rest(), // 吃掉剩下的全部字节
+  payload: bytes(ref("len")), // Uint8Array
+  tail: rest(),               // 吃掉剩下的全部字节
 });
 
-const Item = new DynamicStructBuffer("item", { id: uint32_t });
+const Item = struct("item", { id: uint32_t });
 
-new DynamicStructBuffer("pkt2", {
+struct("pkt2", {
   n: uint8_t,
   items: records(Item, ref("n")), // 个数来自 n; decode 恒为数组
 });
 ```
 
-- `uint8_t[n]` / `uint8_t[ref(...)]`: 连续的 `uint8_t`, 即一段字节, 解成 `Uint8Array`
-- `rest()`: 声明式长度前缀的终点标记
-- `skip(n)`: 占位 n 字节, 该键不出现在结果里(encode 写 0)
+- `bytes(n)` / `bytes(ref(...))` / `rest()`: 一段字节, 解成 `Uint8Array`
+- `list(item, n)`: 定长或 `ref` 长度的数组; 嵌套即多维
 - `records(Sub, spec?)`: 定长记录填到末尾; 变长子结构体须给 `spec`(`n` / `ref("count")`)。
   decode 恒为数组
+- `skip(n)`: 占位 n 字节, 该键不出现在结果里(encode 写 0)
 - `variant(key, cases)`: 变体联合, 判别字段须在本字段之前, 分支字段与其平级(平铺进父对象);
   无对应分支时 decode 抛 `DecodeError`、encode 抛 `EncodeError`
-- `framed(reader, writer)`: 自定界子帧循环, 反复读自带长度的子帧直到 `reader` 返回
-  `null`. 与其做一个猜错一半的 DSL, 不如让调用方老实描述"怎么跳过一个子帧":
+- `codec(spec)` / `delimited(spec)` / `framed(spec)`: 自定界字段, 见下
 
-```ts
-framed(
-  {
-    read: (c) => {
-      if (c.left < 2) return null; // 不够一个头 ⇒ 流结束
-      const op = c.u8("op");
-      const n = c.u8("flen");
-      return { op, body: c.bytes(n, "body") };
-    },
-  },
-  {
-    write: (w, v) => {
-      w.u8(v.op);
-      w.u8(v.body.length);
-      w.bytes(v.body);
-    },
-  }
-);
-```
-
-`uint8_t[n]` 是**定宽**字节字段(`char name[8]` 那种): encode 写满 n 字节(短补 NUL / 长截断)。
-它同时也是**不定宽**字节字段的写法 —— `uint8_t[ref("len")]` 就是"以 `len` 为字节数的那一段"。
-decode 一律给满 n 字节, **不在 NUL 处截断** —— 截断是 C 风格字符串的约定而不是字节属性,
-定宽字段也常见空格补位或满宽正文, 猜错就是静默丢数据。要截自己切, NUL 是单字节且不会
-出现在多字节序列中间, 所以切在它上面不会劈开 UTF-8 / GBK:
+`bytes(n)` 是**定宽**字节字段(`char name[8]` 那种): encode 写满 n 字节(短补 NUL / 长截断),
+decode 一律给满 n 字节, **不在 NUL 处截断** —— 截断是 C 风格字符串的约定而不是字节属性, 定宽
+字段也常见空格补位或满宽正文, 猜错就是静默丢数据。要截自己切, NUL 是单字节且不会出现在多字节
+序列中间, 所以切在它上面不会劈开 UTF-8 / GBK:
 
 ```ts
 const cut = (b: Uint8Array) => {
@@ -347,14 +293,14 @@ const { value, errors, consumed } = Msg.decodeLenient(Uint8Array.from([1, 0xff, 
 `decode()` 的结果类型、`encode()` 的入参类型都由字段表推出来, 不用手写:
 
 ```ts
-const Msg = new DynamicStructBuffer("msg", {
+const Msg = struct("msg", {
   msg_type: uint8_t,
-  msg: uint8_t[ref("msg_size")],
-  name: uint8_t[ref("name_size")],
+  msg: bytes(ref("msg_size")),
+  name: bytes(ref("name_size")),
 });
 
 const data = Msg.decode(view);
-data.msg.toString(); // ok
+data.msg; // Uint8Array
 data.no_such_field; // 编译期报错
 Msg.encode({ msg_typo: 1 }); // 编译期报错
 ```
@@ -362,14 +308,13 @@ Msg.encode({ msg_typo: 1 }); // 编译期报错
 几个容易踩的点:
 
 - **encode 入参是 Partial, 且长度字段不用给** —— encode 时由框架回填
-- **`uint8_t[n]` / `rest()` 解出来是 `Uint8Array`, 写回去也只收 `Uint8Array`** ——
+- **`bytes(...)` / `rest()` 解出来是 `Uint8Array`, 写回去也只收 `Uint8Array`** ——
   字节只有一种形态; 传字符串 / `number[]` 编译期就报错(见"文本与编码")
 - **variant 分支字段在父对象上**(`data.name`, 不是 `data.body.name`), 类型上是可选的;
   不做按判别值收窄的 union
-- **`DynamicStructBuffer` 的泛型顺序是 `<S, D, E>`**(`S` 是字段表)。想显式指定类型时
-  写 `new DynamicStructBuffer<any, MyType>(...)` —— `S` 填 `any` 就是放弃推导
 
-单独用 `InferDef<typeof Msg.struct>` / `InferType<typeof Msg>` 也能拿到类型.
+单独用 `InferDef<typeof Msg.struct>` / `InferType<typeof Msg>` / `InferEncodeDef<typeof Msg.struct>`
+也能拿到类型.
 
 ## 文本与编码
 
@@ -378,7 +323,7 @@ Msg.encode({ msg_typo: 1 }); // 编译期报错
 UTF-16LE / UTF-16BE / GBK / GB18030 / Big5 / Shift-JIS / codepage..., 把其中一种当默认
 就是在替协议做决定。
 
-所以 `uint8_t[n]` / `rest()` 的 encode 入参只有 `Uint8Array`: 传字符串或 `number[]` 编译期就报错,
+所以 `bytes(n)` / `rest()` 的 encode 入参只有 `Uint8Array`: 传字符串或 `number[]` 编译期就报错,
 绕过类型运行时也报错。`encode({ name: "hello" })` 不会"帮你按 UTF-8 转一下" —— 那等于
 悄悄替你选了编码, 而选了之后 GBK / UTF-16LE 的报文就静默错了。
 
@@ -386,9 +331,9 @@ UTF-16LE / UTF-16BE / GBK / GB18030 / Big5 / Shift-JIS / codepage..., 把其中�
 "库里支持哪种编码"这个问题不成立: 解码用平台 `TextDecoder` 就能吃下几十种 label。
 
 ```ts
-const Msg = new DynamicStructBuffer("msg", {
+const Msg = struct("msg", {
   name_size: uint8_t,
-  name: uint8_t[ref("name_size")], // 出 Uint8Array, 长度是字节数
+  name: bytes(ref("name_size")), // 出 Uint8Array, 长度是字节数
 });
 
 // 解码: 编码由你指定
@@ -405,13 +350,11 @@ Msg.encode({ name: "hello" });
 ```
 
 长度头一律写**字节数**: `"世界"` 的 `.length` 是 2, UTF-8 占 6 字节, GBK 占 4 字节 ——
-拿字符数当长度会把正文截掉。`uint8_t[ref(...)]` 会在 encode 时按实际字节数回填 `ref` 长度字段。
-
-调试用 `TEXT(bytes, new TextDecoder("gbk"))`, 它会按给定编码渲染字节。
+拿字符数当长度会把正文截掉。`bytes(ref(...))` 会在 encode 时按实际字节数回填 `ref` 长度字段。
 
 ## bits
 ```ts
-import { uint32_t, bits, DynamicStructBuffer } from "struct-buffer";
+import { bits, uint32_t } from "struct-buffer";
 
 const EFLAG_DATA = 0x00000246;
 const littleEndian = true;
@@ -432,14 +375,7 @@ const data = EFLAG.decode(new Uint32Array([EFLAG_DATA]), littleEndian);
 // => { CF: 0, PF: 1, AF: 0, ZF: 1, SF: 0, TF: 0, IF: 1, DF: 0, OF: 0 }
 
 // encode
-const view = EFLAG.encode(
-  {
-    PF: 1,
-    ZF: 1,
-    IF: 1,
-  },
-  littleEndian
-);
+const out = EFLAG.encode({ PF: 1, ZF: 1, IF: 1 }, littleEndian);
 // => <44 02 00 00>
 ```
 
@@ -447,7 +383,7 @@ const view = EFLAG.encode(
 
 ## bitFields
 ```ts
-import { uint8_t, bitFields, DynamicStructBuffer, sbytes as b, } from "struct-buffer";
+import { bitFields, sbytes as b, uint8_t } from "struct-buffer";
 
 const bf = bitFields(uint8_t, {
   a: 1,
@@ -455,11 +391,7 @@ const bf = bitFields(uint8_t, {
   c: 3,
 });
 
-const v = bf.encode({
-  a: 1,
-  b: 2,
-  c: 3,
-});
+const v = bf.encode({ a: 1, b: 2, c: 3 });
 // => <1D>
 
 const data = bf.decode(b("1D"));
@@ -468,70 +400,78 @@ const data = bf.decode(b("1D"));
 
 > 每个字段占**连续几位**(位宽), 值须放得进该位宽; 存储支持 1/2/4 字节, 位宽总和不能超。
 
-## delimited
+## delimited / framed / codec
 
-单个**自定界**字段: 读一个, 然后把游标停在它后面, 后续字段继续。尺寸由 reader 自己推进
-`Cursor` 决定 —— 引擎不需要提前知道, 所以 NUL 结尾的 C 字符串这类"长度只能跑起来才知道"
-的字段在这里是自然的。
+自定界字段: 尺寸由 reader 自己推进 `Cursor` 决定 —— 引擎不需要提前知道, 所以 NUL 结尾的
+C 字符串这类"长度只能跑起来才知道"的字段在这里是自然的。
 
 ```ts
-import { delimited, DecodeError, DynamicStructBuffer, float } from "struct-buffer";
+import { codec, delimited, DecodeError, float, struct } from "struct-buffer";
 
 const cstr = () =>
-  delimited<string>(
-    {
-      read: (c) => {
-        const at = c.pos;
-        while (c.left > 0) {
-          if (c.view.getUint8(c.pos++) === 0) {
-            // 已经扫过整段正文, 直接从 view 取: bytes() 只能从当前位置读,
-            // 而游标此刻已经停在结尾 NUL 之后了
-            const n = c.pos - at - 1;
-            const view = new Uint8Array(
-              c.view.buffer,
-              c.view.byteOffset + at,
-              n
-            );
-            return new TextDecoder().decode(view);
-          }
+  delimited<string>({
+    read: (c) => {
+      const at = c.pos;
+      while (c.left > 0) {
+        if (c.view.getUint8(c.pos++) === 0) {
+          // 已经扫过整段正文, 直接从 view 取: bytes() 只能从当前位置读,
+          // 而游标此刻已经停在结尾 NUL 之后了
+          const n = c.pos - at - 1;
+          const view = new Uint8Array(c.view.buffer, c.view.byteOffset + at, n);
+          return new TextDecoder().decode(view);
         }
-        throw DecodeError.reason(c.where, at, "没遇到结尾 NUL");
-      },
+      }
+      throw DecodeError.reason(c.where, at, "没遇到结尾 NUL");
     },
-    {
-      write: (w, v) => {
-        w.bytes(new TextEncoder().encode(v));
-        w.u8(0);
-      },
-    }
-  );
+    write: (w, v) => {
+      w.bytes(new TextEncoder().encode(v));
+      w.u8(0);
+    },
+  });
 
 // 变长字段夹在定长字段中间
-const Player = new DynamicStructBuffer("Player", {
+const Player = struct("Player", {
   hp: float,
   name: cstr(),
   mp: float,
 });
 ```
 
-### delimited 与 framed 的区别
+三个工厂只差**读几个子帧**:
 
-两者只差**读几个**:`framed` 贪婪读到缓冲区末尾, 所以**只能放在结构体最后一个字段**;
-变长字段夹在中间时它会把后面字段的字节也当成下一个子帧吃掉(而且失败时已经吃掉了,
-后面字段直接报越界)。`delimited` 读一个就停。
+| | `framed` | `delimited` | `codec` |
+| --- | --- | --- | --- |
+| 解出来是 | `T[]` | `T` | `T` |
+| 读几个 | 直到字节耗尽 / reader 返回 `null` | 一个 | 一个字段(由 reader 决定推进多少) |
+| 能放中间吗 | **不能** | 能 | 能 |
+| reader 返回 `null` | 流结束(干净收手) | 这一帧不完整 ⇒ `DecodeError` | 同 `delimited` |
 
-| | `framed` | `delimited` |
-| --- | --- | --- |
-| 解出来是 | `T[]` | `T` |
-| 读几个子帧 | 直到字节耗尽 | 一个 |
-| 能放中间吗 | **不能** | 能 |
-| 适合 | `op\|flen\|body` 这种流式布局 | 夹在中间的 C 字符串、单个 TLV |
+`framed` 贪婪读到缓冲区末尾, 所以**只能放在结构体最后一个字段**; 变长字段夹在中间时它会把
+后面字段的字节也当成下一个子帧吃掉(而且失败时已经吃掉了, 后面字段直接报越界)。`delimited`
+读一个就停。
 
-reader 返回 `null` 的含义也不同:`framed` 里是"流结束"(干净收手), `delimited` 里是
-"这一帧不完整"—— 后者会抛 `DecodeError`, 因为位置已经不可信了。
+```ts
+import { framed, struct, uint8_t } from "struct-buffer";
 
-`delimited` 不检查"reader 有没有推进游标":单次读没有循环, 空 C 字符串消费 0 字节是合法的。
-那个死循环检查只对 `framed` 有意义。
+struct("stream", {
+  ops: framed({
+    read: (c) => {
+      if (c.left < 2) return null; // 不够一个头 ⇒ 流结束
+      const op = c.u8("op");
+      const n = c.u8("flen");
+      return { op, body: c.bytes(n, "body") };
+    },
+    write: (w, v) => {
+      w.u8(v.op);
+      w.u8(v.body.length);
+      w.bytes(v.body);
+    },
+  }),
+});
+```
+
+`framed` 会检查"reader 有没有推进游标": 一个子帧消费 0 字节会让循环死转, 于是直接报错。
+`delimited` / `codec` 是单次读, 没有循环, 消费 0 字节是合法的。
 
 ## Some utility functions
 ```ts
@@ -554,6 +494,8 @@ TEXT(makeDataView([
 ]))
 // => "abc..xyz........"
 ```
+
+`makeDataView` 尊重 `Uint8Array` 的 `byteOffset` / `byteLength` 窗口(subarray 不会读出去)。
 
 ## test
 > $ npm test

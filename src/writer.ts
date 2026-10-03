@@ -137,6 +137,28 @@ export class Writer {
     this.pos += 8;
   }
 
+  i64(v: number): void {
+    this.grow(8);
+    this.buf.setBigInt64(this.pos, BigInt(v), this.opts.littleEndian);
+    this.pos += 8;
+  }
+
+  /**
+   * 按字节形状写: `scalarHandle` 给出的 DataView 访问器名 + 是否 BigInt。
+   * 引擎唯一写标量的入口, 免得为每种宽度各写一份 `if`。
+   */
+  accessor(
+    size: number,
+    set: string,
+    isBig: boolean,
+    value: number,
+    le: boolean
+  ): void {
+    this.grow(size);
+    (this.buf as any)[set](this.pos, isBig ? BigInt(value) : value, le);
+    this.pos += size;
+  }
+
   bytes(src: Uint8Array): void {
     this.grow(src.length);
     for (let i = 0; i < src.length; i++) this.buf.setUint8(this.pos++, src[i]);

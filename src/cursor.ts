@@ -159,6 +159,13 @@ export class Cursor {
     return Number(v);
   }
 
+  i64(field: string, le: boolean = false): number {
+    this.need(8, field);
+    const v = this.view.getBigInt64(this.pos, le);
+    this.pos += 8;
+    return Number(v);
+  }
+
 /**
    * 取 n 字节**零拷贝**子视图(借用底层 buffer, 不复制).
    * 字节字段(`rest()`)用它把字节直接交出去; 解码源本身是 `readByteArray` 出来的

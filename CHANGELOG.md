@@ -1,19 +1,40 @@
 ## 6.0.0
 
 6.0 只做减法: 把定位模糊、又在真实项目里用不上的外围功能砍掉, 并修掉一批把类型或数据
-撒谎的 bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那套表达力不够、也没人
-靠它读长度前缀。
+撒谎的 bug; 同时把结构体收敛成**单 AST + 单引擎 + 显式构造器**, 用 `struct()` 取代
+`DynamicStructBuffer`, 用 `bytes(n)` / `list(T, n)` 取代 `T[n]` 下标魔法。
+
+### 🏗 架构: 单 AST + 单引擎 + 显式构造器
+
+上一版同时存在两套 schema 表示(`DynamicStructBuffer` 的字段表归一化, 与 `StructType`
+自带 def/deeps 的递归引擎)和两套引擎, 复杂度散在"谁负责下标展开、谁负责继承
+`littleEndian`、谁负责长度回填"上。这一版合成一条路:
+
+- **schema 即 AST**: 每个构造器 (`struct` / `bytes` / `list` / `bits` / `variant` / ...) 只造一个
+  `Node`, 纯数据、无状态; 引擎 (`engine.ts`) 只做一件事 —— 拿 `Cursor`/`Writer` 从 AST 根走到尾
+- **下标魔法删除**: `T[n]` / `uint8_t[ref(...)]` 改成语义明确的构造器 —— `bytes(n)` 出
+  `Uint8Array`, `list(T, n)` 出 `T[]`, 维度靠嵌套 `list(list(T, 2), 2)`, 不再靠"下标几次"猜
+  `number[]` 还是 `Uint8Array`
+- **尺寸只有一个来源**: 不再另写尺寸推算 (`sizeof` / `getSize` / `getByteLength` 全删),
+  定长与否由 `fixedSize(node)` 从 AST 直接读, 变长尺寸就是 `encode(obj).byteLength`
+- **`littleEndian` 逐级继承**: `node.le ?? inheritedLE`, 最近的显式配置赢, 没配就继承父级
+- **每个 codec 都带根入口**: `decode` / `decodeLenient` / `encode` 由统一的 `make()` 提供
+  (用 `Cursor`+`readNode` / `Writer`+`writeNode`), `struct` 与标量覆盖之 —— 于是 `list(T, n)`
+  这种中间 codec 也能单独 decode/encode
 
 ### ✨ 新增
 
-- `DynamicStructBuffer`: decode 结果与 encode 入参类型全部自动推出来, 字段名拼错编译期就报错
-- `InferType` / `InferDef` / `InferEncodeDef` 导出, 可以单独拿来推任意字段表
-- `rest` / `records` / `framed` / `delimited` / `variant` 声明式字段工厂
+- `struct(name, def, { littleEndian? })`: decode 结果与 encode 入参类型全部自动推出来,
+  字段名拼错编译期就报错; 返回的 codec 可直接嵌套
+- `bytes(n)` / `rest()` / `list(T, n)` / `records(source, len?)` 显式构造器
+- `InferType` / `InferDef` / `InferEncodeDef` / `InferEncode` / `InferSource` 导出, 可单独推任意字段表
+- `rest` / `records` / `framed` / `delimited` / `codec` / `variant` 声明式字段工厂
 - `decodeLenient`: 坏字段变 `undefined` 并收集错误, 而不是整帧丢掉
+- `skip(n)`: 占位字节, 不在结果里出现(取代旧 `padding_t` 的"把填充解进结果")
 
 ### 🐛 修复
 
-- **嵌套 `DynamicStructBuffer` 收不到父级的 `littleEndian`**: 归一化字段表时, 自带 def 的结构体
+- **嵌套 `struct` 收不到父级的 `littleEndian`**: 归一化字段表时, 自带 def 的结构体
   曾直接复用**自己构造期**算好的那份 def, 而那份 def 是拿 `littleEndian ?? false` 算的 ——
   于是"没配"被焊死成大端, 父级之后配成小端也传不进去。旧 `StructBuffer` 那条分支一直是对的
   (`config.littleEndian ?? inheritedLE`), 所以旧结构体嵌进新引擎正常、新结构体嵌新结构体才
@@ -53,8 +74,8 @@
 
 ### 📚 文档
 
-- README 补 `DynamicStructBuffer`、类型推导、10 个类型的对照表与别名归属, 另加一节
-  「文本与编码」说明为什么库里没有字符串类型
+- README 按 6.0 定稿 API 重写: `struct` / `bytes` / `list`, 类型推导、10 个类型的对照表与
+  别名归属, 另加一节「文本与编码」说明为什么库里没有字符串类型
 
 ### 💥 破坏性变更
 
@@ -76,31 +97,36 @@ uint8_t.names.includes("BYTE")                 →  (删除)
 `kind` 默认 `"int"`, 只有浮点需要显式写。删掉 `typedef` 是因为它唯一的职责就是造一个**有名字的**
 别名, 名字没了它就没有存在理由 —— 顺带也修掉了它给 float 换名字时丢浮点身份的那个 bug。
 
-**删除 `StructBuffer`**(`src/struct-buffer.ts`)—— 现在只有一个结构体引擎
+**删除旧的两套结构体 API (`StructBuffer` / `StructType` / `DynamicStructBuffer`) —— 统一成 `struct()`**
 
-旧 `StructBuffer` 是"每个字段各自持有状态、自己按 offset 递归"的引擎, 新 `DynamicStructBuffer`
-是"构造期把字段表归一化成 `Field[]`, decode/encode 只做一件事: 拿 `Cursor`/`Writer` 从头走到
-尾"。功能上前者是后者的子集(新引擎多出 `ref` / `framed` / `delimited` / `records` /
-`variant` / `decodeLenient`, 旧引擎一样都表达不了), 复杂度和 bug 面却是反过来的。
+最终的 6.0 只剩一个结构体构造器 `struct(name, def, config)`, 返回一个可嵌套、可单独
+`decode` / `encode` 的 codec。旧的 `StructBuffer` 按 `maxSize` 做 C 风格对齐, 旧的
+`StructType` 自带 def/deeps 递归, 旧的 `DynamicStructBuffer` 是过渡期的字段表引擎 ——
+三者全部删除, 语义合并进单 AST。
 
 迁移是机械的:
 
 ```ts
-new StructBuffer("Player", { ... })          →  new DynamicStructBuffer("Player", { ... })
-sb.byteLength                                 →  sb.getByteLength()      // 变长字段要传样本对象
-struct.byteLength                             →  struct.getByteLength()
+new StructBuffer("Player", { ... })          →  struct("Player", { ... })
+new DynamicStructBuffer("Player", { ... })   →  struct("Player", { ... })
+sb.byteLength / sb.getByteLength()           →  sb.encode(obj).byteLength
+struct.byteLength / struct.getByteLength()   →  struct.encode(obj).byteLength
+// 旧的 T[n] 下标魔法:
+uint8_t[ref("len")]                          →  bytes(ref("len"))   // Uint8Array
+uint8_t[3]                                   →  bytes(3)           // Uint8Array
+uint32_t[2]                                  →  list(uint32_t, 2)  // number[]
+Item[2][2]                                   →  list(list(Item, 2), 2)
 ```
 
-**同时删除 `sizeof()`**
+`DynamicStructBuffer` 的 `<S, D, E>` 泛型也随类一起删除 —— `struct()` 直接返回带推导类型的
+codec, 不再需要靠泛型参数补类型。
 
-`sizeof(type)` 这个自由函数没了, 拆成两处、各自只有一个算法来源:
+**同时删除 `sizeof()` / `getSize()` / `getByteLength()`**
 
-- `StructType.getSize(ctx?)` —— 单个类型(含下标展开)的字节数
-- `DynamicStructBuffer.getByteLength(obj?)` —— 整个结构体; 全定长时不必传对象, 有变长字段时
-  **直接把对象 encode 一遍量出来**, 而不是另写一套尺寸推算
-
-删它的理由不是"有更好的替代", 而是它**在结构体上是错的**。`sizeof` 对 `StructBuffer` 会按
-`maxSize` 做 C 风格对齐补位, 而这套补位从来没在 `encode` 里实现过:
+不再另写一套尺寸推算。定长与否从 AST 直接读 (`fixedSize(node)`), 变长尺寸就是
+`encode(obj).byteLength`。删它的理由不是"有更好的替代", 而是 `sizeof` **在结构体上是错的**:
+`sizeof` 对 `StructBuffer` 会按 `maxSize` 做 C 风格对齐补位, 而这套补位从来没在 `encode` 里
+实现过:
 
 ```ts
 const B = new StructBuffer("B", { a: uint32_t, b: A, c: uint8_t }) // A = { u64, u8 }
@@ -122,42 +148,31 @@ B.encode(...).byteLength  // 14
 - 去掉 `pack` / `pack_into` / `unpack` / `unpack_from` / `iter_unpack` / `calcsize` /
   `Struct`。格式串表达不了长度前缀、变长正文、未知/保留字节这些真实报文里最常见的形状
 
-**删除 `blob()`: 字节字段只有一个写法**
+**删除 `blob()` / `uint8_t[n]` 下标: 字节字段只有一个写法 `bytes(n)`**
 
-`uint8_t[n]` 和 `blob(n)` 一直都能描述同一段字节 —— 判据是 `size === 1 && unsigned &&
-deeps.length === 1`, 两者写出**完全相同**的字节, 线上格式、长度回填、ref 解析都一样。
-区别只在解出来的容器: 一个 `number[]`, 一个 `Uint8Array`。同一个含义有两种表示, 就得由
-调用方去猜该用哪个 —— 而这两个 API 各自还有一堆只有对方才有的毛病: `blob()` 裸调用会
-抛 `Cannot use 'in' operator`, `blob({stride})` 静默只读一部分字节, `blob(uint8_t[4])`
-报一个跟调用方式对不上的错。
+`uint8_t[n]`、`blob(n)` 一直都能描述同一段字节, 区别只在解出来的容器: 一个 `number[]`,
+一个 `Uint8Array`。同一个含义有两种表示, 就得由调用方去猜该用哪个 —— 而这两个 API 各自还有
+一堆只有对方才有的毛病: `blob()` 裸调用会抛 `Cannot use 'in' operator`, `blob({stride})`
+静默只读一部分字节, `blob(uint8_t[4])` 报一个跟调用方式对不上的错; `uint8_t[n]` 的下标
+魔法还分不出 `uint8_t[2]` 和 `uint8_t[2][2]`。
 
-于是让 `uint8_t[n]` 直接表示字节, `blob()` 删除:
+最终去掉下标魔法, 字节与数组各有一个语义明确的构造器:
 
 ```ts
-blob(n)                  →  uint8_t[n]
-blob(ref("len"))         →  uint8_t[ref("len")]
-
-struct.decode(view).blobField    // number[]   →  Uint8Array
+blob(n) / uint8_t[n]         →  bytes(n)          // Uint8Array
+blob(ref("len"))             →  bytes(ref("len"))
+uint8_t[ref("len")]          →  bytes(ref("len"))
 ```
 
-只认"**连续的 1 字节无符号元素**", 两个反例都保持原样:
-
-- 嵌套(`uint8_t[2][3]`)仍是 `number[][]` —— 形状对调用方有意义(第一行 / 第二行)
-- `int8_t[3]` 仍是 `number[]` —— 有符号要做符号扩展, 那是**取值转换**而不是字节重解释。
-  混进来等于库替调用方挑了怎么读
-
-encode 入参只收 `Uint8Array`(`BlobValue` 这个 `Uint8Array | number[]` 联合随之删除)。
-`bits` / `bitFields` 虽然也是 1 字节无符号,
-但解出来是**对象**, 底层那层 `number[]` 是位映射的输入, 因此不走字节段。
-
-> 类型层有个已知缺口: `uint8_t[2][3]` 运行时给 `number[][]`, 但**声明类型**只能给
-> `Uint8Array[]` —— 类型只看得见"下标了一次", 分不出 `uint8_t[2]` 和 `uint8_t[2][2]`。
-> 运行时行为才是准的
+- `bytes(n)` 只认字节: decode 恒为 `Uint8Array`, encode 只收 `Uint8Array`
+  (`BlobValue` 这个 `Uint8Array | number[]` 联合随之删除)
+- 想拿 `number[]` 时用 `list(uint8_t, n)` —— "一段字节"与"一串数字"是两回事, 由构造器区分,
+  不再由下标次数猜
 
 **类型导出从 40 个压到 10 个**
 
 - 只保留 `uint8_t`~`uint64_t`、`int8_t`~`int64_t`、`float`、`double`
-- C / Windows 别名收进类型自己的 `names` 数组, 不再各导出一个实例: `char` / `uchar` /
+- C / Windows 别名一个都不导出, 也不再有 `names` 数组: `char` / `uchar` /
   `short` / `ushort` / `int` / `uint` / `long` / `ulong` / `long long` / `ulong long` /
   `BYTE` / `WORD` / `DWORD` / `QWORD` / `CHAR`..`ULONGLONG` / `FLOAT` / `DOUBLE`
   改写即可, 例如 `DWORD` → `uint32_t`
@@ -170,7 +185,7 @@ encode 入参只收 `Uint8Array`(`BlobValue` 这个 `Uint8Array | number[]` 联�
   是协议属性。真实报文的编码有 UTF-8 / UTF-16LE / UTF-16BE / GBK / GB18030 / Big5 /
   Shift-JIS / codepage..., 把其中一种当默认就是在替协议做决定; 而 `string_t` 还在字节之上
   叠了**第二个**协议假设 —— 定宽字段"遇第一个 NUL 截断"。定宽字段也常见空格补位或满宽
-  正文, 猜错就是静默丢数据。文本字段改用 `uint8_t[n]` / `uint8_t[ref(...)]`, 拿到 `Uint8Array`,
+  正文, 猜错就是静默丢数据。文本字段改用 `bytes(n)` / `bytes(ref(...))`, 拿到 `Uint8Array`,
   编码与截断都归调用方
 - 删除 `padding_t`: 它会把跳过的字节解成 uint8 数组塞进结果, 真实项目里协议表一半的字段
   是"未知/保留/填充", 让它们出现在结果里只会污染每一次消费。动态结构体请用 `skip()`
@@ -198,24 +213,20 @@ Big5 / Shift-JIS ...)。因此:
 
 - 删掉 `StructBufferConfig` 的 `textDecode` / `textEncoder`, 以及 `BlobField` 的
   `as: "text"` 形态 —— 解出来的值一律是字节
-- `uint8_t[n]` / `rest()` 的 encode 入参是 `Uint8Array`, **不含 `string`, 也不含 `number[]`**。
+- `bytes(n)` / `rest()` 的 encode 入参是 `Uint8Array`, **不含 `string`, 也不含 `number[]`**。
   这一层完全不知道手里的字节是不是文本: 库不猜编码, 也不"顺手按 UTF-8 帮你转一下" ——
   悄悄替调用方选编码, 换来的就是 GBK / UTF-16LE 报文静默错。传字符串编译期就报错, 绕过
   类型运行时也报错。文本自己 `new TextEncoder().encode(...)` / `new TextDecoder("gbk").decode(...)`,
   编码由调用方决定
-- `StructType.decode` / `encode` 的第 4 个参数原本是 `textDecode`, 并用
-  `!arg.decode` 这种"位置猜测"兼容两种传法。现在它是 `ctx`, 猜测逻辑删掉 —— 这是所有
-  `StructType` 子类签名的一次简化
+- 旧的 `decode` / `encode` 第 4 个参数原本是 `textDecode`, 并用
+  `!arg.decode` 这种"位置猜测"兼容两种传法。猜测逻辑删掉, 现在它就是一个普通上下文参数
 - `InferType` 里的 `IsStringy` 递归只为 `string_t` 存在(把 `string[]` 压成 `string`, 因为
   引擎下标只定字节数)。没有字符串类型之后整套逻辑连同它的深度上限一起删掉, 推导直接是
-  `V` —— 顺带修掉一个隐患: 那套压平对用户自定义的 `StructType<string>` 其实是错的,
+  `V` —— 顺带修掉一个隐患: 那套压平对用户自定义的字符串 codec 其实是错的,
   引擎真会返回 `string[]`
 
 **其他**
 
-- `DynamicStructBuffer` 泛型顺序变成 `<S, D, E>`(`S` 是字段表)。类的类型参数默认值不能
-  引用后声明的参数(TS2744), 而 `D` 的默认值就是 `InferDef<S>`, 想保住老的 `<D, E>` 位置
-  就只能让推导失效. 需要显式指定类型时写 `new DynamicStructBuffer<any, MyType>(...)`
 - 定宽字节字段不再在 NUL 处截断, 一律给满宽度。要截自己切 —— NUL 是单字节且不可能出现在
   多字节序列中间, 所以切在它上面不会劈开 UTF-8 / GBK
 - **`bits` / `bitFields` 的越界/溢出从"静默写错"改成报错**: 位下标、位宽总和、存储宽度在
