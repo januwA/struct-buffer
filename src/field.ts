@@ -1,7 +1,7 @@
 import { StructType } from "./class-type";
-// VALUE_TYPE/ENCODE_VALUE_TYPE 是 `declare const`(运行时不存在), 必须按类型导入,
+// VALUE_TYPE 是 `declare const`(运行时不存在), 必须按类型导入,
 // 否则打包器会把它们当真实导入留下, 运行时报"没有这个导出"
-import type { ENCODE_VALUE_TYPE, VALUE_TYPE } from "./class-type";
+import type { VALUE_TYPE } from "./class-type";
 import { Cursor } from "./cursor";
 import { DecodeError, EncodeError } from "./errors";
 import { AnyObject } from "./interfaces";
@@ -362,18 +362,14 @@ export class TypeField implements Field {
       w.zero(size);
       return;
     }
-    // 字节段的入参是**整段**, 不是单个数字: 传进来的东西不对(典型是字符串)不能像
+    // 字节段的入参是**整段**, 不是单个数字: 传进来的东西不对(典型是 number[])不能像
     // 标量那样被访问器悄悄强转成 0, 那会写出一段看着成功的错数据
-    if (
-      this.type.isByteRun &&
-      value != null &&
-      !(value instanceof Uint8Array) &&
-      !Array.isArray(value)
-    ) {
+    if (this.type.isByteRun && value != null && !(value instanceof Uint8Array)) {
       throw new EncodeError(
         "encode",
-        `${this.name}: 期望 Uint8Array/number[], 实际 ${typeof value} —— 这一层只有字节, ` +
-          `文本请自己编码好再传(编码也归调用方决定)`
+        `${this.name}: 期望 Uint8Array, 实际 ${
+          Array.isArray(value) ? "number[]" : typeof value
+        } —— 这一层只有字节, 文本请自己编码好再传(编码也归调用方决定)`
       );
     }
     const before = w.raw;
@@ -445,11 +441,11 @@ export class BlobField implements Field {
   private encodeValue(value: any): Uint8Array {
     if (value == null) return new Uint8Array(0);
     if (value instanceof Uint8Array) return value;
-    if (Array.isArray(value)) return Uint8Array.from(value as number[]);
     throw new EncodeError(
       "encode",
-      `${this.name}: 期望 Uint8Array/number[], 实际 ${typeof value} —— 这一层只有字节, ` +
-        `文本请自己编码好再传(编码也归调用方决定)`
+      `${this.name}: 期望 Uint8Array, 实际 ${
+        Array.isArray(value) ? "number[]" : typeof value
+      } —— 这一层只有字节, 文本请自己编码好再传(编码也归调用方决定)`
     );
   }
 
@@ -793,21 +789,18 @@ export interface FieldBuildCtx {
  * 声明式字段工厂. 之所以做成"延迟构建"而不是直接造 Field: `littleEndian` 要等
  * 父级 def 归一化时才知道, 由 makeField 统一注入才不会漏。
  */
-export interface FieldSpec<T = any, E = T> {
+export interface FieldSpec<T = any> {
   readonly __fieldSpec: true;
   /**
    * phantom: 声明"我这个字段解码出来是 T", 运行时**不存在**这个属性.
    * 与 `StructType[VALUE_TYPE]` 同一个机制(`rest()` 靠它把 `Uint8Array` 带进
    * `InferType`) —— 声明式字段的运行时形态只有 `{build}`, 类型只能由工厂自己声明.
+   *
+   * decode 值和 encode 入参都是它: 声明式字段里没有"收进去的形态和解出来不一样"的
+   * 情况 —— 字节类字段只有 `Uint8Array` 一种形态, 而嵌套子结构体"encode 可只写部分
+   * 字段"那层可选性由 `DynamicStructBuffer` 的 `E` 单独表达, 和这里无关.
    */
   readonly [VALUE_TYPE]: T;
-  /**
-   * phantom: encode 时这个字段收什么. 解码值和 encode 入参**不是一回事** ——
-   * `rest()` 与 `uint8_t[n]` 解出来是 `Uint8Array`, 写回去却接受字节数组, 合成一个
-   * 类型就得更宽 —— 放宽成 `Uint8Array | number[]` 会让 `d.body.length`
-   * 这类正常用法也要多一次收窄.
-   */
-  readonly [ENCODE_VALUE_TYPE]: E;
   build(ctx: FieldBuildCtx): Field;
 }
 

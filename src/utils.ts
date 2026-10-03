@@ -129,9 +129,8 @@ declare const REF_INDEX: unique symbol;
 /**
  * `ref()` 的返回值类型. 运行时是一个 `Ref` 对象, 但类型上声明为
  * `number & {...}` —— 这样 `uint8_t[ref("msg_size")]` 就能命中 `StructType extends
- * Array<...>` 的下标签名, 推导出 `StructType<number[], number[]>`(即解码结果是
- * `number[]`), 从而让 `InferDef` 拿到真实类型. `ref` 原先声明为 `any`, 推导到这里
- * 就断了.
+ * Array<...>` 的下标签名, 由 `uint8_t` 的字节段形态推出 `Uint8Array`, 从而让
+ * `InferDef` 拿到真实类型. `ref` 原先声明为 `any`, 推导到这里就断了.
  */
 export type RefIndex = number & { readonly [REF_INDEX]?: Ref };
 

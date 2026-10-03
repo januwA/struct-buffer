@@ -34,11 +34,19 @@ describe("定宽字节字段", () => {
       name: uint8_t[8],
       tail: uint8_t,
     });
-    expect(bytes(P.encode({ head: 1, name: [0x61, 0x62], tail: 9 }))).toEqual([
+    expect(
+      bytes(P.encode({ head: 1, name: new Uint8Array([0x61, 0x62]), tail: 9 }))
+    ).toEqual([
       1, 0x61, 0x62, 0, 0, 0, 0, 0, 0, 9,
     ]);
     expect(
-      bytes(P.encode({ head: 1, name: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], tail: 9 }))
+      bytes(
+        P.encode({
+          head: 1,
+          name: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+          tail: 9,
+        })
+      )
     ).toEqual([1, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
     // 缺省值补满: 长度字段不存在时同样不能少写
     expect(bytes(P.encode({ head: 1 }))).toEqual([1, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
@@ -76,10 +84,14 @@ describe("定宽字节字段", () => {
       pad: uint8_t[4],
       tail: uint8_t,
     });
-    expect(bytes(P.encode({ head: 1, pad: [0xaa], tail: 9 }))).toEqual([
+    expect(
+      bytes(P.encode({ head: 1, pad: new Uint8Array([0xaa]), tail: 9 }))
+    ).toEqual([
       1, 0xaa, 0, 0, 0, 9,
     ]);
-    expect(bytes(P.encode({ head: 1, pad: [1, 2, 3, 4, 5], tail: 9 }))).toEqual([
+    expect(
+      bytes(P.encode({ head: 1, pad: new Uint8Array([1, 2, 3, 4, 5]), tail: 9 }))
+    ).toEqual([
       1, 1, 2, 3, 4, 9,
     ]);
     expect(Array.from(P.decode(Uint8Array.from([1, 0xaa, 0, 0, 0, 9])).pad)).toEqual([
@@ -101,12 +113,21 @@ describe("README 示例", () => {
       },
       { littleEndian: true }
     );
-    const obj = { type: 1, payload: [0x41, 0x42], name: [0x61, 0x62, 0x63] };
+    const obj = {
+      type: 1,
+      payload: new Uint8Array([0x41, 0x42]),
+      name: new Uint8Array([0x61, 0x62, 0x63]),
+    };
     const dv = Msg.encode(obj);
     expect(bytes(dv)).toEqual([
       1, 2, 0, 0x41, 0x42, 0x61, 0x62, 0x63, 0, 0, 0, 0, 0,
     ]);
-    expect(obj).toEqual({ type: 1, payload: [0x41, 0x42], name: [0x61, 0x62, 0x63] });
+    // encode 在副本上回填长度, 原来的 Uint8Array 一个都没被换掉
+    expect(obj).toEqual({
+      type: 1,
+      payload: new Uint8Array([0x41, 0x42]),
+      name: new Uint8Array([0x61, 0x62, 0x63]),
+    });
 
     const d = Msg.decode(new Uint8Array(dv.buffer));
     expect([d.type, d.len, Array.from(d.payload), Array.from(d.name)]).toEqual([

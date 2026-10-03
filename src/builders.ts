@@ -25,15 +25,14 @@ import { InferSource } from "./infer";
  * 字段名一律取**对象的键**, 工厂自己不接受 name —— 两处都写名字就一定会有一处
  * 是错的, 而错的那处只会表现为"字段值莫名丢失", 极难查.
  *
- * `T`/`E` 是这个字段的解码值类型与 encode 入参类型, 只走类型推导(两个 phantom
- * 属性), 运行时都不携带 —— 声明式字段本身没有类型信息, 类型必须由工厂自己声明.
- * 两者分开是因为它们**确实不一样**: `rest()` 解出来是 `Uint8Array`, 但写回去时
- * 接受字节数组.
+ * `T` 是这个字段的解码值类型(也是 encode 入参类型), 只走类型推导(`VALUE_TYPE`
+ * phantom), 运行时都不携带 —— 声明式字段本身没有类型信息, 类型必须由工厂自己声明.
+ * 自定义工厂的实现细节(`Field` 的 encode 是否对入参更宽容)不体现在类型上.
  */
-export function field<T = any, E = T>(
+export function field<T = any>(
   build: (b: FieldBuildCtx) => Field
-): FieldSpec<T, E> {
-  return { __fieldSpec: true, build } as FieldSpec<T, E>;
+): FieldSpec<T> {
+  return { __fieldSpec: true, build } as FieldSpec<T>;
 }
 
 /**
@@ -48,28 +47,23 @@ export function field<T = any, E = T>(
  *
  * encode 时这 n 字节写 0.
  */
-export function skip(n: number): FieldSpec<never, never> {
+export function skip(n: number): FieldSpec<never> {
   return field((b) => new SkipField(b.name, n));
 }
-
-/**
- * encode 入参收字节, decode 结果也是字节。这段字节是文本、密文还是别的什么, 库不关心:
- * 想读成字符串就自己 `new TextDecoder("gbk").decode(bytes)`, 编码也由调用方决定。
- *
- * 定长与长度前缀的字节字段用 `uint8_t[n]` / `uint8_t[ref("len")]`, 不需要专门的工厂 ——
- * 连续的 `uint8` 就是字节, 见 `StructType.isByteRun`。本类型是 `rest()` 的入参形态。
- */
-export type BlobValue = Uint8Array | number[];
 
 /**
  * 吃掉"剩下的全部字节"。声明式长度前缀的终点标记 —— 报文尾部那段没有长度头可
  * 引用的变长正文靠它收尾。
  *
+ * encode 入参收字节, decode 结果也是字节 —— 全程只有 `Uint8Array` 一种形态。这段
+ * 字节是文本、密文还是别的什么, 库不关心: 想读成字符串就自己
+ * `new TextDecoder("gbk").decode(bytes)`, 编码也由调用方决定。
+ *
  * ```ts
  * { text_len: uint16_t, text: uint8_t[ref("text_len")], tail: rest() }
  * ```
  */
-export function rest(): FieldSpec<Uint8Array, BlobValue> {
+export function rest(): FieldSpec<Uint8Array> {
   return field((b) => new BlobField(b.name, { until: "end" }));
 }
 

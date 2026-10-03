@@ -50,7 +50,7 @@ export declare class BitFieldsType<D = {
     decode(view: DecodeBuffer_t, littleEndian?: boolean, offset?: number, ctx?: any): D;
     encode(obj: E, littleEndian?: boolean, offset?: number, view?: DataView, ctx?: any): DataView;
 }
-export type ByteListType = StructType<Uint8Array, Uint8Array | number[]>;
+export type ByteListType = StructType<Uint8Array, Uint8Array>;
 export declare function registerType(size: 1, unsigned: true, kind?: "int"): StructType<number, number, ByteListType>;
 export declare function registerType<D extends number, E extends number>(size: TypeSize_t, unsigned?: boolean, kind?: TypeKind): StructType<D, E>;
 export declare function bits(type: StructType<any, any, any>, obj: BitsType_t): BitsType<{

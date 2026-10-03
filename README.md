@@ -201,15 +201,15 @@ const data = Users.decode(
   new Uint8Array([0x61, 0x31, 0x61, 0x32, 0x62, 0x31, 0x62, 0x32])
 );
 // data.users.length => 2
-// data.users[0] => { name: [0x61, 0x31], name2: [0x61, 0x32] }
-// data.users[1] => { name: [0x62, 0x31], name2: [0x62, 0x32] }
+// data.users[0] => { name: Uint8Array([0x61, 0x31]), name2: Uint8Array([0x61, 0x32]) }
+// data.users[1] => { name: Uint8Array([0x62, 0x31]), name2: Uint8Array([0x62, 0x32]) }
 
 // or
 
 const users = User[2].decode(
   new Uint8Array([0x61, 0x31, 0x61, 0x32, 0x62, 0x31, 0x62, 0x32])
 );
-// users => [ { name: [0x61,0x31], name2: [0x61,0x32] }, ... ]
+// users => [ { name: Uint8Array([0x61,0x31]), name2: Uint8Array([0x61,0x32]) }, ... ]
 ```
 
 ## DynamicStructBuffer
@@ -240,7 +240,11 @@ const Msg = new DynamicStructBuffer(
 Msg.decode(view);
 // => { type: 1, len: 2, payload: Uint8Array, name: Uint8Array }
 
-Msg.encode({ type: 1, payload: [0x41, 0x42], name: "abc" });
+Msg.encode({
+  type: 1,
+  payload: new Uint8Array([0x41, 0x42]),
+  name: new Uint8Array([0x61, 0x62, 0x63]),
+});
 // len 不用给: encode 会把 payload 实际字节数回填进 len, 而且**不改你的入参对象**
 ```
 
@@ -363,8 +367,8 @@ Msg.encode({ msg_typo: 1 }); // 编译期报错
 几个容易踩的点:
 
 - **encode 入参是 Partial, 且长度字段不用给** —— encode 时由框架回填
-- **`uint8_t[n]` / `rest()` 解出来是 `Uint8Array`**, 写回去也只接受 `Uint8Array | number[]` ——
-  这一层只有字节, 传字符串编译期就报错(见"文本与编码")
+- **`uint8_t[n]` / `rest()` 解出来是 `Uint8Array`, 写回去也只收 `Uint8Array`** ——
+  字节只有一种形态; 传字符串 / `number[]` 编译期就报错(见"文本与编码")
 - **variant 分支字段在父对象上**(`data.name`, 不是 `data.body.name`), 类型上是可选的;
   不做按判别值收窄的 union
 - **`DynamicStructBuffer` 的泛型顺序是 `<S, D, E>`**(`S` 是字段表)。想显式指定类型时
@@ -379,7 +383,7 @@ Msg.encode({ msg_typo: 1 }); // 编译期报错
 UTF-16LE / UTF-16BE / GBK / GB18030 / Big5 / Shift-JIS / codepage..., 把其中一种当默认
 就是在替协议做决定。
 
-所以 `uint8_t[n]` / `rest()` 的 encode 入参只有 `Uint8Array | number[]`: 传字符串编译期就报错,
+所以 `uint8_t[n]` / `rest()` 的 encode 入参只有 `Uint8Array`: 传字符串或 `number[]` 编译期就报错,
 绕过类型运行时也报错。`encode({ name: "hello" })` 不会"帮你按 UTF-8 转一下" —— 那等于
 悄悄替你选了编码, 而选了之后 GBK / UTF-16LE 的报文就静默错了。
 

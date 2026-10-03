@@ -88,7 +88,7 @@ describe("宽松解码 decodeLenient", () => {
     expect(r.value.len).toBeUndefined();
     expect(() => Fwd.decode(wire)).toThrow(DecodeError);
     // encode 方向仍然可用: 长度头可以声明在数据之后
-    expect(Fwd.encode({ body: [1, 2, 3], len: 3 }).byteLength).toBe(4);
+    expect(Fwd.encode({ body: bytes(1, 2, 3), len: 3 }).byteLength).toBe(4);
   });
 
   it("嵌套定长子结构体: 里面的坏字段照样恢复, 定位串一路带进子结构", () => {

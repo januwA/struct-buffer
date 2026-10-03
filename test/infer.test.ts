@@ -6,7 +6,6 @@ import {
   Writer,
   bitFields,
   bits,
-  type BlobValue,
   double,
   float,
   framed,
@@ -310,7 +309,7 @@ describe("类型推导", () => {
       len: uint8_t,
       body: uint8_t[ref("len")],
     });
-    const dv = Msg.encode({ body: [1, 2, 3] });
+    const dv = Msg.encode({ body: new Uint8Array([1, 2, 3]) });
     expect(Array.from(new Uint8Array(dv.buffer))).toEqual([3, 1, 2, 3]);
 
     // @ts-expect-error 字段名拼错: Partial<D> 不是 {k: any}
@@ -392,7 +391,7 @@ describe("类型推导", () => {
     void (() => Pkt.encode({ msg_type: 1, nam: "abc" }));
   });
 
-  it("encode 入参类型和 decode 值类型分开推", () => {
+  it("字节段的 decode 值和 encode 入参是同一种类型", () => {
     const F = new DynamicStructBuffer("F", {
       op: uint8_t,
       body: rest(),
@@ -400,14 +399,14 @@ describe("类型推导", () => {
     type D = InferType<typeof F>;
     type E = InferEncodeDef<typeof F.struct>;
     type _t = [
-      // 解码是 Uint8Array
       Assert<Equals<D["body"], Uint8Array>>,
-      // 写回去却还收字节数组和字符串(字符串按 UTF-8)
-      Assert<Equals<E["body"], BlobValue>>
+      // 收窄到一种之后, 写回去和解出来就是同一个类型
+      Assert<Equals<E["body"], Uint8Array>>
     ];
 
-    F.encode({ body: [1, 2, 3] });
     F.encode({ body: Uint8Array.from([1, 2, 3]) });
+    // @ts-expect-error number[] 不再被接受: 字节只有 Uint8Array 一种形态
+    void (() => F.encode({ body: [1, 2, 3] }));
     expect(Array.from(F.decode([7, 9]).body)).toEqual([9]);
   });
 });

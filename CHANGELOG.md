@@ -130,7 +130,8 @@ struct.decode(view).blobField    // number[]   →  Uint8Array
 - `int8_t[3]` 仍是 `number[]` —— 有符号要做符号扩展, 那是**取值转换**而不是字节重解释。
   混进来等于库替调用方挑了怎么读
 
-encode 入参两种都收(`Uint8Array | number[]`)。`bits` / `bitFields` 虽然也是 1 字节无符号,
+encode 入参只收 `Uint8Array`(`BlobValue` 这个 `Uint8Array | number[]` 联合随之删除)。
+`bits` / `bitFields` 虽然也是 1 字节无符号,
 但解出来是**对象**, 底层那层 `number[]` 是位映射的输入, 因此不走字节段。
 
 > 类型层有个已知缺口: `uint8_t[2][3]` 运行时给 `number[][]`, 但**声明类型**只能给
@@ -181,7 +182,7 @@ Big5 / Shift-JIS ...)。因此:
 
 - 删掉 `StructBufferConfig` 的 `textDecode` / `textEncoder`, 以及 `BlobField` 的
   `as: "text"` 形态 —— 解出来的值一律是字节
-- `uint8_t[n]` / `rest()` 的 encode 入参是 `Uint8Array | number[]`, **不含 `string`**。
+- `uint8_t[n]` / `rest()` 的 encode 入参是 `Uint8Array`, **不含 `string`, 也不含 `number[]`**。
   这一层完全不知道手里的字节是不是文本: 库不猜编码, 也不"顺手按 UTF-8 帮你转一下" ——
   悄悄替调用方选编码, 换来的就是 GBK / UTF-16LE 报文静默错。传字符串编译期就报错, 绕过
   类型运行时也报错。文本自己 `new TextEncoder().encode(...)` / `new TextDecoder("gbk").decode(...)`,

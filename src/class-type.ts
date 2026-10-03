@@ -123,11 +123,10 @@ export class StructType<D, E, Idx = never> extends Array<
 
   /**
    * phantom: encode **入参**类型。绝大多数类型解出来是什么就收什么(`E` 跟 `D` 一样),
-   * 只有字节段两者不同 —— 解出来是 `Uint8Array`, 收 `Uint8Array | number[]`
-   * (跟 `rest()` 的 `BlobValue` 保持一致, 不然"同一个字节概念两种收法"又变成新裂缝)。
+   * 字节段也是 —— 解出来是 `Uint8Array`, 收进去同样只收 `Uint8Array`, 字节只有一种形态。
    *
-   * `BitsType` / `BitFieldsType` 的 `E` 是 `Partial<D>`, 也就是"子对象可以只写要覆盖的
-   * 字段" —— 之前它们靠 `InferEncode` 兜底回 `InferType` 拿到 `D`, 少了一层可选性。
+   * 唯一分叉的是位域: `BitsType` / `BitFieldsType` 的 `E` 是 `Partial<D>`, 也就是
+   * "子对象可以只写要覆盖的字段", 而解码结果 `D` 是满的。
    */
   declare readonly [ENCODE_VALUE_TYPE]: E;
 
@@ -546,11 +545,11 @@ export class BitFieldsType<
 /**
  * `uint8_t` 的列表形态: 解出来是一段字节。
  *
- * encode 入参是 `Uint8Array | number[]` —— 两者写出的字节完全一样, 收下哪个都行。
- * 解出来的类型靠 phantom `VALUE_TYPE` 携带(见 `StructType`), 所以 `InferType` /
- * `InferEncode` 自动跟着走, 推导侧不需要特判。
+ * encode 入参和解码值都是 `Uint8Array` —— 字节只有一种形态。解出来的类型靠 phantom
+ * `VALUE_TYPE` 携带(见 `StructType`), 所以 `InferType` / `InferEncode` 自动跟着走,
+ * 推导侧不需要特判。
  */
-export type ByteListType = StructType<Uint8Array, Uint8Array | number[]>;
+export type ByteListType = StructType<Uint8Array, Uint8Array>;
 
 /**
  * 注册一个新类型。参数就是线上的字节形状, 没有类型名 —— 名字对编解码毫无用处。

@@ -1,6 +1,5 @@
 import {
   bitFields,
-  BlobValue,
   Cursor,
   DecodeError,
   discriminated,
@@ -99,7 +98,9 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
       data: uint8_t[ref("len")],
       len: uint8_t,
     });
-    const encoded = Fwd.encode({ data: [0xde, 0xad, 0xbe] } as any);
+    const encoded = Fwd.encode({
+      data: new Uint8Array([0xde, 0xad, 0xbe]),
+    } as any);
     expect(hex(encoded)).toBe("de ad be 03");
   });
 
@@ -128,7 +129,7 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
       msg_size: uint16_t,
       msg: uint8_t[ref("msg_size")],
     });
-    const input = { msg: [1, 2, 3] } as any;
+    const input = { msg: new Uint8Array([1, 2, 3]) } as any;
     const snapshot = JSON.stringify(input);
     Msg.encode(input);
     expect(JSON.stringify(input)).toBe(snapshot);
@@ -270,7 +271,12 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
       msg: uint8_t[ref("msg_size")],
     });
     const view = new DataView(new ArrayBuffer(16));
-    const ret = Msg.encode({ msg: [1, 2, 3] } as any, false, 4, view);
+    const ret = Msg.encode(
+      { msg: new Uint8Array([1, 2, 3]) } as any,
+      false,
+      4,
+      view
+    );
     expect(ret).toBe(view);
     expect(hex(view)).toBe(
       "00 00 00 00 00 03 01 02 03 00 00 00 00 00 00 00"
@@ -284,7 +290,7 @@ describe("声明式字段: rest / records / variant / framed", () => {
       op: uint8_t,
       body: rest(),
     });
-    const encoded = Pkt.encode({ op: 9, body: [1, 2, 3, 4] });
+    const encoded = Pkt.encode({ op: 9, body: new Uint8Array([1, 2, 3, 4]) });
     expect(hex(encoded)).toBe("09 01 02 03 04");
     expect(Pkt.decode(encoded)).toEqual({ op: 9, body: new Uint8Array([1, 2, 3, 4]) });
   });
@@ -297,7 +303,7 @@ describe("声明式字段: rest / records / variant / framed", () => {
     });
     const encoded = Pkt.encode({
       text: new TextEncoder().encode("hi"),
-      tail: [0xaa, 0xbb],
+      tail: new Uint8Array([0xaa, 0xbb]),
     });
     expect(hex(encoded)).toBe("00 02 68 69 aa bb");
     expect(Pkt.decode(encoded)).toEqual({
@@ -323,15 +329,12 @@ describe("声明式字段: rest / records / variant / framed", () => {
       raw: uint8_t[ref("len")],
     });
 
-    // 编译期: BlobValue 就是字节, 里面没有 string
-    type _t = [Assert<Equals<BlobValue, Uint8Array | number[]>>];
-
     // 编码归调用方 —— 下面这行过不去, 因为库不认识"文本"这个概念
     const encodeText = () => {
-      // @ts-expect-error raw 收 Uint8Array | number[], 不收 string
+      // @ts-expect-error raw 收 Uint8Array, 不收 string
       Pkt.encode({ len: 2, raw: "hi" });
     };
-    expect(encodeText).toThrow(/期望 Uint8Array\/number\[\]/);
+    expect(encodeText).toThrow(/期望 Uint8Array/);
   });
 
   it("records 把定长子记录填到末尾", () => {

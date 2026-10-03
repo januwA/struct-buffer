@@ -18,7 +18,7 @@ describe("DynamicStructBuffer", () => {
       msg: uint8_t[ref("msg_size")],
     });
 
-    const payload = [0x11, 0x22, 0x33, 0x44];
+    const payload = new Uint8Array([0x11, 0x22, 0x33, 0x44]);
     const encoded = MessageStruct.encode({
       size: 100,
       uknow1: 1,
@@ -127,7 +127,7 @@ describe("DynamicStructBuffer", () => {
 
     const encoded = Transformed.encode({
       hdr_len: 5, // 3 bytes payload + 2
-      data: [1, 2, 3],
+      data: new Uint8Array([1, 2, 3]),
     });
 
     expect(encoded.byteLength).toBe(5);

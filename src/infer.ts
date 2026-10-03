@@ -15,14 +15,14 @@ import type { DynamicStructBuffer } from "./dynamic-struct-buffer";
  * 下标签名 `StructType<D[], E[]>` 自引用, TS 从子类结构反推基类类型参数推不出来),
  * `bits(...)` / `bitFields(...)` 正好中招。读 phantom 字段不做结构推断, 绕开整个问题。
  *
- * 关键效果是**下标即数组**: `StructType<D, E> extends Array<StructType<D[], E[]>>`
- * 让下标操作在类型层面把 D 推成数组, 所以
+ * 关键效果是**下标即数组**: `StructType` 继承自 `Array<...>`, 下标操作在类型层面把 D
+ * 推成数组, 所以
  *
  * ```ts
  * uint8_t              => number
- * uint8_t[2]           => number[]
- * uint8_t[2][3]        => number[][]
- * uint8_t[ref("len")]  => number[]
+ * uint8_t[2]           => Uint8Array   // 连续的 uint8 就是字节段
+ * uint16_t[2]          => number[]
+ * uint8_t[2][3]        => Uint8Array[] // 声明层只看得见"下标一次", 运行时才是 number[][]
  * ```
  *
  * 旧版 `ref()` 声明成 `any`, 推导到 `uint8_t[ref("len")]` 就断了; 改成 `RefIndex`
@@ -105,15 +105,16 @@ export type InferDef<S> = S extends any
   : never;
 
 /**
- * encode 入参类型. 和解码值类型**故意**分开推: `rest()` 解出来是 `Uint8Array`, 写回去
- * 却接受字节数组; `uint8_t[n]` 同理; 嵌套子结构体则用 `E`(默认 `Partial<D>`), 也就是
- * "子对象可以只写要覆盖的字段"。
+ * encode 入参类型. 和解码值类型**基本一致**, 只有两处不同, 都是"可以少写":
+ * 位域(`bits` / `bitFields`)的 `E` 是 `Partial<D>`, 嵌套子结构体用
+ * `DynamicStructBuffer` 的 `E`(默认 `Partial<D>`) —— 也就是"子对象可以只写要覆盖的
+ * 字段"。字节段不是这一类: 解出来是 `Uint8Array`, 收进去同样只收 `Uint8Array`。
  */
 export type InferEncode<T> = T extends { [ENCODE_VALUE_TYPE]: infer V }
-  ? V // rest() / records() / framed(): 工厂自己声明入参类型
+  ? V // bits / bitFields: Partial<D>
   : T extends DynamicStructBuffer<any, any, infer V>
     ? V // 嵌套子结构体: Partial<D>
-    : InferType<T>; // 其余字段: 入参就是解码值类型(能不能省由外层 Partial 决定)
+    : InferType<T>; // 其余字段: 入参就是解码值类型
 
 /** 整个字段表 -> encode 入参类型(`skip(n)` 的键同样去掉) */
 export type InferEncodeDef<S> = S extends any

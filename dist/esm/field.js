@@ -195,12 +195,8 @@ export class TypeField {
             w.zero(size);
             return;
         }
-        if (this.type.isByteRun &&
-            value != null &&
-            !(value instanceof Uint8Array) &&
-            !Array.isArray(value)) {
-            throw new EncodeError("encode", `${this.name}: 期望 Uint8Array/number[], 实际 ${typeof value} —— 这一层只有字节, ` +
-                `文本请自己编码好再传(编码也归调用方决定)`);
+        if (this.type.isByteRun && value != null && !(value instanceof Uint8Array)) {
+            throw new EncodeError("encode", `${this.name}: 期望 Uint8Array, 实际 ${Array.isArray(value) ? "number[]" : typeof value} —— 这一层只有字节, 文本请自己编码好再传(编码也归调用方决定)`);
         }
         const before = w.raw;
         const after = this.type.encode(value, this.le, w.pos, before, values);
@@ -236,10 +232,7 @@ export class BlobField {
             return new Uint8Array(0);
         if (value instanceof Uint8Array)
             return value;
-        if (Array.isArray(value))
-            return Uint8Array.from(value);
-        throw new EncodeError("encode", `${this.name}: 期望 Uint8Array/number[], 实际 ${typeof value} —— 这一层只有字节, ` +
-            `文本请自己编码好再传(编码也归调用方决定)`);
+        throw new EncodeError("encode", `${this.name}: 期望 Uint8Array, 实际 ${Array.isArray(value) ? "number[]" : typeof value} —— 这一层只有字节, 文本请自己编码好再传(编码也归调用方决定)`);
     }
     resolveLengths(obj, ctx) {
         if (!isRefSpec(this.spec) || this.spec.transform)

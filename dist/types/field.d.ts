@@ -1,5 +1,5 @@
 import { StructType } from "./class-type";
-import type { ENCODE_VALUE_TYPE, VALUE_TYPE } from "./class-type";
+import type { VALUE_TYPE } from "./class-type";
 import { Cursor } from "./cursor";
 import { DecodeError } from "./errors";
 import { AnyObject } from "./interfaces";
@@ -147,10 +147,9 @@ export interface FieldBuildCtx {
     parentName: string;
     le: boolean;
 }
-export interface FieldSpec<T = any, E = T> {
+export interface FieldSpec<T = any> {
     readonly __fieldSpec: true;
     readonly [VALUE_TYPE]: T;
-    readonly [ENCODE_VALUE_TYPE]: E;
     build(ctx: FieldBuildCtx): Field;
 }
 export declare function isFieldSpec(x: any): x is FieldSpec;
