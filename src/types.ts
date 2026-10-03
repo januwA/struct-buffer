@@ -1,4 +1,4 @@
-import { DOUBLE_TYPE, FLOAT_TYPE, registerType } from "./class-type";
+import { registerType } from "./class-type";
 
 /**
  * 结构体构造配置。
@@ -12,70 +12,37 @@ export type StructBufferConfig = {
 };
 
 /**
- * 一个公开类型 = 一次 `registerType`; C / C++ / Windows 的别名收进 `names` 数组,
- * 不再各导出一个实例:
+ * 类型就是**线上的字节形状**: `(size, unsigned, kind)` 三元组, 没有名字。
  *
- * - 同一 (size, unsigned) 组合的别名共用实例, 尺寸遍历少走一半 StructType
- * - 有符号与无符号的 8 字节类型**必须**是两个实例 —— `typeHandle` 靠 `unsigned` 选
- *   `getBigInt64` / `getBigUint64`, 一旦共用就有一边符号是错的
+ * C / C++ / Windows 的别名(`__int8`、`BYTE`、`DWORD`、`long long`...)对编解码毫无
+ * 影响, 所以一个别名都不导出 —— 想表达"C 里的那个 int32_t", 直接用 `int32_t`。
  *
- * `int64_t` 之前是从 `longlong` typedef 来的, 而 `longlong` 没显式传 `unsigned`,
- * 落进默认的 `true` —— 于是 `int64_t` 实际是无符号的, 负数解出来是一大坨正数。
- * 现在两个 8 字节类型都显式传 `unsigned`。
+ * 有符号与无符号的 8 字节类型**必须**是两个实例: `unsigned` 决定用
+ * `getBigInt64` 还是 `getBigUint64`, 共用就有一边符号是错的。
+ * (`int64_t` 之前是从 `longlong` typedef 来的, 而 `longlong` 没显式传 `unsigned`,
+ * 落进默认的 `true` —— 于是 `int64_t` 实际是无符号的, 负数解出来是一大坨正数。)
  *
- * 这里只有**线上的字节形状**才是类型。文本不是: 编码选择(UTF-8 / UTF-16LE / GBK /
- * Big5 / Shift-JIS / codepage...)是协议属性而不是类型属性, 而本库一行编解码都没实现
- * —— `TextDecoder` / `TextEncoder` 全程委托给平台, 所以"库里支持哪种编码"这个问题本身
- * 不成立。文本字段用 `blob(...)` 拿 `Uint8Array`, 编码由调用方自己接。
+ * 文本不是类型: 编码选择(UTF-8 / UTF-16LE / GBK / Big5 / Shift-JIS / codepage...)
+ * 是协议属性而不是类型属性, 而本库一行编解码都没实现 —— `TextDecoder` / `TextEncoder`
+ * 全程委托给平台, 所以"库里支持哪种编码"这个问题本身不成立。文本字段用 `blob(...)`
+ * 拿 `Uint8Array`, 编码由调用方自己接。
  */
-export const int8_t = registerType(
-  ["int8_t", "__int8", "signed char", "char"],
-  1,
-  false
-);
+export const int8_t = registerType(1, false);
 
-export const int16_t = registerType(["int16_t", "__int16", "short"], 2, false);
+export const int16_t = registerType(2, false);
 
-export const int32_t = registerType(
-  ["int32_t", "__int32", "int", "signed"],
-  4,
-  false
-);
+export const int32_t = registerType(4, false);
 
-export const int64_t = registerType(
-  ["int64_t", "__int64", "long long", "signed long long"],
-  8,
-  false
-);
+export const int64_t = registerType(8, false);
 
-export const uint8_t = registerType(
-  ["uint8_t", "__uint8", "unsigned char", "uchar", "BYTE"],
-  1,
-  true
-);
+export const uint8_t = registerType(1, true);
 
-export const uint16_t = registerType(
-  ["uint16_t", "__uint16", "unsigned short", "ushort", "WORD"],
-  2,
-  true
-);
+export const uint16_t = registerType(2, true);
 
-export const uint32_t = registerType(
-  ["uint32_t", "__uint32", "unsigned int", "uint", "DWORD"],
-  4,
-  true
-);
+export const uint32_t = registerType(4, true);
 
-export const uint64_t = registerType(
-  ["uint64_t", "__uint64", "unsigned long long", "ulonglong", "QWORD"],
-  8,
-  true
-);
+export const uint64_t = registerType(8, true);
 
-export const float = registerType([FLOAT_TYPE, "FLOAT"], 4, true);
+export const float = registerType(4, true, "float");
 
-export const double = registerType(
-  [DOUBLE_TYPE, "DOUBLE", "long double"],
-  8,
-  true
-);
+export const double = registerType(8, true, "float");

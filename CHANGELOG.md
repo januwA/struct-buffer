@@ -24,10 +24,16 @@ bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那�
   解出来是 `18446744073709551615` 而不是 `-1`
 - **8 字节类型的值类型统一是 `number`**: 之前 decode 把 `bigint` 原样抛给调用方, 声明
   类型和运行时类型对不上。代价是超过 `2^53` 的值会掉精度
+- **`float` 的别名会静默按整数编解码**: 选访问器是拿"名字里有没有 `float`"来判的
+  (`float` 的 `size=4` / `unsigned=true` 单看这两个属性只能落到 `getUint32`), 于是
+  `typedef("my_float", float)` 造出来的类型不含这个名字, `1.5` 被编成 `00 00 00 01` ——
+  不报错、字节还合法, 要到对端才发现。类型身份改由 `kind` 字段携带, 名字不再参与派发
 - 定长字节字段(`blob(n)`)encode 现在写满 n 字节(短补 NUL / 长截断) —— 之前短值会把后面
   所有字段整体前移, 而 `sizeof()` 报的仍是 n
 - `frameReader.read` 类型允许返回 `null`(文档一直是这么说的)
 - 判别字段没有对应分支 / `ref` 指向非法值时, 错误消息不再被塞进 `hex:` 槽位
+- 类型报不出名字之后, "不存在的字节形状" 从一句 `Unrecognized [object Object] type.` 改成
+  带上 `size` / `unsigned` / `kind` 的具体描述
 
 ### 📚 文档
 
@@ -35,6 +41,24 @@ bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那�
   「文本与编码」说明为什么库里没有字符串类型
 
 ### 💥 破坏性变更
+
+**类型不再有名字**: `registerType` 去掉第一个参数, `StructType.names` / `isName()` / `typedef()`
+一并删除
+
+类型的唯一职责是描述线上的字节形状, 名字对它没有任何用处 —— 派发看的是
+`(size, unsigned, kind)`。C / C++ / Windows 的别名(`BYTE` / `DWORD` / `long long` ...)本来
+也只是挂在 `names` 数组里当文档, 现在一个都不导出: 想表达"C 里的那个 DWORD", 直接写
+`uint32_t`。
+
+```ts
+registerType("int", 4, false)                  →  registerType(4, false)
+registerType("float", 4, true)                 →  registerType(4, true, "float")
+typedef("HANDLE", uint32_t)                    →  uint32_t          // 直接用现成的
+uint8_t.names.includes("BYTE")                 →  (删除)
+```
+
+`kind` 默认 `"int"`, 只有浮点需要显式写。删掉 `typedef` 是因为它唯一的职责就是造一个**有名字的**
+别名, 名字没了它就没有存在理由 —— 顺带也修掉了它给 float 换名字时丢浮点身份的那个 bug。
 
 **删除 `StructBuffer`**(`src/struct-buffer.ts`)—— 现在只有一个结构体引擎
 

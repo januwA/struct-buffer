@@ -8,7 +8,6 @@ import {
   uint64_t,
   double,
   DynamicStructBuffer,
-  typedef,
   makeDataView,
   sview,
   sbytes2 as b2,
@@ -194,14 +193,6 @@ describe("test struct nesting", () => {
 
   it("test byteLength", () => {
     expect(XINPUT_STATE.getByteLength()).toBe(16);
-  });
-});
-
-describe("test typedef", () => {
-  it("test typedef", () => {
-    const HANDLE = typedef("HANDLE", uint32_t);
-    expect(HANDLE.size).toBe(4);
-    expect(HANDLE.unsigned).toBe(true);
   });
 });
 

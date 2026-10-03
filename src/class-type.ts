@@ -14,13 +14,20 @@ import {
   unflattenDeep,
 } from "./utils";
 
-export const FLOAT_TYPE = "float";
-export const DOUBLE_TYPE = "double";
+/**
+ * 线上的字节形状只有两类: 整数和浮点。这是选访问器的**唯一**依据。
+ *
+ * 之前这里靠"名字里有没有 float"来判断 —— 因为 `float` 的 size 是 4、unsigned 是 true,
+ * 光看这两个属性只能落到 `getUint32`, 于是得反过来查名字。代价是别名会掉队:
+ * `typedef("my_float", float)` 造出来的类型不含 "float" 这个名字, 于是静默按整数读写
+ * (`1.5` 编成 `00 00 00 01`, 不报错、字节还合法)。名字是给人看的, 不该参与派发。
+ */
+export type TypeKind = "int" | "float";
 
 /** [DataView 读方法, DataView 写方法, 该类型是否走 BigInt 访问器] */
 type TypeHandle_t = [get: string, set: string, isBig: boolean];
 
-const hData: any = {
+const intHandle: any = {
   1: {
     1: "getUint8",
     0: "getInt8",
@@ -37,26 +44,26 @@ const hData: any = {
     1: "getBigUint64",
     0: "getBigInt64",
   },
-  f: "getFloat32",
-  d: "getFloat64",
 };
 
-function typeHandle<D, E>(type: StructType<D, E>): TypeHandle_t {
-  let h: string | undefined = undefined;
+/** 浮点没有 2 字节形态, 宽度就是 4 或 8 */
+const floatHandle: any = {
+  4: "getFloat32",
+  8: "getFloat64",
+};
 
-  const isFloat =
-    type.isName(FLOAT_TYPE.toLowerCase()) ||
-    type.isName(FLOAT_TYPE.toUpperCase());
+function typeHandle(type: StructType<any, any>): TypeHandle_t {
+  const h: string | undefined =
+    type.kind === "float"
+      ? floatHandle[type.size]
+      : intHandle[type.size]?.[+type.unsigned];
 
-  const isDouble =
-    type.isName(DOUBLE_TYPE.toLowerCase()) ||
-    type.isName(DOUBLE_TYPE.toUpperCase());
-
-  if (isFloat) h = hData["f"];
-  if (isDouble) h = hData["d"];
-
-  if (!h) h = hData[type.size][+type.unsigned];
-  if (!h) throw new Error(`StructType: Unrecognized ${type} type.`);
+  if (!h) {
+    throw new Error(
+      `StructType: 不存在这种字节形状 (size=${type.size}, ` +
+        `unsigned=${type.unsigned}, kind=${type.kind})`
+    );
+  }
 
   return [h, h.replace(/^g/, "s"), h.startsWith("getBig")];
 }
@@ -91,7 +98,6 @@ export declare const VARIANT_CASES: unique symbol;
 // D decode return type
 // E encode obj type
 export class StructType<D, E> extends Array<StructType<D[], E[]>> {
-  names: string[];
   deeps: (number | Ref)[] = [];
 
   /**
@@ -167,10 +173,6 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
     return this.size;
   }
 
-  isName(typeName: string) {
-    return this.names.includes(typeName);
-  }
-
   get: string;
   set: string;
 
@@ -182,12 +184,11 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
   readonly isBig: boolean;
 
   constructor(
-    typeName: string | string[],
     public size: TypeSize_t,
-    public readonly unsigned: boolean
+    public readonly unsigned: boolean,
+    public readonly kind: TypeKind = "int"
   ) {
     super();
-    this.names = Array.isArray(typeName) ? typeName : [typeName];
 
     if (this.size) {
       const [get, set, isBig] = typeHandle(this);
@@ -293,7 +294,7 @@ export class BitsType<
   E = Partial<D>
 > extends StructType<D, E> {
   constructor(size: TypeSize_t, public readonly bits: BitsType_t) {
-    super("<bits>", size, true);
+    super(size, true);
   }
 
   override decode(
@@ -401,7 +402,7 @@ export class BitFieldsType<
   E = Partial<D>
 > extends StructType<D, E> {
   constructor(size: TypeSize_t, public readonly bitFields: BitsType_t) {
-    super("<bit-fields>", size, true);
+    super(size, true);
   }
 
   override decode(
@@ -482,40 +483,22 @@ export class BitFieldsType<
 }
 
 /**
- *
- * Register a new type
+ * 注册一个新类型。参数就是线上的字节形状, 没有类型名 —— 名字对编解码毫无用处。
  *
  * ```ts
- * const int = registerType(["int", "signed", "signed int"], 4, false);
+ * const int = registerType(4, false); // 4 字节有符号整数
+ * const f32 = registerType(4, true, "float"); // 4 字节浮点
  * ```
- * @param typeName
- * @param size
- * @param unsigned
+ * @param size 字节宽度, 只支持 1 / 2 / 4 / 8
+ * @param unsigned 整数才看这个; 传 `0` 当"定长未知"的占位, 见 types.ts 的 docstring
+ * @param kind 整数或浮点
  */
 export function registerType<D extends number, E extends number>(
-  typeName: string | string[],
   size: TypeSize_t,
-  unsigned = true
+  unsigned = true,
+  kind: TypeKind = "int"
 ) {
-  return new StructType<D, E>(typeName, size, unsigned);
-}
-
-/**
- *
- * Inherit the "size" and "unsigned" attributes
- *
- * ```ts
- * const int8_t = typedef("int8_t", char);
- * ```
- * @param typeName
- * @param type
- */
-export function typedef<D extends number, E extends number>(
-  typeName: string | string[],
-  type: StructType<any, any>
-) {
-  const newType = registerType<D, E>(typeName, type.size, type.unsigned);
-  return newType;
+  return new StructType<D, E>(size, unsigned, kind);
 }
 
 export function bits(type: StructType<number, number>, obj: BitsType_t) {

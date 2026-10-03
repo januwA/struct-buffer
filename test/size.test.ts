@@ -7,6 +7,8 @@ import {
   int32_t,
   int64_t,
   int8_t,
+  registerType,
+  sview,
   uint16_t,
   uint32_t,
   uint64_t,
@@ -79,25 +81,41 @@ describe("test size", () => {
     expect(double[10].getSize()).toBe(8 * 10);
   });
 
-  it("同名别名与固定宽度类型是同一个实例", () => {
-    // C / Windows 别名收进 names, 不再各导出一个实例
-    expect(uint8_t.names).toContain("BYTE");
-    expect(uint16_t.names).toContain("WORD");
-    expect(uint32_t.names).toContain("DWORD");
-    expect(uint64_t.names).toContain("QWORD");
-
-    // char 在 x86/ARM 上默认有符号, 和 unsigned char 分属两侧
-    expect(int8_t.names).toContain("char");
-    expect(uint8_t.names).toContain("unsigned char");
-    expect(uint8_t.names).toContain("uchar");
+  it("访问器由字节形状决定, 不看名字", () => {
+    expect(int8_t.get).toBe("getInt8");
+    expect(uint8_t.get).toBe("getUint8");
+    expect(uint16_t.get).toBe("getUint16");
+    expect(int32_t.get).toBe("getInt32");
+    expect(float.get).toBe("getFloat32");
+    expect(double.get).toBe("getFloat64");
   });
 
   it("有符号与无符号的 8 字节类型必须是两个实例", () => {
-    // typeHandle 靠 unsigned 选 getBigInt64 / getBigUint64,
+    // 8 字节整数走 BigInt 访问器, 由 unsigned 决定是哪一支;
     // 共用一个实例就有一边符号是错的
+    expect(int64_t.get).toBe("getBigInt64");
+    expect(uint64_t.get).toBe("getBigUint64");
     expect(int64_t).not.toBe(uint64_t);
     expect(int64_t.unsigned).toBe(false);
     expect(uint64_t.unsigned).toBe(true);
+  });
+
+  it("自定义浮点类型按浮点读写", () => {
+    // 过去 kind 是靠"名字里有没有 float"猜的, 所以任何 float 的别名都会掉队:
+    // size=4 + unsigned=true 只能落到 getUint32, 1.5 被静默编成 00 00 00 01 ——
+    // 不报错, 字节还合法。现在浮点身份由 kind 携带, 与名字无关
+    const my_float = registerType(4, true, "float");
+
+    expect(my_float.kind).toBe("float");
+    expect(my_float.get).toBe("getFloat32");
+    expect(sview(my_float.encode(1.5))).toBe("3f c0 00 00");
+    expect(my_float.decode(my_float.encode(1.5))).toBe(1.5);
+  });
+
+  it("不存在的字节形状要当场报错", () => {
+    // 浮点没有 2 字节形态, 整数也没有 3 字节形态
+    expect(() => registerType(2, true, "float")).toThrow(/字节形状/);
+    expect(() => registerType(3, true)).toThrow(/字节形状/);
   });
 
   it("结构体: 字段相加", () => {

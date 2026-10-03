@@ -1,7 +1,5 @@
 import { arrayProxyNext, COUNT, createDataView, isRef, makeDataView, unflattenDeep, } from "./utils";
-export const FLOAT_TYPE = "float";
-export const DOUBLE_TYPE = "double";
-const hData = {
+const intHandle = {
     1: {
         1: "getUint8",
         0: "getInt8",
@@ -18,23 +16,19 @@ const hData = {
         1: "getBigUint64",
         0: "getBigInt64",
     },
-    f: "getFloat32",
-    d: "getFloat64",
+};
+const floatHandle = {
+    4: "getFloat32",
+    8: "getFloat64",
 };
 function typeHandle(type) {
-    let h = undefined;
-    const isFloat = type.isName(FLOAT_TYPE.toLowerCase()) ||
-        type.isName(FLOAT_TYPE.toUpperCase());
-    const isDouble = type.isName(DOUBLE_TYPE.toLowerCase()) ||
-        type.isName(DOUBLE_TYPE.toUpperCase());
-    if (isFloat)
-        h = hData["f"];
-    if (isDouble)
-        h = hData["d"];
-    if (!h)
-        h = hData[type.size][+type.unsigned];
-    if (!h)
-        throw new Error(`StructType: Unrecognized ${type} type.`);
+    const h = type.kind === "float"
+        ? floatHandle[type.size]
+        : intHandle[type.size]?.[+type.unsigned];
+    if (!h) {
+        throw new Error(`StructType: 不存在这种字节形状 (size=${type.size}, ` +
+            `unsigned=${type.unsigned}, kind=${type.kind})`);
+    }
     return [h, h.replace(/^g/, "s"), h.startsWith("getBig")];
 }
 class StructTypeNext {
@@ -87,15 +81,12 @@ export class StructType extends Array {
         }
         return this.size;
     }
-    isName(typeName) {
-        return this.names.includes(typeName);
-    }
-    constructor(typeName, size, unsigned) {
+    constructor(size, unsigned, kind = "int") {
         super();
         this.size = size;
         this.unsigned = unsigned;
+        this.kind = kind;
         this.deeps = [];
-        this.names = Array.isArray(typeName) ? typeName : [typeName];
         if (this.size) {
             const [get, set, isBig] = typeHandle(this);
             this.set = set;
@@ -140,7 +131,7 @@ export class StructType extends Array {
 }
 export class BitsType extends StructType {
     constructor(size, bits) {
-        super("<bits>", size, true);
+        super(size, true);
         this.bits = bits;
     }
     decode(view, littleEndian = false, offset = 0, ctx) {
@@ -193,7 +184,7 @@ export class BitsType extends StructType {
 }
 export class BitFieldsType extends StructType {
     constructor(size, bitFields) {
-        super("<bit-fields>", size, true);
+        super(size, true);
         this.bitFields = bitFields;
     }
     decode(view, littleEndian = false, offset = 0, ctx) {
@@ -242,12 +233,8 @@ export class BitFieldsType extends StructType {
         }
     }
 }
-export function registerType(typeName, size, unsigned = true) {
-    return new StructType(typeName, size, unsigned);
-}
-export function typedef(typeName, type) {
-    const newType = registerType(typeName, type.size, type.unsigned);
-    return newType;
+export function registerType(size, unsigned = true, kind = "int") {
+    return new StructType(size, unsigned, kind);
 }
 export function bits(type, obj) {
     return new BitsType(type.size, obj);

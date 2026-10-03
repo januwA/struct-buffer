@@ -54,17 +54,19 @@ const data = uint32_t[2].decode(view);
 // data => [ 1, 2 ]
 ```
 
-只导出 10 个类型, 别名收进类型自己的 `names` 而不是各导出一个实例 —— 同宽同符号的
-别名本来就是同一个类型, 多导一份只会让人在 "该用哪个" 上纠结:
+类型就是线上的字节形状 `(size, unsigned, kind)`, 没有名字 —— 同宽同符号的 C 别名本来就是同一个
+类型, 多导一份只会让人在"该用哪个"上纠结, 而名字对编解码又毫无用处:
 
-| 有符号 | 无符号 | C / Windows 别名（在 `names` 里） |
+| 有符号 | 无符号 | C / Windows 里的对应写法 |
 | --- | --- | --- |
-| `int8_t` | `uint8_t` | `char` / `signed char`、`unsigned char`、`uchar`、`BYTE` |
-| `int16_t` | `uint16_t` | `short`、`signed short`、`unsigned short`、`ushort`、`WORD` |
-| `int32_t` | `uint32_t` | `int`、`signed`、`unsigned int`、`uint`、`DWORD` |
-| `int64_t` | `uint64_t` | `long long`、`signed long long`、`unsigned long long`、`ulonglong`、`QWORD` |
+| `int8_t` | `uint8_t` | `signed char` / `unsigned char`、`BYTE` |
+| `int16_t` | `uint16_t` | `short`、`WORD` |
+| `int32_t` | `uint32_t` | `int`、`DWORD` |
+| `int64_t` | `uint64_t` | `long long`、`QWORD` |
+| `float` | `double` | 4 / 8 字节浮点 |
 
-浮点是 `float` / `double`，宽度不合适就 [`registerType`](#register-type)。
+表里的 C 写法只是说明这些类型对应协议里的哪个字段, 不作为标识符存在 —— 用 `uint32_t` 而不是
+`DWORD`。宽度或浮点身份不合适就 [`registerType`](#register-type)。
 
 两处语义在 6.0 修正，升级时留意：
 
@@ -88,8 +90,11 @@ Boolean(d.ok); // => true 真值判断是消费方的事
 永远出不来，往返即损坏）。需要状态多于两态的字段，同理直接用整数类型自己收窄。
 
 ## register Type
+类型就是线上的字节形状 `(size, unsigned, kind)`, 没有名字:
+
 ```ts
-const myShort = registerType("short", 2, false);
+const myShort = registerType(2, false);
+const myFloat = registerType(4, true, "float"); // kind 默认 "int"
 
 const struct = new DynamicStructBuffer("Player", {
   hp: myShort,
@@ -110,13 +115,12 @@ const data = struct.decode(view);
 // data => { hp: 2, mp: 10, pos: [ 100, 200 ] }
 ```
 
-## typedef
-```ts
-const HANDLE = typedef("HANDLE", uint32_t);
-HANDLE.size // 4
-HANDLE.unsigned // true
-```
+C / C++ / Windows 的别名(`BYTE`、`DWORD`、`long long`...)一个都不导出 —— 它们对
+编解码没有任何影响。想表达"C 里的那个 DWORD", 直接写 `uint32_t`。
 
+`kind` 决定整数还是浮点, 历史上这里靠"名字里有没有 float"猜 —— 代价是任何 float 别名都会
+掉队: `size=4` + `unsigned=true` 只能落到 `getUint32`, 于是 `1.5` 被静默编成 `00 00 00 01`,
+不报错、字节还合法。名字是给人看的, 不该参与派发, 所以浮点身份必须显式声明。
 
 ## Nested struct
 ```ts

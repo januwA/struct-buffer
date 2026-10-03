@@ -5,7 +5,8 @@ export * from "./types";
 export { DecodeError, EncodeError, LenientResult } from "./errors";
 export { Cursor } from "./cursor";
 export { Writer } from "./writer";
-export { registerType, typedef, bits, bitFields } from "./class-type";
+export { registerType, bits, bitFields } from "./class-type";
+export type { TypeKind } from "./class-type";
 export { display } from "./display";
 // 自定义 Field / FieldSpec 是公开扩展点, 归一化 Def 一侧也是 builders 里公开签名的一部分,
 // 所以只挑这些 —— `export * from "./field"` 会把 30 多个内部符号(各 Field 实现、resolveCount
