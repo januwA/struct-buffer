@@ -32,6 +32,21 @@
 - `decodeLenient`: 坏字段变 `undefined` 并收集错误, 而不是整帧丢掉
 - `skip(n)`: 占位字节, 不在结果里出现(取代旧 `padding_t` 的"把填充解进结果")
 
+### 🛠 构建与运行时
+
+把 webpack 换成 esbuild, 并让产物只依赖 ECMAScript 标准本身:
+
+- 删除 `webpack` / `webpack-cli` / `ts-loader` / `node-notifier` / `ts-node`, 改用
+  `scripts/build.mjs`(esbuild)+ `tsc --emitDeclarationOnly` 出类型
+- esbuild 用 `platform: "neutral"`, 不注入 node/browser shim; 产物三份:
+  `dist/esm/index.mjs` / `dist/cjs/index.cjs` / `dist/iife/struct-buffer.global.js`
+- `package.json` 的 `main` / `module` / `exports` 指向新入口, IIFE 挂在 `unpkg` / `jsdelivr`
+  上供浏览器 `<script>` 直接引入(全局 `StructBuffer`)
+- 产物不引用 `require` / `process` / `Buffer` / `global` / `window` / `self` 等宿主全局;
+  `TEXT()` / `sbytes2()` 不再内置文本实现或探测平台全局, 只声明 `ITextDecoder` /
+  `ITextEncoder` 抽象由调用方注入 —— 于是 Node / 浏览器 / Bun / Frida 17+ 都能跑
+- devDependencies 升级到 `typescript@^5.9` / `jest@^30` / `ts-jest@^29.4` / `@types/jest@^30`
+
 ### 🐛 修复
 
 - **嵌套 `struct` 收不到父级的 `littleEndian`**: 归一化字段表时, 自带 def 的结构体
@@ -237,6 +252,10 @@ Big5 / Shift-JIS ...)。因此:
   类型的一部分, 改名只影响直接引用这个名字的 `.d.ts` 使用者
 - `ref()` 的 `scope`(`self` / `parent` / `root`)连同 `Ctx` 的 parent/root 一起删除:
   公开 API 从来不产出 `scope`, 那两条分支不可达
+- `sbytes2()` / `TEXT()` 不再内置文本编解码、也不再探测平台 `TextEncoder` / `TextDecoder`,
+  改为注入抽象接口: `TEXT(buf, decoder, placeholder?)` 第二个参数是调用方提供的
+  `ITextDecoder`(如 `new TextDecoder()`), `sbytes2(str, encoder?)` 只在含非十六进制文本
+  时需要 `ITextEncoder`, 纯十六进制串可省略
 
 ## 5.2.0 2022-9-28
 

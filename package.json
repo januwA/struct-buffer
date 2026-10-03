@@ -7,22 +7,24 @@
   "files": [
     "dist"
   ],
-  "main": "./dist/umd/struct-buffer.js",
-  "module": "./dist/esm/index.js",
+  "main": "./dist/cjs/index.cjs",
+  "module": "./dist/esm/index.mjs",
   "types": "./dist/types/index.d.ts",
+  "unpkg": "./dist/iife/struct-buffer.global.js",
+  "jsdelivr": "./dist/iife/struct-buffer.global.js",
   "exports": {
     ".": {
       "types": "./dist/types/index.d.ts",
-      "import": "./dist/esm/index.js",
-      "require": "./dist/umd/struct-buffer.js",
-      "default": "./dist/esm/index.js"
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.cjs",
+      "default": "./dist/esm/index.mjs"
     },
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build:umd": "webpack -c webpack.config.js",
-    "build:esm": "tsc --project tsconfig.esm.json",
-    "build": "npm run build:umd && npm run build:esm",
+    "build:js": "node scripts/build.mjs",
+    "build:types": "tsc --project tsconfig.types.json",
+    "build": "npm run build:js && npm run build:types",
     "test": "jest"
   },
   "keywords": [
@@ -42,15 +44,11 @@
     "url": "https://github.com/januwA/struct-buffer.git"
   },
   "devDependencies": {
-    "@types/jest": "^27.0.2",
-    "jest": "^27.3.1",
-    "node-notifier": "^10.0.0",
-    "ts-jest": "^27.0.7",
-    "ts-loader": "^9.2.6",
-    "ts-node": "^10.4.0",
-    "typescript": "^4.4.4",
-    "webpack": "^5.60.0",
-    "webpack-cli": "^4.9.1"
+    "@types/jest": "^30.0.0",
+    "esbuild": "^0.28.2",
+    "jest": "^30.5.2",
+    "ts-jest": "^29.4.14",
+    "typescript": "^5.9.3"
   },
   "dependencies": {}
 }

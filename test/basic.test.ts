@@ -54,7 +54,7 @@ describe("test decode and encode", () => {
 
 describe("test int8_t", () => {
   it("test decode and encode", () => {
-    const view = b2("abcd");
+    const view = b2("abcd", new TextEncoder());
     const obj = {
       a: 0x61,
       b: [0x62],
@@ -219,12 +219,12 @@ describe("test struct list", () => {
   });
 
   it("test decode", () => {
-    expect(users.decode(b2("a1a2b1b2"))).toEqual(obj);
-    expect(list(user, 2).decode(b2("a1a2b1b2")).length).toBe(2);
+    expect(users.decode(b2("a1a2b1b2", new TextEncoder()))).toEqual(obj);
+    expect(list(user, 2).decode(b2("a1a2b1b2", new TextEncoder())).length).toBe(2);
   });
 
   it("test encode", () => {
-    expect(sview(users.encode(obj))).toBe(sview(b2("a1a2b1b2")));
+    expect(sview(users.encode(obj))).toBe(sview(b2("a1a2b1b2", new TextEncoder())));
   });
 
   it("test byteLength", () => {

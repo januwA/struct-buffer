@@ -7,6 +7,21 @@ Add structure to ArrayBuffer
 $ npm i struct-buffer
 ```
 
+## 运行时
+
+产物**只依赖 ECMAScript 标准本身**: 不引用 `require` / `process` / `Buffer` / `global` /
+`window` / `self` 等任何宿主专有全局, 也不在加载时要求平台提供额外对象。因此同一份代码可以
+在 Node、浏览器、Bun, 以及 Frida 17+ 的 agent 里直接使用。
+
+- ESM(默认): Node / Bun / 各打包器 / 支持 ESM 的 Frida 17 — `import { struct } from "struct-buffer"`
+- CJS: `require()` 与老 bundler — `const { struct } = require("struct-buffer")`
+- IIFE: 浏览器 `<script>` 的全局 `StructBuffer`(也在 `unpkg` / `jsdelivr` 字段上)
+
+文本相关的 `TEXT()` / `sbytes2()` 只声明抽象接口 `ITextDecoder` / `ITextEncoder`, 需要时由调用方
+按运行时注入(例如 `new TextDecoder()` / `new TextEncoder()`), 库本身不内置任何实现、也不探测
+平台全局 —— 这样在 Node / 浏览器 / Bun / Frida 里行为完全由调用方决定。`sbytes2()` 仅解析
+十六进制时可以省略编码器, 一旦出现非十六进制文本就必须传入, 否则报错。
+
 ## how to use
 ```ts
 import { bytes, struct, uint32_t, uint8_t, sbytes } from "struct-buffer";
@@ -37,9 +52,10 @@ const out = Player.encode({
 
 ## Use in browser
 ```html
-<script src="struct-buffer.js"></script>
+<!-- 直接用 unpkg 上挂到全局的 IIFE 版本 -->
+<script src="https://unpkg.com/struct-buffer"></script>
 <script>
-  const { struct, bytes, uint32_t } = window.StructBuffer;
+  const { struct, bytes, uint32_t } = StructBuffer;
 </script>
 ```
 
@@ -486,14 +502,17 @@ makeDataView([1, 2, 3])
 b("01 02 03")
 // => <01 02 03>
 
-b2("abc\\x1\\x2\\x3")
+b2("abc\\x1\\x2\\x3", new TextEncoder())
 // => <61 62 63 01 02 03>
 
 TEXT(makeDataView([
   0x61, 0x62, 0x63, 0x01, 0x02, 0x78, 0x79, 0x7a, 0, 0, 0, 8, 0, 0, 0, 9,
-]))
+]), new TextDecoder())
 // => "abc..xyz........"
 ```
+
+`TEXT()` 的第二个参数是调用方提供的 `ITextDecoder`; `sbytes2()` 只在文本段需要
+`ITextEncoder`, 纯十六进制串可省略。
 
 `makeDataView` 尊重 `Uint8Array` 的 `byteOffset` / `byteLength` 窗口(subarray 不会读出去)。
 
@@ -502,6 +521,18 @@ TEXT(makeDataView([
 
 ## build
 > $ npm run build
+
+用 esbuild 打包(不再依赖 webpack), 一条命令产出三份 JS 加一份类型声明:
+
+| 产物 | 格式 | 面向 |
+| --- | --- | --- |
+| `dist/esm/index.mjs` | ESM | Node / Bun / 打包器 / Frida 17 |
+| `dist/cjs/index.cjs` | CJS | `require()` / 老 bundler |
+| `dist/iife/struct-buffer.global.js` | IIFE | 浏览器 `<script>` 全局 `StructBuffer` |
+| `dist/types/*.d.ts` | — | TypeScript 类型(`tsc --emitDeclarationOnly`) |
+
+`scripts/build.mjs` 里 esbuild 用 `platform: "neutral"`, 不注入任何宿主 shim —— 这样才保证
+产物在 Node / 浏览器 / Bun / Frida 里行为一致。
 
 ## See also:
   - [See the test for more examples](https://github.com/januwA/struct-buffer/blob/main/test/basic.test.ts)

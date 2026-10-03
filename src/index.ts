@@ -46,4 +46,10 @@ export { Cursor } from "./cursor";
 export { Writer } from "./writer";
 export { display } from "./display";
 export { makeDataView, createDataView, sbytes, sbytes2, sview, TEXT } from "./utils";
-export type { DecodeBuffer_t, DisplayResult, Bit_t } from "./interfaces";
+export type {
+  DecodeBuffer_t,
+  DisplayResult,
+  Bit_t,
+  ITextDecoder,
+  ITextEncoder,
+} from "./interfaces";

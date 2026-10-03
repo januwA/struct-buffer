@@ -40,7 +40,10 @@ describe("utils test", () => {
   });
 
   it("sbytes2 parse string", () => {
-    expect(sview(b2("abc\\x1\\x2\\x3"))).toBe("61 62 63 01 02 03");
+    expect(sview(b2("abc\\x1\\x2\\x3", new TextEncoder()))).toBe(
+      "61 62 63 01 02 03"
+    );
+    expect(() => b2("abc")).toThrow();
   });
 
   it("TEXT", () => {
@@ -50,12 +53,12 @@ describe("utils test", () => {
       0x78, 0x79, 0x7a, // "xyz"
       0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x09,
     ]);
-    expect(TEXT(view)).toBe("abc..xyz........");
+    expect(TEXT(view, new TextDecoder())).toBe("abc..xyz........");
     expect(
-      TEXT(view, (byte: number) => {
+      TEXT(view, new TextDecoder(), (byte: number) => {
         return " " + byte.toString(16).padStart(2, "0");
       })
     ).toBe("abc 01 02xyz 00 00 00 08 00 00 00 09");
-    expect(TEXT(view, "^")).toBe("abc^^xyz^^^^^^^^");
+    expect(TEXT(view, new TextDecoder(), "^")).toBe("abc^^xyz^^^^^^^^");
   });
 });

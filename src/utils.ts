@@ -1,4 +1,4 @@
-import { DecodeBuffer_t } from "./interfaces";
+import { DecodeBuffer_t, ITextDecoder, ITextEncoder } from "./interfaces";
 
 export function zeroMemory(view: DataView, length: number, offset: number) {
   while (length-- > 0) view.setUint8(offset++, 0);
@@ -57,56 +57,6 @@ export function sbytes(str: string): DataView {
 const HEX_EXP = /^(0x([0-9a-f]{1,2})|([0-9a-f]{1,2})h|\\x([0-9a-f]{1,2}))/i;
 const HEX_SEARCH_EXP = /0x([0-9a-f]{1,2})|([0-9a-f]{1,2})h|\\x([0-9a-f]{1,2})/i;
 
-class FallbackTextDecoder {
-  decode(buf?: ArrayBuffer | ArrayBufferView): string {
-    if (!buf) return "";
-    const u8 = ArrayBuffer.isView(buf)
-      ? new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength)
-      : new Uint8Array(buf);
-    let s = "";
-    for (let i = 0; i < u8.length; i++) {
-      s += "%" + u8[i].toString(16).padStart(2, "0");
-    }
-    try {
-      return decodeURIComponent(s);
-    } catch {
-      let out = "";
-      for (let i = 0; i < u8.length; i++) out += String.fromCharCode(u8[i]);
-      return out;
-    }
-  }
-}
-
-class FallbackTextEncoder {
-  encode(str: string): Uint8Array {
-    let s = "";
-    try {
-      s = unescape(encodeURIComponent(str));
-    } catch {
-      s = str;
-    }
-    const arr = new Uint8Array(s.length);
-    for (let i = 0; i < s.length; i++) {
-      arr[i] = s.charCodeAt(i) & 0xff;
-    }
-    return arr;
-  }
-}
-
-export function createTextDecoder(): TextDecoder {
-  if (typeof TextDecoder !== "undefined") {
-    return new TextDecoder();
-  }
-  return new FallbackTextDecoder() as any;
-}
-
-export function createTextEncoder(): TextEncoder {
-  if (typeof TextEncoder !== "undefined") {
-    return new TextEncoder();
-  }
-  return new FallbackTextEncoder() as any;
-}
-
 /**
  * ```ts
  * b2('abc 0x640x0a')
@@ -114,8 +64,11 @@ export function createTextEncoder(): TextEncoder {
  * b2('abc \\x640ah')
  * // => <61 62 63 20 64 0a>
  * ```
+ *
+ * `encoder` 只在遇到非十六进制文本时才会用到, 由调用方按运行时提供
+ * (例如浏览器/Node 的 `new TextEncoder()`)。纯十六进制串不需要它。
  */
-export function sbytes2(str: string, te = createTextEncoder()): DataView {
+export function sbytes2(str: string, encoder?: ITextEncoder): DataView {
   let m;
   const bytes = [];
   while (str.length) {
@@ -125,14 +78,18 @@ export function sbytes2(str: string, te = createTextEncoder()): DataView {
       bytes.push(parseInt(v, 16));
       str = str.substr(m[1].length);
     } else if (str.length) {
+      if (!encoder)
+        throw new Error(
+          "sbytes2: 输入含非十六进制文本, 请传入文本编码器 (如 new TextEncoder())"
+        );
       const i = str.search(HEX_SEARCH_EXP);
       if (i < 0) {
         // all string
-        bytes.push(...te.encode(str));
+        bytes.push(...encoder.encode(str));
         str = "";
       } else {
         const s = str.substr(0, i);
-        bytes.push(...te.encode(s));
+        bytes.push(...encoder.encode(s));
         str = str.substr(i);
       }
     }
@@ -169,38 +126,21 @@ export function sview(view: DecodeBuffer_t): string {
  * const view = makeDataView([
  *   0x61, 0x62, 0x63, 0x01, 0x02, 0x78, 0x79, 0x7a, 0, 0, 0, 8, 0, 0, 0, 9,
  * ]);
- * TEXT(view)
+ * TEXT(view, new TextDecoder())
  * // => "abc..xyz........"
  *
- * TEXT(view, "^")
+ * TEXT(view, new TextDecoder(), "^")
  * // => "abc^^xyz^^^^^^^^"
  * ```
+ *
+ * `decoder` 由调用方按运行时提供 (例如 `new TextDecoder()`), 库不内置任何实现。
  */
 export function TEXT(
   buf: number[] | ArrayBufferView,
+  decoder: ITextDecoder,
   placeholder?: ((byte: number) => string) | string
-): string;
-export function TEXT(
-  buf: number[] | ArrayBufferView,
-  text?: TextDecoder,
-  placeholder?: ((byte: number) => string) | string
-): string;
-export function TEXT(
-  buf: number[] | ArrayBufferView,
-  text?: any,
-  placeholder?: any
 ): string {
   const view = makeDataView(buf);
-
-  if (!text && !placeholder) {
-    text = createTextDecoder();
-  } else if (
-    (text !== undefined && typeof text === "string") ||
-    typeof text === "function"
-  ) {
-    placeholder = text;
-    text = createTextDecoder();
-  }
   let offset = 0;
   let str = "";
   let strBytes = [];
@@ -211,7 +151,7 @@ export function TEXT(
         strBytes.push(byte);
       } else {
         if (strBytes.length) {
-          str += text.decode(Uint8Array.from(strBytes));
+          str += decoder.decode(Uint8Array.from(strBytes));
           strBytes = [];
         }
         str += placeholder
@@ -220,8 +160,8 @@ export function TEXT(
             : placeholder(byte)
           : ".";
       }
-    } catch (error) {
-      if (strBytes.length) str += text.decode(Uint8Array.from(strBytes));
+    } catch {
+      if (strBytes.length) str += decoder.decode(Uint8Array.from(strBytes));
       break;
     }
   }
