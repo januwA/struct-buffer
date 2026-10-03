@@ -74,7 +74,8 @@ describe("DynamicStructBuffer", () => {
 
     const encoded = ChatPacket.encode({
       channel: 1,
-      text: "hello world",
+      // 编码归调用方: 库这一层只有字节
+      text: new TextEncoder().encode("hello world"),
     });
 
     // 1 (channel) + 2 (text_len) + 11 (text) = 14 bytes

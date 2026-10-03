@@ -358,8 +358,8 @@ Msg.encode({ msg_typo: 1 }); // 编译期报错
 几个容易踩的点:
 
 - **encode 入参是 Partial, 且长度字段不用给** —— encode 时由框架回填
-- **`blob()` / `rest()` 解出来是 `Uint8Array`**, 写回去接受 `Uint8Array | number[] | string`
-  (字符串按 UTF-8; 非 UTF-8 自己编码好再传字节)
+- **`blob()` / `rest()` 解出来是 `Uint8Array`**, 写回去也只接受 `Uint8Array | number[]` ——
+  这一层只有字节, 传字符串编译期就报错(见"文本与编码")
 - **variant 分支字段在父对象上**(`data.name`, 不是 `data.body.name`), 类型上是可选的;
   不做按判别值收窄的 union
 - **`DynamicStructBuffer` 的泛型顺序是 `<S, D, E>`**(`S` 是字段表)。想显式指定类型时
@@ -369,9 +369,14 @@ Msg.encode({ msg_typo: 1 }); // 编译期报错
 
 ## 文本与编码
 
-库里**没有字符串类型**。这不是遗漏, 是刻意的: 线上的字节形状才是类型, 而"这些字节是什么
-字符"是协议属性。真实报文的编码有 UTF-8 / UTF-16LE / UTF-16BE / GBK / GB18030 /
-Big5 / Shift-JIS / codepage..., 把其中一种当默认就是在替协议做决定。
+库里**没有字符串类型**, 而且这一层**完全不知道字节是不是文本**。这不是遗漏, 是刻意的:
+线上的字节形状才是类型, 而"这些字节是什么字符"是协议属性。真实报文的编码有 UTF-8 /
+UTF-16LE / UTF-16BE / GBK / GB18030 / Big5 / Shift-JIS / codepage..., 把其中一种当默认
+就是在替协议做决定。
+
+所以 `blob()` / `rest()` 的 encode 入参只有 `Uint8Array | number[]`: 传字符串编译期就报错,
+绕过类型运行时也报错。`encode({ name: "hello" })` 不会"帮你按 UTF-8 转一下" —— 那等于
+悄悄替你选了编码, 而选了之后 GBK / UTF-16LE 的报文就静默错了。
 
 本库一行编解码都没实现 —— `TextDecoder` / `TextEncoder` 全程委托平台, 所以
 "库里支持哪种编码"这个问题不成立: 解码用平台 `TextDecoder` 就能吃下几十种 label。
@@ -388,7 +393,10 @@ gbk.decode(Msg.decode(view).name); // => "你好，世界"
 
 // 编码: Node 的 TextEncoder 按规范只支持 UTF-8, 别的编码得靠 iconv-lite 之类
 Msg.encode({ name: gbkBytes("你好，世界") }); // 自己编码好的 Uint8Array
-// 或者传字符串, 按 UTF-8
+Msg.encode({ name: new TextEncoder().encode("hello") });
+
+// 传字符串不行 —— 编译期就报错:
+// @ts-expect-error
 Msg.encode({ name: "hello" });
 ```
 

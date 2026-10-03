@@ -58,19 +58,18 @@ export function skip(n: number): FieldSpec<never, never> {
  * 长度一律是**字节数**, 不是字符数: `"世界"` 的 length 是 2, UTF-8 编码占 6 字节,
  * GBK 占 4 字节 —— 拿字符数当长度头会把正文截掉.
  *
- * 文本字段也走这里, 编码由调用方自己接 `new TextDecoder(...)`。本库一行编解码都没实现,
- * `TextDecoder`/`TextEncoder` 全程委托平台, 所以不猜编码。
+ * 这一层只有字节。`blob()` 收什么编码的正文、怎么变成字符串, 全是调用方的事 —— 本库
+ * 一行编解码都没实现, 所以不猜也不记。
  *
  * ```ts
  * { head: uint8_t, payload: blob(ref("len")) }
  * ```
  */
 /**
- * encode 入参额外收 `string`, 但**只按 UTF-8 编码** —— 非 UTF-8(GBK / UTF-16LE / ...)
- * 的正文自己编码好再传 `Uint8Array`。Node 的 `TextEncoder` 按规范只支持 UTF-8,
- * 别的编码得靠 iconv-lite 之类, 所以这一层不给编码参数。
+ * encode 入参收字节, decode 结果也是字节。这段字节是文本、密文还是别的什么, 库不关心:
+ * 想读成字符串就自己 `new TextDecoder("gbk").decode(bytes)`, 编码也由调用方决定。
  */
-export type BlobValue = Uint8Array | number[] | string;
+export type BlobValue = Uint8Array | number[];
 
 export function blob(spec: CountSpec): FieldSpec<Uint8Array, BlobValue> {
   return field((b) => new BlobField(b.name, spec));

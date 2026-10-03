@@ -1,6 +1,7 @@
 import {
   bitFields,
   blob,
+  BlobValue,
   Cursor,
   DecodeError,
   discriminated,
@@ -20,6 +21,13 @@ const hex = (dv: DataView) =>
   Array.from({ length: dv.byteLength }, (_, i) =>
     dv.getUint8(i).toString(16).padStart(2, "0")
   ).join(" ");
+
+type Equals<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B
+  ? 1
+  : 2
+  ? true
+  : false;
+type Assert<T extends true> = T;
 
 describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
   it("嵌套 DynamicStructBuffer 列表 encode/decode 往返", () => {
@@ -133,8 +141,9 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
       text_len: uint16_t,
       text: blob(ref("text_len")),
     });
-    // "世界" 的 length 是 2, UTF-8 是 6 字节 —— 长度头写的是字节数, 拿字符数会把正文截掉
-    const encoded = Chat.encode({ text: "世界" });
+    // "世界" 的 length 是 2, UTF-8 是 6 字节 —— 长度头写的是字节数, 拿字符数会把正文截掉.
+    // 编码是调用方的事: 库只看到 6 个字节, 不知道它们是"世界"
+    const encoded = Chat.encode({ text: new TextEncoder().encode("世界") });
     expect(encoded.byteLength).toBe(2 + 6);
     expect(hex(encoded)).toBe("00 06 e4 b8 96 e7 95 8c");
     expect(Chat.decode(encoded)).toEqual({
@@ -287,7 +296,10 @@ describe("声明式字段: rest / blob / records / variant / framed", () => {
       text: blob(ref("text_len")),
       tail: rest(),
     });
-    const encoded = Pkt.encode({ text: "hi", tail: [0xaa, 0xbb] });
+    const encoded = Pkt.encode({
+      text: new TextEncoder().encode("hi"),
+      tail: [0xaa, 0xbb],
+    });
     expect(hex(encoded)).toBe("00 02 68 69 aa bb");
     expect(Pkt.decode(encoded)).toEqual({
       text_len: 2,
@@ -304,6 +316,23 @@ describe("声明式字段: rest / blob / records / variant / framed", () => {
     const out = Pkt.decode([3, 1, 2, 3]);
     expect(out.raw).toBeInstanceOf(Uint8Array);
     expect(Array.from(out.raw)).toEqual([1, 2, 3]);
+  });
+
+  it("blob 只收字节: string 既不在类型里, 运行时也直接拒绝", () => {
+    const Pkt = new DynamicStructBuffer("pkt", {
+      len: uint8_t,
+      raw: blob(ref("len")),
+    });
+
+    // 编译期: BlobValue 就是字节, 里面没有 string
+    type _t = [Assert<Equals<BlobValue, Uint8Array | number[]>>];
+
+    // 编码归调用方 —— 下面这行过不去, 因为库不认识"文本"这个概念
+    const encodeText = () => {
+      // @ts-expect-error raw 收 Uint8Array | number[], 不收 string
+      Pkt.encode({ len: 2, raw: "hi" });
+    };
+    expect(encodeText).toThrow(/期望 Uint8Array\/number\[\]/);
   });
 
   it("records 把定长子记录填到末尾", () => {
@@ -379,7 +408,8 @@ describe("声明式字段: rest / blob / records / variant / framed", () => {
     const encoded = Pkt.encode({
       chan: 1,
       msg_type: 0x0a,
-      text: "世界",
+      // 编码归调用方, 库只看到 6 个字节
+      text: new TextEncoder().encode("世界"),
     } as any);
     expect(hex(encoded)).toBe("01 0a 00 06 e4 b8 96 e7 95 8c");
     expect(Pkt.decode(encoded)).toEqual({

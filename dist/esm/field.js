@@ -229,9 +229,8 @@ export class BlobField {
             return value;
         if (Array.isArray(value))
             return Uint8Array.from(value);
-        if (typeof value === "string")
-            return new TextEncoder().encode(value);
-        throw new EncodeError("encode", `${this.name}: 期望 Uint8Array/number[]/string, 实际 ${typeof value}`);
+        throw new EncodeError("encode", `${this.name}: 期望 Uint8Array/number[], 实际 ${typeof value} —— 这一层只有字节, ` +
+            `文本请自己编码好再传(编码也归调用方决定)`);
     }
     resolveLengths(obj, ctx) {
         if (!isRefSpec(this.spec) || this.spec.transform)

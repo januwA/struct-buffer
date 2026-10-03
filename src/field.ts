@@ -407,7 +407,7 @@ export class SkipField implements Field {
  * 一段字节, 长度**一律按字节数**.
  *
  * 定宽(`spec` 是数字)时 encode 永远写满 `spec` 字节(短补 0 / 长截断). 直接按实际长度
- * 写会让短值把后面所有字段整体前移, 而 `sizeof()` 报的仍是 `spec` —— 错位要到对端
+ * 写会让短值把后面所有字段整体前移, 而长度头仍然声明着 `spec` —— 错位要到对端
  * 才暴露.
  *
  * 这里**只出字节, 不出字符串**: 定宽字节不做"遇 NUL 截断"。截断是协议约定而不是
@@ -429,10 +429,10 @@ export class BlobField implements Field {
     if (value == null) return new Uint8Array(0);
     if (value instanceof Uint8Array) return value;
     if (Array.isArray(value)) return Uint8Array.from(value as number[]);
-    if (typeof value === "string") return new TextEncoder().encode(value);
     throw new EncodeError(
       "encode",
-      `${this.name}: 期望 Uint8Array/number[]/string, 实际 ${typeof value}`
+      `${this.name}: 期望 Uint8Array/number[], 实际 ${typeof value} —— 这一层只有字节, ` +
+        `文本请自己编码好再传(编码也归调用方决定)`
     );
   }
 

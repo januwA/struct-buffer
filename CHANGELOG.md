@@ -126,9 +126,11 @@ Big5 / Shift-JIS ...)。因此:
 
 - 删掉 `StructBufferConfig` 的 `textDecode` / `textEncoder`, 以及 `BlobField` 的
   `as: "text"` 形态 —— 解出来的值一律是字节
-- `blob()` / `rest()` 的 encode 入参放宽成 `BlobValue = Uint8Array | number[] | string`,
-  字符串**只按 UTF-8** 编码; 非 UTF-8 自己编码好再传字节。注意 Node 的 `TextEncoder`
-  按规范只支持 UTF-8, 别的编码得靠 iconv-lite 之类
+- `blob()` / `rest()` 的 encode 入参是 `BlobValue = Uint8Array | number[]`, **不含 `string`**。
+  这一层完全不知道手里的字节是不是文本: 库不猜编码, 也不"顺手按 UTF-8 帮你转一下" ——
+  悄悄替调用方选编码, 换来的就是 GBK / UTF-16LE 报文静默错。传字符串编译期就报错, 绕过
+  类型运行时也报错。文本自己 `new TextEncoder().encode(...)` / `new TextDecoder("gbk").decode(...)`,
+  编码由调用方决定
 - `StructType.decode` / `encode` 的第 4 个参数原本是 `textDecode`, 并用
   `!arg.decode` 这种"位置猜测"兼容两种传法。现在它是 `ctx`, 猜测逻辑删掉 —— 这是所有
   `StructType` 子类签名的一次简化
