@@ -1,5 +1,5 @@
 import { StructType } from "./class-type";
-import { DysplayResult } from "./interfaces";
+import { DisplayResult } from "./interfaces";
 
 /**
  *
@@ -20,7 +20,7 @@ export function display(
     hex?: boolean;
     littleEndian?: boolean;
   }
-): DysplayResult[] {
+): DisplayResult[] {
   options = Object.assign(
     {
       hex: true,
@@ -29,7 +29,7 @@ export function display(
     options
   );
   let offset = 0;
-  const result: DysplayResult[] = [];
+  const result: DisplayResult[] = [];
 
   while (true) {
     try {

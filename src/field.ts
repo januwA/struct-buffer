@@ -8,13 +8,9 @@ import { AnyObject } from "./interfaces";
 import { isRef, Ref, withCount } from "./utils";
 import { Writer } from "./writer";
 
-/** `ref` 往上找几层 */
-export type Scope = "self" | "parent" | "root";
-
-/** 取同层(默认)/上层字段的值作为个数; `transform` 再过一道 */
+/** 取"同一层、声明在本字段之前"的字段值作为个数; `transform` 再过一道 */
 export interface RefSpec {
   field: string;
-  scope?: Scope;
   transform?: (val: number, ctx: AnyObject) => number;
 }
 
@@ -55,19 +51,12 @@ export interface Site {
 export class Ctx {
   constructor(
     readonly values: AnyObject,
-    readonly parent: Ctx | undefined,
     /** 本元素在本层的下标, 供嵌套形状还原 */
     readonly index: number = 0
   ) {}
 
   child(values: AnyObject, index = 0): Ctx {
-    return new Ctx(values, this, index);
-  }
-
-  get root(): Ctx {
-    let c: Ctx = this;
-    while (c.parent) c = c.parent;
-    return c;
+    return new Ctx(values, index);
   }
 
   /** 兼容 `StructType.getCount(ctx)`: 那套 API 收的是 values 对象而不是 Ctx */
@@ -75,14 +64,9 @@ export class Ctx {
     return this.values;
   }
 
-  /** 支持 `a.b.c` 下钻; 起点由 scope 决定 */
-  lookup(path: string, scope: Scope = "self"): any {
-    let cur: any =
-      scope === "self"
-        ? this.values
-        : scope === "parent"
-          ? this.parent?.values
-          : this.root.values;
+  /** 支持 `a.b.c` 下钻, 从本层 values 起 */
+  lookup(path: string): any {
+    let cur: any = this.values;
     for (const seg of path.split(".")) {
       if (cur == null) return undefined;
       cur = cur[seg];
@@ -111,14 +95,13 @@ export function resolveCount(
     );
   }
 
-  const raw = ctx.lookup(spec.field, spec.scope ?? "self");
+  const raw = ctx.lookup(spec.field);
   if (raw == null) {
     throw DecodeError.reason(
       site.where,
       site.offset,
       `${site.field}: ref("${spec.field}") 指向的字段尚未解析 —— ` +
-        `ref 只能引用同一层里声明在它之前的字段` +
-        (spec.scope && spec.scope !== "self" ? ` (scope=${spec.scope})` : "")
+        `ref 只能引用同一层里声明在它之前的字段`
     );
   }
   if (typeof raw !== "number" || !Number.isFinite(raw)) {
@@ -246,7 +229,7 @@ function computeFixedSize(fields: Field[]): number | undefined {
 /** 按形状把平铺的元素还原成多层数组; shape=[] 表示单个值 */
 export function nest(values: any[], shape: number[]): any {
   if (shape.length === 0) return values[0];
-  if (shape.length === 1) return shape[0] === 1 ? values[0] : values;
+  if (shape.length === 1) return values;
   const rest = shape.slice(1);
   const stride = rest.reduce((a, b) => a * b, 1);
   const out: any[] = [];
@@ -276,19 +259,15 @@ function defFixedSize(def: Def, site: Site): number {
 }
 
 /** 逐字段回填长度; 只在真的改动时重建对象 */
-export function resolveLengths(
-  def: Def,
-  obj: AnyObject,
-  parent?: Ctx
-): AnyObject {
+export function resolveLengths(def: Def, obj: AnyObject): AnyObject {
   let out = obj;
-  let ctx = new Ctx(out, parent, 0);
+  let ctx = new Ctx(out, 0);
   for (const f of def.fields) {
     const next = f.resolveLengths(out, ctx);
     if (next !== out) {
       out = next;
       // 值变了就重建 ctx, 让后面的字段能看到刚回填的长度
-      ctx = new Ctx(out, parent, 0);
+      ctx = new Ctx(out, 0);
     }
   }
   return out;
@@ -501,7 +480,13 @@ export class StructField implements Field {
      * 一直填到末尾(`records`): decode 时个数由"剩余字节 / 单元尺寸"算出, encode
      * 时个数只能取自值数组本身 —— 数据里没有长度头可读, 也就无从校验.
      */
-    private readonly toEnd: boolean = false
+    private readonly toEnd: boolean = false,
+    /**
+     * decode 结果恒为数组(`records`), 不按 shape 还原成单值/多维. `toEnd` 天然是
+     * 数组; 带显式 spec 的 `records` 也要保持数组, 否则解出的记录会被 `nest` 收成
+     * 第一个元素, 静默丢掉后面的 —— 见 `records` 的 spec 分支.
+     */
+    private readonly arrayOut: boolean = toEnd
   ) {
     if (typeof spec === "number" && def.fixedSize !== undefined) {
       this.fixedSize = def.fixedSize * spec;
@@ -524,15 +509,18 @@ export class StructField implements Field {
     let changed = false;
     const resolved = items.map((item) => {
       if (item == null) return item;
-      const r = resolveLengths(this.def, item, ctx);
+      const r = resolveLengths(this.def, item);
       if (r !== item) changed = true;
       return r;
     });
     if (!changed) return out;
     return {
       ...out,
-      [this.name]:
-        this.shape.length === 0
+      [this.name]: this.arrayOut
+        ? this.shape.length
+          ? nest(resolved, this.shape)
+          : resolved
+        : this.shape.length === 0
           ? resolved[0]
           : nest(resolved, this.shape),
     };
@@ -553,8 +541,8 @@ export class StructField implements Field {
       // 当前元素已解出的字段仍然有效, 保留(哪怕它后面的字段失败了)
       values.push(item);
     }
-    // toEnd 的个数是"读到末尾才知道几个", 不可能还原成单值/多维形状, 只能是数组
-    out[this.name] = this.toEnd ? values : nest(values, this.shape);
+    // records 的个数只能读到末尾/读到 spec 才知道, 还原成单值只会丢数据, 所以恒为数组
+    out[this.name] = this.arrayOut ? values : nest(values, this.shape);
   }
 
   encode(w: Writer, value: any, ctx: Ctx): void {
@@ -603,25 +591,32 @@ export class VariantField implements Field {
     private readonly select?: (tag: any) => string | undefined
   ) {}
 
-  private pick(out: AnyObject, site: Site): Def {
+  private pick(
+    out: AnyObject,
+    site: Site,
+    kind: "decode" | "encode" = "decode"
+  ): Def {
     const tag = out[this.keyField];
     const key =
       tag == null ? undefined : this.select ? this.select(tag) : String(tag);
     const def = key == null ? undefined : this.cases[key];
     if (!def) {
-      throw DecodeError.reason(
-        site.where,
-        site.offset,
+      const reason =
         `${this.name}: ${this.keyField}=${JSON.stringify(tag)} 没有对应分支 (已有: ${
           Object.keys(this.cases).join(", ") || "无"
-        })`
-      );
+        })`;
+      throw kind === "encode"
+        ? new EncodeError(site.where, reason)
+        : DecodeError.reason(site.where, site.offset, reason);
     }
     return def;
   }
 
-  resolveLengths(obj: AnyObject, ctx: Ctx): AnyObject {
-    return resolveLengths(this.pick(obj, { where: "encode", field: this.name, offset: 0 }), obj, ctx);
+  resolveLengths(obj: AnyObject): AnyObject {
+    return resolveLengths(
+      this.pick(obj, { where: "encode", field: this.name, offset: 0 }, "encode"),
+      obj
+    );
   }
 
   decode(c: Cursor, out: AnyObject, ctx: Ctx, sink?: ErrorSink): void {
@@ -635,11 +630,11 @@ export class VariantField implements Field {
 
   encode(w: Writer, value: any, ctx: Ctx): void {
     void value; // 分支字段都在 ctx.values 上, 没有"这个字段的值"可言
-    const def = this.pick(ctx.values, {
-      where: "encode",
-      field: this.name,
-      offset: w.pos,
-    });
+    const def = this.pick(
+      ctx.values,
+      { where: "encode", field: this.name, offset: w.pos },
+      "encode"
+    );
     for (const f of def.fields) f.encode(w, ctx.values[f.name], ctx);
   }
 }

@@ -1,8 +1,8 @@
 ## 6.0.0
 
-6.0 只做减法: 把定位模糊、又在真实项目里用不上的外围功能砍掉, 并修掉两个把类型撒谎的
-bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那套表达力不够、也没人靠它读
-长度前缀。
+6.0 只做减法: 把定位模糊、又在真实项目里用不上的外围功能砍掉, 并修掉一批把类型或数据
+撒谎的 bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那套表达力不够、也没人
+靠它读长度前缀。
 
 ### ✨ 新增
 
@@ -34,6 +34,22 @@ bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那�
 - 判别字段没有对应分支 / `ref` 指向非法值时, 错误消息不再被塞进 `hex:` 槽位
 - 类型报不出名字之后, "不存在的字节形状" 从一句 `Unrecognized [object Object] type.` 改成
   带上 `size` / `unsigned` / `kind` 的具体描述
+- **`records(source, spec)` 静默丢掉除第一条以外的所有记录**: 带显式 spec 的分支漏了
+  "恒为数组", decode 走到 `nest(values, [])` 把结果收成单值。现在 decode 与 `records()` 一样
+  恒为数组, encode 仍按 spec 校验个数
+- **三层及以上的原始类型嵌套 encode 静默写 0**: `StructType.encode` 只 `flat()` 一层, 第 3 层
+  起元素还是数组, 被 DataView 访问器强转成 0。改为 `flat(Infinity)`(decode 侧早就是任意层)
+- **`bits(...)` 列表里的空洞元素抛裸 `TypeError`**: encode 直接 `Object.entries(obj[i])`, 一个
+  `undefined` 就崩。现在按声明的位序取值, 缺失补 0, 与 `bitFields` 对齐
+- **`variant` 在 encode 方向抛 `DecodeError`**: 判别字段没有对应分支时, 两个方向共用的
+  `pick` 恒抛 `DecodeError`; encode 现在抛 `EncodeError`
+- **`bits` / `bitFields` 的越界取值会串到下一位**: `1 << len` 的溢出位悄悄盖到相邻字段上
+  (`{a:1,b:1}` 编 `a:2` 解回来是 `{a:0,b:1}`)。现在构造期校验位下标 / 位宽总和 / 存储宽度
+  (只支持 1/2/4 字节), encode 期校验取值放得进声明位宽
+- **长度为 1 的嵌套结构体 `Item[1]` 塌成标量**: 与 `uint8_t[1]` 解成数组不一致。去掉
+  `nest` 里 `shape[0] === 1` 的特判, 两边都保持数组
+- **底层 `uint8_t[n].encode` 仍收 `number[]`**: 声明层 `TypeField` 早已只认 `Uint8Array`,
+  底层 `StructType.encode` 却照收然后把数字强转成 0。两侧边界统一
 
 ### 📚 文档
 
@@ -202,6 +218,14 @@ Big5 / Shift-JIS ...)。因此:
   就只能让推导失效. 需要显式指定类型时写 `new DynamicStructBuffer<any, MyType>(...)`
 - 定宽字节字段不再在 NUL 处截断, 一律给满宽度。要截自己切 —— NUL 是单字节且不可能出现在
   多字节序列中间, 所以切在它上面不会劈开 UTF-8 / GBK
+- **`bits` / `bitFields` 的越界/溢出从"静默写错"改成报错**: 位下标、位宽总和、存储宽度在
+  构造期校验, encode 取值放得进声明位宽 —— 8 字节存储(`bits(uint64_t, ...)`)不再支持,
+  位运算走 JS 32 位整数, 高位本来就会被静默截断
+- 删除 `DecodeError.at`: 全库没人调用, 错误现场由 `Cursor` 直接构造
+- `DysplayResult` 改名 `DisplayResult`(拼写错误)。它没有从入口导出, 只是 `display()` 返回
+  类型的一部分, 改名只影响直接引用这个名字的 `.d.ts` 使用者
+- `ref()` 的 `scope`(`self` / `parent` / `root`)连同 `Ctx` 的 parent/root 一起删除:
+  公开 API 从来不产出 `scope`, 那两条分支不可达
 
 ## 5.2.0 2022-9-28
 

@@ -5,7 +5,7 @@ export interface AnyObject {
 export interface Type<T extends Object> extends Function {
     new (...args: any[]): T;
 }
-export interface DysplayResult {
+export interface DisplayResult {
     offset: number;
     value: any;
 }

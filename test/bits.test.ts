@@ -1,4 +1,4 @@
-import { uint32_t, bits, DynamicStructBuffer, uint16_t } from "../src";
+import { uint32_t, bits, DynamicStructBuffer, uint16_t, uint8_t, uint64_t } from "../src";
 
 describe("bits test", () => {
   it("decode and encode", () => {
@@ -46,5 +46,28 @@ describe("bits test", () => {
       0, 1, 0x00, 0x00, 0x02, 0x46, 0x00, 0x00, 0x02, 0x46,
     ]);
     expect(data.eflag.length).toBe(2);
+  });
+
+  it("列表里的空洞元素补 0, 不再抛裸 TypeError", () => {
+    const EFLAG = bits(uint8_t, { a: 0, b: 1 });
+    expect(EFLAG[2].decode([0b10, 0b01])).toEqual([
+      { a: 0, b: 1 },
+      { a: 1, b: 0 },
+    ]);
+    // 第二个元素缺位: 旧实现直接 `Object.entries(undefined[i])` ⇒ TypeError
+    const view = (EFLAG[2] as any).encode([{ a: 1, b: 0 }, undefined]);
+    expect(Array.from(new Uint8Array(view.buffer))).toEqual([0b01, 0b00]);
+  });
+
+  it("位下标越界 / 取值非 0-1 在构造期或 encode 期报错", () => {
+    expect(() => bits(uint8_t, { a: 8 })).toThrow(/越界/);
+    expect(() => bits(uint8_t, { a: -1 })).toThrow(/越界/);
+    expect(() => bits(uint8_t, { a: 0 }).encode({ a: 2 } as any)).toThrow(
+      /0 或 1/
+    );
+  });
+
+  it("只支持 1/2/4 字节存储(位运算是 32 位)", () => {
+    expect(() => bits(uint64_t, { a: 0 })).toThrow(/只支持/);
   });
 });

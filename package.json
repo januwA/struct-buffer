@@ -3,6 +3,10 @@
   "version": "6.0.0",
   "description": "Add structure to ArrayBuffer",
   "private": false,
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
   "main": "./dist/umd/struct-buffer.js",
   "module": "./dist/esm/index.js",
   "types": "./dist/types/index.d.ts",

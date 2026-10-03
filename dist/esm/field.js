@@ -5,29 +5,18 @@ export function isRefSpec(spec) {
     return typeof spec === "object" && "field" in spec;
 }
 export class Ctx {
-    constructor(values, parent, index = 0) {
+    constructor(values, index = 0) {
         this.values = values;
-        this.parent = parent;
         this.index = index;
     }
     child(values, index = 0) {
-        return new Ctx(values, this, index);
-    }
-    get root() {
-        let c = this;
-        while (c.parent)
-            c = c.parent;
-        return c;
+        return new Ctx(values, index);
     }
     get valuesFor() {
         return this.values;
     }
-    lookup(path, scope = "self") {
-        let cur = scope === "self"
-            ? this.values
-            : scope === "parent"
-                ? this.parent?.values
-                : this.root.values;
+    lookup(path) {
+        let cur = this.values;
         for (const seg of path.split(".")) {
             if (cur == null)
                 return undefined;
@@ -49,11 +38,10 @@ export function resolveCount(spec, ctx, left, site) {
     if ("product" in spec) {
         return spec.product.reduce((a, sub) => a * resolveCount(sub, ctx, left, site), 1);
     }
-    const raw = ctx.lookup(spec.field, spec.scope ?? "self");
+    const raw = ctx.lookup(spec.field);
     if (raw == null) {
         throw DecodeError.reason(site.where, site.offset, `${site.field}: ref("${spec.field}") 指向的字段尚未解析 —— ` +
-            `ref 只能引用同一层里声明在它之前的字段` +
-            (spec.scope && spec.scope !== "self" ? ` (scope=${spec.scope})` : ""));
+            `ref 只能引用同一层里声明在它之前的字段`);
     }
     if (typeof raw !== "number" || !Number.isFinite(raw)) {
         throw DecodeError.reason(site.where, site.offset, `${site.field}: ref("${spec.field}") 取到 ${JSON.stringify(raw)}, 不是有限数字`);
@@ -111,7 +99,7 @@ export function nest(values, shape) {
     if (shape.length === 0)
         return values[0];
     if (shape.length === 1)
-        return shape[0] === 1 ? values[0] : values;
+        return values;
     const rest = shape.slice(1);
     const stride = rest.reduce((a, b) => a * b, 1);
     const out = [];
@@ -133,14 +121,14 @@ function defFixedSize(def, site) {
     }
     return def.fixedSize;
 }
-export function resolveLengths(def, obj, parent) {
+export function resolveLengths(def, obj) {
     let out = obj;
-    let ctx = new Ctx(out, parent, 0);
+    let ctx = new Ctx(out, 0);
     for (const f of def.fields) {
         const next = f.resolveLengths(out, ctx);
         if (next !== out) {
             out = next;
-            ctx = new Ctx(out, parent, 0);
+            ctx = new Ctx(out, 0);
         }
     }
     return out;
@@ -266,12 +254,13 @@ export class BlobField {
     }
 }
 export class StructField {
-    constructor(name, def, spec, shape, toEnd = false) {
+    constructor(name, def, spec, shape, toEnd = false, arrayOut = toEnd) {
         this.name = name;
         this.def = def;
         this.spec = spec;
         this.shape = shape;
         this.toEnd = toEnd;
+        this.arrayOut = arrayOut;
         if (typeof spec === "number" && def.fixedSize !== undefined) {
             this.fixedSize = def.fixedSize * spec;
         }
@@ -291,7 +280,7 @@ export class StructField {
         const resolved = items.map((item) => {
             if (item == null)
                 return item;
-            const r = resolveLengths(this.def, item, ctx);
+            const r = resolveLengths(this.def, item);
             if (r !== item)
                 changed = true;
             return r;
@@ -300,9 +289,13 @@ export class StructField {
             return out;
         return {
             ...out,
-            [this.name]: this.shape.length === 0
-                ? resolved[0]
-                : nest(resolved, this.shape),
+            [this.name]: this.arrayOut
+                ? this.shape.length
+                    ? nest(resolved, this.shape)
+                    : resolved
+                : this.shape.length === 0
+                    ? resolved[0]
+                    : nest(resolved, this.shape),
         };
     }
     decode(c, out, ctx, sink) {
@@ -317,7 +310,7 @@ export class StructField {
             runFields(this.def.fields, ic, item, ctx.child(item, i), sink);
             values.push(item);
         }
-        out[this.name] = this.toEnd ? values : nest(values, this.shape);
+        out[this.name] = this.arrayOut ? values : nest(values, this.shape);
     }
     encode(w, value, ctx) {
         const site = { where: "encode", field: this.name, offset: w.pos };
@@ -350,17 +343,20 @@ export class VariantField {
         this.select = select;
         this.fixedSize = undefined;
     }
-    pick(out, site) {
+    pick(out, site, kind = "decode") {
         const tag = out[this.keyField];
         const key = tag == null ? undefined : this.select ? this.select(tag) : String(tag);
         const def = key == null ? undefined : this.cases[key];
         if (!def) {
-            throw DecodeError.reason(site.where, site.offset, `${this.name}: ${this.keyField}=${JSON.stringify(tag)} 没有对应分支 (已有: ${Object.keys(this.cases).join(", ") || "无"})`);
+            const reason = `${this.name}: ${this.keyField}=${JSON.stringify(tag)} 没有对应分支 (已有: ${Object.keys(this.cases).join(", ") || "无"})`;
+            throw kind === "encode"
+                ? new EncodeError(site.where, reason)
+                : DecodeError.reason(site.where, site.offset, reason);
         }
         return def;
     }
-    resolveLengths(obj, ctx) {
-        return resolveLengths(this.pick(obj, { where: "encode", field: this.name, offset: 0 }), obj, ctx);
+    resolveLengths(obj) {
+        return resolveLengths(this.pick(obj, { where: "encode", field: this.name, offset: 0 }, "encode"), obj);
     }
     decode(c, out, ctx, sink) {
         const def = this.pick(out, {
@@ -372,11 +368,7 @@ export class VariantField {
     }
     encode(w, value, ctx) {
         void value;
-        const def = this.pick(ctx.values, {
-            where: "encode",
-            field: this.name,
-            offset: w.pos,
-        });
+        const def = this.pick(ctx.values, { where: "encode", field: this.name, offset: w.pos }, "encode");
         for (const f of def.fields)
             f.encode(w, ctx.values[f.name], ctx);
     }

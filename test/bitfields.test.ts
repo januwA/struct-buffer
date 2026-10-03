@@ -56,4 +56,15 @@ describe("test bitFields", () => {
     expect(data.b).toBe(2);
     expect(data.c).toBe(3);
   });
+
+  it("值放不进声明位宽就报错, 不再串到下一位", () => {
+    const bf = bitFields(uint8_t, { a: 1, b: 1 });
+    // 旧实现: a=2 的 bit1 溢出串到 b, a 解回来变 0, 静默写错
+    expect(() => bf.encode({ a: 2, b: 0 })).toThrow(/放不进 1 位/);
+  });
+
+  it("位宽总和超过存储宽度在构造期报错", () => {
+    expect(() => bitFields(uint8_t, { a: 7, b: 2 })).toThrow(/超过 8 位/);
+    expect(() => bitFields(uint8_t, { a: 0 })).toThrow(/位宽/);
+  });
 });

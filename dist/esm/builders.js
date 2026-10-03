@@ -12,7 +12,7 @@ export function records(source, spec) {
     return field((b) => {
         const def = normalizeDef(source, `${b.parentName}.${b.name}`, b.le);
         if (spec !== undefined)
-            return new StructField(b.name, def, spec, []);
+            return new StructField(b.name, def, spec, [], false, true);
         if (def.fixedSize === undefined) {
             throw new TypeError(`records("${b.name}"): 子结构体 "${def.name}" 含变长字段, 无法按定长填到末尾` +
                 ` —— 请显式给 spec(长度前缀), 或改用 ref/framed`);

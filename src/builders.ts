@@ -19,8 +19,8 @@ import type { VARIANT_CASES } from "./class-type";
 import { InferSource } from "./infer";
 
 /**
- * 声明式字段工厂. 之所以做成"延迟构建"而不是直接造 Field: `littleEndian` 与
- * textCodec 要等父级 def 归一化时才知道, 由 makeField 统一注入才不会漏.
+ * 声明式字段工厂. 之所以做成"延迟构建"而不是直接造 Field: `littleEndian` 要等
+ * 父级 def 归一化时才知道, 由 makeField 统一注入才不会漏.
  *
  * 字段名一律取**对象的键**, 工厂自己不接受 name —— 两处都写名字就一定会有一处
  * 是错的, 而错的那处只会表现为"字段值莫名丢失", 极难查.
@@ -83,7 +83,8 @@ export function records<S extends StructSource>(
 ): FieldSpec<InferSource<S>[]> {
   return field((b) => {
     const def = normalizeDef(source, `${b.parentName}.${b.name}`, b.le);
-    if (spec !== undefined) return new StructField(b.name, def, spec, []);
+    // 带显式 spec 也必须是数组: 它是"若干个记录", 还原成单值只会留下第一个
+    if (spec !== undefined) return new StructField(b.name, def, spec, [], false, true);
     if (def.fixedSize === undefined) {
       throw new TypeError(
         `records("${b.name}"): 子结构体 "${def.name}" 含变长字段, 无法按定长填到末尾` +

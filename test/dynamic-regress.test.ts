@@ -3,6 +3,7 @@ import {
   Cursor,
   DecodeError,
   discriminated,
+  EncodeError,
   DynamicStructBuffer,
   framed,
   records,
@@ -367,6 +368,42 @@ describe("声明式字段: rest / records / variant / framed", () => {
     );
   });
 
+  it("records 带显式 spec 也恒为数组, 不再只留第一个元素", () => {
+    const Ent = new DynamicStructBuffer("ent", { id: uint16_t });
+    const Pkt = new DynamicStructBuffer("pkt", {
+      n: uint8_t,
+      ents: records(Ent, ref("n")),
+    });
+    // 旧实现: toEnd 漏传 ⇒ nest(values, []) ⇒ { ents: { id: 10 } }, 静默丢掉后两条
+    expect(Pkt.decode([3, 0, 10, 0, 20, 0, 30])).toEqual({
+      n: 3,
+      ents: [{ id: 10 }, { id: 20 }, { id: 30 }],
+    });
+
+    const Fixed = new DynamicStructBuffer("fixed", { ents: records(Ent, 2) });
+    expect(Fixed.decode([0, 1, 0, 2])).toEqual({
+      ents: [{ id: 1 }, { id: 2 }],
+    });
+  });
+
+  it("records 带变长子结构体 + ref spec 也能解成数组", () => {
+    const Ent = new DynamicStructBuffer("ent", {
+      len: uint8_t,
+      data: uint8_t[ref("len")],
+    });
+    const Pkt = new DynamicStructBuffer("pkt", {
+      n: uint8_t,
+      ents: records(Ent, ref("n")),
+    });
+    expect(Pkt.decode([2, 1, 0xaa, 1, 0xbb])).toEqual({
+      n: 2,
+      ents: [
+        { len: 1, data: Uint8Array.from([0xaa]) },
+        { len: 1, data: Uint8Array.from([0xbb]) },
+      ],
+    });
+  });
+
   it("variant 按判别字段平铺展开分支", () => {
     const Pkt = new DynamicStructBuffer("pkt", {
       msg_type: uint8_t,
@@ -397,6 +434,17 @@ describe("声明式字段: rest / records / variant / framed", () => {
     });
     expect(() => Pkt.decode([7, 0])).toThrow(/msg_type=7/);
     expect(() => Pkt.decode([7, 0])).toThrow(/已有: 1/);
+  });
+
+  it("variant 未知判别值在 encode 方向抛 EncodeError, 不是 DecodeError", () => {
+    const Pkt = new DynamicStructBuffer("pkt", {
+      msg_type: uint8_t,
+      body: variant("msg_type", { 1: { a: uint8_t } }),
+    });
+    expect(() => Pkt.encode({ msg_type: 7, a: 0 } as any)).toThrow(EncodeError);
+    expect(() => Pkt.encode({ msg_type: 7, a: 0 } as any)).toThrow(
+      /没有对应分支/
+    );
   });
 
   it("discriminated 把判别字段排在 variant 之前", () => {

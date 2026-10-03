@@ -1,3 +1,4 @@
+import { EncodeError } from "./errors";
 import {
   AnyObject,
   Bit_t,
@@ -83,8 +84,9 @@ class StructTypeNext {
 export declare const VALUE_TYPE: unique symbol;
 
 /**
- * encode 入参类型的 phantom 键, 与 `VALUE_TYPE` 成对使用(见 `FieldSpec`).
- * 纯类型声明, 运行时不存在.
+ * encode 入参类型的 phantom 键, 与 `VALUE_TYPE` 成对使用 —— 绝大多数类型两者同型,
+ * 只有位域(`BitsType` / `BitFieldsType`)的 encode 入参是 `Partial`. 纯类型声明,
+ * 运行时不存在.
  */
 export declare const ENCODE_VALUE_TYPE: unique symbol;
 
@@ -323,7 +325,19 @@ export class StructType<D, E, Idx = never> extends Array<
     const count = this.getCount(actualCtx);
     const v = createDataView(count * this.size, view);
 
-    if (this.isList && Array.isArray(obj)) (obj as any) = obj.flat();
+    // 字节段的入参是**整段字节**, 不是数字数组 —— 与 `TypeField` 同一条边界。传
+    // number[] 不能被访问器悄悄强转成 0, 那会写出一段看着成功的错数据
+    if (this.isByteRun && obj != null && !(obj instanceof Uint8Array)) {
+      throw new EncodeError(
+        "encode",
+        `字节段期望 Uint8Array, 实际 ${
+          Array.isArray(obj) ? "number[]" : typeof obj
+        } —— 字节只有一种形态, 文本请自己编码好再传`
+      );
+    }
+
+    // 多层形状([2][2])必须拍到元素级: 只拍一层的话第 3 层起整个丢失, 静默写 0
+    if (this.isList && Array.isArray(obj)) (obj as any) = obj.flat(Infinity);
 
     for (let i = 0; i < count; i++) {
       const it = (this.isList ? (obj as any)[i] : obj) ?? 0;
@@ -336,6 +350,19 @@ export class StructType<D, E, Idx = never> extends Array<
 }
 
 type BitsType_t = { [k: string]: number };
+
+/**
+ * 位域的存储宽度. JS 的位运算走 32 位整数, 8 字节存储的高位会被静默截断 —— 与其
+ * 让调用方拿到一个"解不回去"的类型, 不如在构造期就拒绝.
+ */
+function assertBitsStorage(size: TypeSize_t, kind: string): void {
+  if (size !== 1 && size !== 2 && size !== 4) {
+    throw new TypeError(
+      `${kind}: 只支持 1/2/4 字节的存储(位运算走 JS 32 位整数), 实际 ${size}`
+    );
+  }
+}
+
 export class BitsType<
   D = {
     [key in keyof BitsType_t]: Bit_t;
@@ -344,6 +371,14 @@ export class BitsType<
 > extends StructType<D, E> {
   constructor(size: TypeSize_t, public readonly bits: BitsType_t) {
     super(size, true);
+    assertBitsStorage(size, "bits");
+    for (const [k, i] of Object.entries(bits)) {
+      if (!Number.isInteger(i) || i < 0 || i >= size * 8) {
+        throw new TypeError(
+          `bits: 位 "${k}" 的下标 ${i} 越界, 应在 0..${size * 8 - 1}`
+        );
+      }
+    }
   }
 
   // 位域解出来是对象, 不是字节。底层那层 number[] 是位映射的输入(见 decode),
@@ -392,27 +427,32 @@ export class BitsType<
     const count = this.getCount(actualCtx);
     const v = createDataView(count * this.size, view);
 
+    // 按**声明**的位序铺, 不看调用方字面量的键顺序; 缺失的位补 0, 非 0/1 直接报错.
+    // 旧实现遍历 obj 并对 `undefined` 直接解构, 一个空洞元素就是裸 TypeError
+    const _getValue = (o: any): number => {
+      let flags = 0;
+      Object.entries(this.bits).forEach(([k, i]) => {
+        const bit = (o as any)?.[k] ?? 0;
+        if (bit !== 0 && bit !== 1) {
+          throw new EncodeError(
+            "encode",
+            `bits("${k}"): 位只能是 0 或 1, 实际 ${JSON.stringify(bit)}`
+          );
+        }
+        flags |= bit << i;
+      });
+      return flags;
+    };
+
     if (this.isList && Array.isArray(obj)) {
       for (let i = 0; i < count; i++) {
-        let flags = 0;
-        Object.entries<number>(obj[i]).forEach(([k, v]) => {
-          const i: number = this.bits![k];
-          if (i !== undefined) flags |= v << i;
-        });
-        (v as any)[this.set](offset, this.toRaw(flags), littleEndian);
+        (v as any)[this.set](offset, this.toRaw(_getValue(obj[i])), littleEndian);
         offset += this.size;
       }
-
-      return v;
-    } else {
-      let flags = 0;
-      Object.entries<number>(obj as any).forEach(([k, v]) => {
-        const i: number = this.bits![k];
-        if (i !== undefined) flags |= v << i;
-      });
-      (v as any)[this.set](offset, this.toRaw(flags), littleEndian);
       return v;
     }
+    (v as any)[this.set](offset, this.toRaw(_getValue(obj)), littleEndian);
+    return v;
   }
 }
 
@@ -458,6 +498,19 @@ export class BitFieldsType<
 > extends StructType<D, E> {
   constructor(size: TypeSize_t, public readonly bitFields: BitsType_t) {
     super(size, true);
+    assertBitsStorage(size, "bitFields");
+    let total = 0;
+    for (const [k, len] of Object.entries(bitFields)) {
+      if (!Number.isInteger(len) || len < 1) {
+        throw new TypeError(`bitFields: 字段 "${k}" 的位宽 ${len} 非法, 应为正整数`);
+      }
+      total += len;
+      if (total > size * 8) {
+        throw new TypeError(
+          `bitFields: 位宽总和 ${total} 超过 ${size * 8} 位(字段 "${k}" 越界)`
+        );
+      }
+    }
   }
 
   // 同 BitsType: 位域是对象, 底层 number[] 要留给位映射
@@ -519,11 +572,19 @@ export class BitFieldsType<
      */
     const _getValue = (obj: any): number => {
       let val = 0;
-      let count = 0;
+      let shift = 0;
       Object.entries<number>(this.bitFields).forEach(([k, len]) => {
         const v = (obj as any)?.[k] ?? 0;
-        val |= v << count;
-        count += len;
+        if (!Number.isInteger(v) || v < 0 || v >= 2 ** len) {
+          throw new EncodeError(
+            "encode",
+            `bitFields("${k}"): 值 ${JSON.stringify(v)} 放不进 ${len} 位 (0..${
+              2 ** len - 1
+            })`
+          );
+        }
+        val |= v << shift;
+        shift += len;
       });
       return val;
     };

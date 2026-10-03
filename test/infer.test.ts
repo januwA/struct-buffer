@@ -360,6 +360,10 @@ describe("类型推导", () => {
         [{ id: 6 }, { id: 7 }],
       ],
     ]);
+
+    // 长度为 1 也保持数组: 与 `uint8_t[1]` 的字节段形状一致, 不再特判塌成标量
+    const one = new DynamicStructBuffer("one", { list: Item[1] });
+    expect(one.decode(Uint8Array.from([9]))).toEqual({ list: [{ id: 9 }] });
   });
 
   it("variant 的分支字段并进父对象, 且都是可选的", () => {

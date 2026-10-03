@@ -4,10 +4,8 @@ import { Cursor } from "./cursor";
 import { DecodeError } from "./errors";
 import { AnyObject } from "./interfaces";
 import { Writer } from "./writer";
-export type Scope = "self" | "parent" | "root";
 export interface RefSpec {
     field: string;
-    scope?: Scope;
     transform?: (val: number, ctx: AnyObject) => number;
 }
 export type CountSpec = number | RefSpec | {
@@ -25,13 +23,11 @@ export interface Site {
 }
 export declare class Ctx {
     readonly values: AnyObject;
-    readonly parent: Ctx | undefined;
     readonly index: number;
-    constructor(values: AnyObject, parent: Ctx | undefined, index?: number);
+    constructor(values: AnyObject, index?: number);
     child(values: AnyObject, index?: number): Ctx;
-    get root(): Ctx;
     get valuesFor(): AnyObject;
-    lookup(path: string, scope?: Scope): any;
+    lookup(path: string): any;
 }
 export declare function resolveCount(spec: CountSpec, ctx: Ctx, left: number, site: Site): number;
 export declare function specText(spec: CountSpec): string;
@@ -56,7 +52,7 @@ export interface Def {
 }
 export declare function nest(values: any[], shape: number[]): any;
 export declare function flatten(value: any): any[];
-export declare function resolveLengths(def: Def, obj: AnyObject, parent?: Ctx): AnyObject;
+export declare function resolveLengths(def: Def, obj: AnyObject): AnyObject;
 export declare class TypeField implements Field {
     readonly name: string;
     private readonly le;
@@ -93,8 +89,9 @@ export declare class StructField implements Field {
     private readonly spec;
     private readonly shape;
     private readonly toEnd;
+    private readonly arrayOut;
     readonly fixedSize?: number;
-    constructor(name: string, def: Def, spec: CountSpec, shape: number[], toEnd?: boolean);
+    constructor(name: string, def: Def, spec: CountSpec, shape: number[], toEnd?: boolean, arrayOut?: boolean);
     resolveLengths(obj: AnyObject, ctx: Ctx): AnyObject;
     decode(c: Cursor, out: AnyObject, ctx: Ctx, sink?: ErrorSink): void;
     encode(w: Writer, value: any, ctx: Ctx): void;
@@ -109,7 +106,7 @@ export declare class VariantField implements Field {
         [key: string]: Def;
     }, select?: ((tag: any) => string | undefined) | undefined);
     private pick;
-    resolveLengths(obj: AnyObject, ctx: Ctx): AnyObject;
+    resolveLengths(obj: AnyObject): AnyObject;
     decode(c: Cursor, out: AnyObject, ctx: Ctx, sink?: ErrorSink): void;
     encode(w: Writer, value: any, ctx: Ctx): void;
 }

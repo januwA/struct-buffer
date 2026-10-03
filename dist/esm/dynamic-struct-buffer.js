@@ -56,7 +56,7 @@ export class DynamicStructBuffer extends Array {
         void littleEndian;
         const c = this.cursor(view, offset, this.config.littleEndian ?? false);
         const count = this.getCount(parentCtx);
-        const root = new Ctx(parentCtx ?? {}, undefined);
+        const root = new Ctx(parentCtx ?? {});
         const values = [];
         for (let i = 0; i < count; i++) {
             const item = {};
@@ -69,7 +69,7 @@ export class DynamicStructBuffer extends Array {
         void littleEndian;
         const c = this.cursor(view, offset, this.config.littleEndian ?? false);
         const count = this.getCount(parentCtx);
-        const root = new Ctx(parentCtx ?? {}, undefined);
+        const root = new Ctx(parentCtx ?? {});
         const sink = { errors: [], stopped: false };
         const values = [];
         for (let i = 0; i < count; i++) {
@@ -94,11 +94,11 @@ export class DynamicStructBuffer extends Array {
         });
         const count = this.getCount(parentCtx ?? obj);
         const items = this.isList ? flatten(obj) : [obj];
-        const root = new Ctx(parentCtx ?? {}, undefined);
+        const root = new Ctx(parentCtx ?? {});
         for (let i = 0; i < count; i++) {
             const src = items[i];
             const item = src == null ? {} : { ...src };
-            const ctx = resolveLengths(this.def, item, root);
+            const ctx = resolveLengths(this.def, item);
             const ictx = root.child(ctx, i);
             for (const f of this.def.fields)
                 f.encode(w, ctx[f.name], ictx);

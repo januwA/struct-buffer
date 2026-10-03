@@ -26,7 +26,7 @@ import type { DynamicStructBuffer } from "./dynamic-struct-buffer";
  * ```
  *
  * 旧版 `ref()` 声明成 `any`, 推导到 `uint8_t[ref("len")]` 就断了; 改成 `RefIndex`
-* (运行时是 Ref 对象, 类型上是 number)之后才能穿过长度前缀。
+ * (运行时是 Ref 对象, 类型上是 number)之后才能穿过长度前缀。
  *
  * **有意不管的一处**:
  *

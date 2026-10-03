@@ -2,7 +2,7 @@ import { DynamicStructBuffer, sview, uint16_t } from "../src";
 
 // https://github.com/januwA/struct-buffer/issues/2
 
-describe("debug", () => {
+describe("littleEndian 配置", () => {
   it("littleEndian: 配置优先于参数", () => {
     const s = new DynamicStructBuffer(
       "test",
@@ -36,7 +36,7 @@ describe("debug", () => {
     expect(sview(v)).toBe("01 00 02 00 00 0a 00 64");
   });
 
-  it("test extends", () => {
+  it("子类实例经下标后仍保留自有属性", () => {
     class X extends DynamicStructBuffer<any, any, any> {
       a = 10;
     }

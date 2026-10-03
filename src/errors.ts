@@ -1,20 +1,3 @@
-import { DecodeBuffer_t } from "./interfaces";
-import { makeDataView } from "./utils";
-
-const HEX_DUMP_LEN = 16;
-
-/**
- * 越界处的原始字节(最多 16B), 抓包场景下这串 hex 就是唯一有用的定位信息
- */
-function hexAt(view: DataView, offset: number, len: number): string {
-  const out: string[] = [];
-  for (let i = 0; i < len; i++) {
-    if (offset + i >= view.byteLength) break;
-    out.push(view.getUint8(offset + i).toString(16).padStart(2, "0"));
-  }
-  return out.join(" ");
-}
-
 /**
  * 解码失败. 与 DataView 原生抛的 `RangeError: Offset is outside the bounds of
  * the DataView` 相比, 多了三层定位信息:
@@ -46,22 +29,6 @@ export class DecodeError extends Error {
         (hex ? `  hex: ${hex}` : "")
     );
     Object.setPrototypeOf(this, DecodeError.prototype);
-  }
-
-  static at(
-    view: DecodeBuffer_t,
-    where: string,
-    offset: number,
-    need: number
-  ): DecodeError {
-    const v = makeDataView(view);
-    return new DecodeError(
-      where,
-      offset,
-      need,
-      Math.max(0, v.byteLength - offset),
-      hexAt(v, offset, HEX_DUMP_LEN)
-    );
   }
 
   /**

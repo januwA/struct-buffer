@@ -448,6 +448,9 @@ const view = EFLAG.encode(
 // => <44 02 00 00>
 ```
 
+> 位名对应的值是**一个位号**, 取值只能是 0/1; 存储支持 1/2/4 字节。位号越界或取值非 0/1 会
+> 直接报错, 而不是悄悄串到相邻位上。
+
 ## bitFields
 ```ts
 import { uint8_t, bitFields, DynamicStructBuffer, sbytes as b, } from "struct-buffer";
@@ -468,6 +471,9 @@ const v = bf.encode({
 const data = bf.decode(b("1D"));
 // => { a: 1, b: 2, c: 3 }
 ```
+
+> 每个字段占**连续几位**(这里是位宽, 不是位号), 值要放得进声明的位宽。存储支持 1/2/4 字节,
+> 位宽总和不能超过存储宽度 —— 否则构造期就报错。
 
 ## delimited
 
@@ -563,7 +569,7 @@ TEXT(makeDataView([
 > $ npm run build
 
 ## See also:
-  - [See the test for more examples](https://github.com/januwA/struct-buffer/blob/main/test/test.test.ts)
+  - [See the test for more examples](https://github.com/januwA/struct-buffer/blob/main/test/basic.test.ts)
   - [DataView](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/DataView)
   - [C_data_types](https://en.wikipedia.org/wiki/C_data_types)
   - [Built-in types (C++)](https://docs.microsoft.com/en-us/cpp/cpp/fundamental-types-cpp?view=msvc-160)

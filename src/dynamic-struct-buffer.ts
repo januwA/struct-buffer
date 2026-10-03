@@ -153,7 +153,7 @@ export class DynamicStructBuffer<
     void littleEndian; // 字节序已在构造期按 def 链定型
     const c = this.cursor(view, offset, this.config.littleEndian ?? false);
     const count = this.getCount(parentCtx);
-    const root = new Ctx(parentCtx ?? {}, undefined);
+    const root = new Ctx(parentCtx ?? {});
     const values: any[] = [];
 
     for (let i = 0; i < count; i++) {
@@ -184,7 +184,7 @@ export class DynamicStructBuffer<
     void littleEndian;
     const c = this.cursor(view, offset, this.config.littleEndian ?? false);
     const count = this.getCount(parentCtx);
-    const root = new Ctx(parentCtx ?? {}, undefined);
+    const root = new Ctx(parentCtx ?? {});
     const sink: ErrorSink = { errors: [], stopped: false };
     const values: any[] = [];
 
@@ -217,13 +217,13 @@ export class DynamicStructBuffer<
     });
     const count = this.getCount(parentCtx ?? obj);
     const items = this.isList ? flatten(obj) : [obj];
-    const root = new Ctx(parentCtx ?? {}, undefined);
+    const root = new Ctx(parentCtx ?? {});
 
     for (let i = 0; i < count; i++) {
       const src = items[i];
       // 写时复制: 长度回填绝不落到调用方对象上
       const item: AnyObject = src == null ? {} : { ...(src as AnyObject) };
-      const ctx = resolveLengths(this.def, item, root);
+      const ctx = resolveLengths(this.def, item);
       const ictx = root.child(ctx, i);
       for (const f of this.def.fields) f.encode(w, ctx[f.name], ictx);
     }

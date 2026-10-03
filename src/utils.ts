@@ -66,7 +66,22 @@ export function makeDataView(view: DecodeBuffer_t): DataView {
 }
 
 let refSeq = 0;
-const REF_MAP = new Map<string, Ref>();
+
+// `ref()` 返回的 Ref 被当作下标用时, JS 只把它的 `Symbol.toPrimitive` 字符串交给代理,
+// 对象本身已经丢了 —— 只能靠这张表把 transform 找回来. 用 WeakRef 存值 +
+// FinalizationRegistry 删键: schema 被回收后条目随之消失. 旧实现是强引用 Map,
+// 动态建表的场景只增不减. 老运行时没有这两个 API 就退回强引用, 行为与旧版一致.
+interface RefSlot {
+  deref(): Ref | undefined;
+}
+const REF_MAP = new Map<string, RefSlot>();
+const REF_FINALIZER: { register(target: object, held: string): void } | undefined =
+  typeof (globalThis as any).WeakRef === "function" &&
+  typeof (globalThis as any).FinalizationRegistry === "function"
+    ? new (globalThis as any).FinalizationRegistry((id: string) => {
+        REF_MAP.delete(id);
+      })
+    : undefined;
 
 /**
  * 元素个数通道. Field 引擎解析完 `ref("n")` 后把结果挂到 ctx 的这个 symbol 键上,
@@ -99,7 +114,12 @@ export class Ref {
     public readonly transform?: (val: number, ctx: any) => number
   ) {
     this.id = `__ref_${++refSeq}_${field}__`;
-    REF_MAP.set(this.id, this);
+    if (REF_FINALIZER) {
+      REF_MAP.set(this.id, new (globalThis as any).WeakRef(this) as RefSlot);
+      REF_FINALIZER.register(this, this.id);
+    } else {
+      REF_MAP.set(this.id, { deref: () => this });
+    }
   }
 
   resolve(ctx: any): number {
@@ -149,8 +169,10 @@ export function arrayProxy(
     get(t: any, k: string | number | symbol) {
       if (k in t) return t[k];
       if (typeof k === "string") {
-        if (REF_MAP.has(k)) {
-          return cb(t, REF_MAP.get(k)!);
+        const slot = REF_MAP.get(k);
+        if (slot) {
+          const r = slot.deref();
+          if (r) return cb(t, r);
         }
         if (k.startsWith("__ref_")) {
           const m = k.match(/^__ref_\d+_(.+)__$/);

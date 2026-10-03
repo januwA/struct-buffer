@@ -35,6 +35,12 @@ export function makeDataView(view) {
 }
 let refSeq = 0;
 const REF_MAP = new Map();
+const REF_FINALIZER = typeof globalThis.WeakRef === "function" &&
+    typeof globalThis.FinalizationRegistry === "function"
+    ? new globalThis.FinalizationRegistry((id) => {
+        REF_MAP.delete(id);
+    })
+    : undefined;
 export const COUNT = Symbol.for("struct-buffer.element-count");
 export function withCount(ctx, count) {
     if (ctx == null)
@@ -51,7 +57,13 @@ export class Ref {
         this.transform = transform;
         this.__isRef = true;
         this.id = `__ref_${++refSeq}_${field}__`;
-        REF_MAP.set(this.id, this);
+        if (REF_FINALIZER) {
+            REF_MAP.set(this.id, new globalThis.WeakRef(this));
+            REF_FINALIZER.register(this, this.id);
+        }
+        else {
+            REF_MAP.set(this.id, { deref: () => this });
+        }
     }
     resolve(ctx) {
         if (!ctx)
@@ -79,8 +91,11 @@ export function arrayProxy(context, cb) {
             if (k in t)
                 return t[k];
             if (typeof k === "string") {
-                if (REF_MAP.has(k)) {
-                    return cb(t, REF_MAP.get(k));
+                const slot = REF_MAP.get(k);
+                if (slot) {
+                    const r = slot.deref();
+                    if (r)
+                        return cb(t, r);
                 }
                 if (k.startsWith("__ref_")) {
                     const m = k.match(/^__ref_\d+_(.+)__$/);

@@ -1,3 +1,4 @@
+import { EncodeError } from "./errors";
 import { arrayProxyNext, COUNT, createDataView, isRef, makeDataView, unflattenDeep, } from "./utils";
 const intHandle = {
     1: {
@@ -126,8 +127,11 @@ export class StructType extends Array {
         const actualCtx = ctx ?? obj;
         const count = this.getCount(actualCtx);
         const v = createDataView(count * this.size, view);
+        if (this.isByteRun && obj != null && !(obj instanceof Uint8Array)) {
+            throw new EncodeError("encode", `字节段期望 Uint8Array, 实际 ${Array.isArray(obj) ? "number[]" : typeof obj} —— 字节只有一种形态, 文本请自己编码好再传`);
+        }
         if (this.isList && Array.isArray(obj))
-            obj = obj.flat();
+            obj = obj.flat(Infinity);
         for (let i = 0; i < count; i++) {
             const it = (this.isList ? obj[i] : obj) ?? 0;
             v[this.set](offset, this.toRaw(it), littleEndian);
@@ -136,10 +140,21 @@ export class StructType extends Array {
         return v;
     }
 }
+function assertBitsStorage(size, kind) {
+    if (size !== 1 && size !== 2 && size !== 4) {
+        throw new TypeError(`${kind}: 只支持 1/2/4 字节的存储(位运算走 JS 32 位整数), 实际 ${size}`);
+    }
+}
 export class BitsType extends StructType {
     constructor(size, bits) {
         super(size, true);
         this.bits = bits;
+        assertBitsStorage(size, "bits");
+        for (const [k, i] of Object.entries(bits)) {
+            if (!Number.isInteger(i) || i < 0 || i >= size * 8) {
+                throw new TypeError(`bits: 位 "${k}" 的下标 ${i} 越界, 应在 0..${size * 8 - 1}`);
+            }
+        }
     }
     get isByteRun() {
         return false;
@@ -167,35 +182,43 @@ export class BitsType extends StructType {
         const actualCtx = ctx ?? obj;
         const count = this.getCount(actualCtx);
         const v = createDataView(count * this.size, view);
+        const _getValue = (o) => {
+            let flags = 0;
+            Object.entries(this.bits).forEach(([k, i]) => {
+                const bit = o?.[k] ?? 0;
+                if (bit !== 0 && bit !== 1) {
+                    throw new EncodeError("encode", `bits("${k}"): 位只能是 0 或 1, 实际 ${JSON.stringify(bit)}`);
+                }
+                flags |= bit << i;
+            });
+            return flags;
+        };
         if (this.isList && Array.isArray(obj)) {
             for (let i = 0; i < count; i++) {
-                let flags = 0;
-                Object.entries(obj[i]).forEach(([k, v]) => {
-                    const i = this.bits[k];
-                    if (i !== undefined)
-                        flags |= v << i;
-                });
-                v[this.set](offset, this.toRaw(flags), littleEndian);
+                v[this.set](offset, this.toRaw(_getValue(obj[i])), littleEndian);
                 offset += this.size;
             }
             return v;
         }
-        else {
-            let flags = 0;
-            Object.entries(obj).forEach(([k, v]) => {
-                const i = this.bits[k];
-                if (i !== undefined)
-                    flags |= v << i;
-            });
-            v[this.set](offset, this.toRaw(flags), littleEndian);
-            return v;
-        }
+        v[this.set](offset, this.toRaw(_getValue(obj)), littleEndian);
+        return v;
     }
 }
 export class BitFieldsType extends StructType {
     constructor(size, bitFields) {
         super(size, true);
         this.bitFields = bitFields;
+        assertBitsStorage(size, "bitFields");
+        let total = 0;
+        for (const [k, len] of Object.entries(bitFields)) {
+            if (!Number.isInteger(len) || len < 1) {
+                throw new TypeError(`bitFields: 字段 "${k}" 的位宽 ${len} 非法, 应为正整数`);
+            }
+            total += len;
+            if (total > size * 8) {
+                throw new TypeError(`bitFields: 位宽总和 ${total} 超过 ${size * 8} 位(字段 "${k}" 越界)`);
+            }
+        }
     }
     get isByteRun() {
         return false;
@@ -224,11 +247,14 @@ export class BitFieldsType extends StructType {
         const v = createDataView(count * this.size, view);
         const _getValue = (obj) => {
             let val = 0;
-            let count = 0;
+            let shift = 0;
             Object.entries(this.bitFields).forEach(([k, len]) => {
                 const v = obj?.[k] ?? 0;
-                val |= v << count;
-                count += len;
+                if (!Number.isInteger(v) || v < 0 || v >= 2 ** len) {
+                    throw new EncodeError("encode", `bitFields("${k}"): 值 ${JSON.stringify(v)} 放不进 ${len} 位 (0..${2 ** len - 1})`);
+                }
+                val |= v << shift;
+                shift += len;
             });
             return val;
         };

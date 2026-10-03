@@ -318,3 +318,40 @@ describe("test int64_t / uint64_t", () => {
     expect(sview(int64_t[2].encode([1, -2]))).toBe(sview(view));
   });
 });
+
+describe("多层原始类型", () => {
+  const wire = makeDataView([0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8]);
+  const nested = [
+    [
+      [1, 2],
+      [3, 4],
+    ],
+    [
+      [5, 6],
+      [7, 8],
+    ],
+  ];
+
+  it("三层形状 encode 完整写出, 不再从第 3 层起静默写 0", () => {
+    // 旧实现用 obj.flat() 只拍一层 ⇒ 元素变成 [1,2] 这种数组 ⇒ 访问器强转成 0
+    expect(sview((uint16_t[2][2][2] as any).encode(nested))).toBe(sview(wire));
+    expect((uint16_t[2][2][2] as any).decode(wire)).toEqual(nested);
+  });
+
+  it("作为字段的三层形状同样完整", () => {
+    const S = new DynamicStructBuffer("S", { m: uint16_t[2][2][2] });
+    const view = S.encode({ m: nested } as any);
+    expect(sview(view)).toBe(sview(wire));
+    expect((S.decode(view) as any).m).toEqual(nested);
+  });
+});
+
+describe("字节段 encode 只收 Uint8Array", () => {
+  it("number[] 直接报错, 不再静默写 0", () => {
+    expect(() => (uint8_t[2] as any).encode([1, 2])).toThrow(/Uint8Array/);
+  });
+
+  it("Uint8Array 正常往返", () => {
+    expect(sview(uint8_t[2].encode(new Uint8Array([1, 2])))).toBe("01 02");
+  });
+});
