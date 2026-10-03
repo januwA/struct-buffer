@@ -77,8 +77,7 @@ describe("类型推导", () => {
 
   it("布尔语义的字段推出来是 number, 不是 boolean", () => {
     // 库里没有 bool / BOOL / BoolType: 宽度是 uintN_t 的事, 真值判断是调用方的事。
-    // 编译期这一半的断言在 bool.test.ts 的运行时那一半之外单列, 因为"折成 boolean"
-    // 是个只在类型上才看得出来的诱惑
+    // "折成 boolean" 是个只在类型上才看得出来的诱惑, 所以先把类型钉死在 number 上
     const F = new DynamicStructBuffer("F", {
       ok1: uint8_t,
       ok4: uint32_t,
