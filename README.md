@@ -72,22 +72,7 @@ const data = uint32_t[2].decode(view);
 
 - `int64_t` 之前走的是无符号的 `getBigUint64`，负数解出来是一大坨正数。现在按有符号解。
 - 8 字节类型的**值类型统一是 `number`**，不再把 `bigint` 抛给调用方。代价是超过
-  `2^53` 的值会掉精度（协议里的 64 位计数/时间戳基本够用，文件偏移请自己确认）。
-
-布尔字段在真实报文里是 1 / 2 / 4 字节整数，而合法取值往往不止 `{0, 1}`，所以库里**没有**
-`bool` / `BOOL`，也不做真值折叠：宽度用 `uint8_t` / `uint16_t` / `uint32_t`，真值判断自己写。
-
-```ts
-const M = new DynamicStructBuffer("M", { ok: uint32_t });
-
-const d = M.decode(sbytes("00 00 00 02"));
-d.ok;          // => 2   原始取值，不会被折成 true
-Boolean(d.ok); // => true 真值判断是消费方的事
-```
-
-折成 `boolean` 会同时丢两样东西：不同的字节解出同一个值（`[1, 2]` 都变 `true`，于是
-`a === b` 在两种报文字节下都成立），以及编不回去（`encode` 只认 `0` / `1`，原始的 `2`
-永远出不来，往返即损坏）。需要状态多于两态的字段，同理直接用整数类型自己收窄。
+   `2^53` 的值会掉精度（协议里的 64 位计数/时间戳基本够用，文件偏移请自己确认）。
 
 ## register Type
 类型就是线上的字节形状 `(size, unsigned, kind)`, 没有名字:
@@ -214,9 +199,8 @@ const users = User[2].decode(
 
 ## DynamicStructBuffer
 
-`StructBuffer` 只会"按字节切", 遇到带长度前缀的变长字段就只能干瞪眼。`DynamicStructBuffer`
-是给这类报文用的: 字段按声明顺序消费一段游标, 长度可以来自前面任意字段, 嵌套结构体
-可以递归, `ref()` 还能在 encode 时把实际长度回填回长度字段。
+`DynamicStructBuffer` 是给带长度前缀的变长报文用的: 字段按声明顺序消费一段游标, 长度可来自
+前面任意字段, 嵌套结构体可递归, `ref()` 在 encode 时把实际长度回填回长度字段。
 
 ```ts
 import {
@@ -265,6 +249,8 @@ Grid.decode(view);
 // => { n: 2, rows: [{ id }, { id }], pairs: [[{ id }, { id }], [{ id }, { id }]] }
 ```
 
+> 某维长度为 1 也不塌成单值: `Item[1]` 解成数组, 与 `uint8_t[1]` 一致。
+
 ### 变长字段工厂
 
 `uint8_t[ref(...)]` 和 `uint8_t[n]` 就是字节字段(连续的 1 字节无符号元素), 只有"剩下的
@@ -278,13 +264,22 @@ new DynamicStructBuffer("pkt", {
   payload: uint8_t[ref("len")], // Uint8Array
   tail: rest(), // 吃掉剩下的全部字节
 });
+
+const Item = new DynamicStructBuffer("item", { id: uint32_t });
+
+new DynamicStructBuffer("pkt2", {
+  n: uint8_t,
+  items: records(Item, ref("n")), // 个数来自 n; decode 恒为数组
+});
 ```
 
 - `uint8_t[n]` / `uint8_t[ref(...)]`: 连续的 `uint8_t`, 即一段字节, 解成 `Uint8Array`
 - `rest()`: 声明式长度前缀的终点标记
-- `records(Sub)`: 定长子记录一直填到末尾; 子结构体含变长字段会在**构造期**报错
-- `variant(key, cases)`: 变体联合, 判别字段须声明在它之前, 分支字段与判别字段平级
-  (运行时平铺进父对象, 所以 `decode()` 出来就是父对象上的字段)
+- `skip(n)`: 占位 n 字节, 该键不出现在结果里(encode 写 0)
+- `records(Sub, spec?)`: 定长记录填到末尾; 变长子结构体须给 `spec`(`n` / `ref("count")`)。
+  decode 恒为数组
+- `variant(key, cases)`: 变体联合, 判别字段须在本字段之前, 分支字段与其平级(平铺进父对象);
+  无对应分支时 decode 抛 `DecodeError`、encode 抛 `EncodeError`
 - `framed(reader, writer)`: 自定界子帧循环, 反复读自带长度的子帧直到 `reader` 返回
   `null`. 与其做一个猜错一半的 DSL, 不如让调用方老实描述"怎么跳过一个子帧":
 
@@ -448,8 +443,7 @@ const view = EFLAG.encode(
 // => <44 02 00 00>
 ```
 
-> 位名对应的值是**一个位号**, 取值只能是 0/1; 存储支持 1/2/4 字节。位号越界或取值非 0/1 会
-> 直接报错, 而不是悄悄串到相邻位上。
+> 位名对应**一个位号**, 取值只能是 0/1; 存储支持 1/2/4 字节, 越界或非 0/1 直接报错。
 
 ## bitFields
 ```ts
@@ -472,8 +466,7 @@ const data = bf.decode(b("1D"));
 // => { a: 1, b: 2, c: 3 }
 ```
 
-> 每个字段占**连续几位**(这里是位宽, 不是位号), 值要放得进声明的位宽。存储支持 1/2/4 字节,
-> 位宽总和不能超过存储宽度 —— 否则构造期就报错。
+> 每个字段占**连续几位**(位宽), 值须放得进该位宽; 存储支持 1/2/4 字节, 位宽总和不能超。
 
 ## delimited
 
