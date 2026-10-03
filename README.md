@@ -122,6 +122,7 @@ skip(4)                  // 占位 4 字节, 不出现在结果里(encode 写 0)
 ## 变长与长度回填
 
 `ref("len")` 让字段长度取自 `len`, 并在 encode 时把实际字节数回填进去(不改入参对象)。
+`ref(field, transform?)` 的第二参可把长度换算一下, 例如长度头含额外头部字节。
 `littleEndian` 省略则逐级继承父级, 最近显式配置赢, 默认大端。
 
 ```ts
@@ -144,6 +145,18 @@ Msg.encode({
   name: new Uint8Array([0x61, 0x62, 0x63]),
 });
 // len 不用给: encode 自动回填 payload 的字节数
+```
+
+`transform(raw, ctx)` 解码时把长度字段的值换算成字节数, 编码时同样用它算写入宽度; 因此带
+`transform` 时 encode 不会自动回填, 需要自己给长度字段:
+
+```ts
+const Pkt = struct("pkt", {
+  len: uint16_t,                       // 5 = 3 字节数据 + 2
+  data: bytes(ref("len", (v) => v - 2)),
+});
+
+Pkt.encode({ len: 5, data: new Uint8Array([1, 2, 3]) });
 ```
 
 ## variant
