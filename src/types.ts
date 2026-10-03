@@ -24,7 +24,7 @@ export type StructBufferConfig = {
  *
  * 文本不是类型: 编码选择(UTF-8 / UTF-16LE / GBK / Big5 / Shift-JIS / codepage...)
  * 是协议属性而不是类型属性, 而本库一行编解码都没实现 —— `TextDecoder` / `TextEncoder`
- * 全程委托给平台, 所以"库里支持哪种编码"这个问题本身不成立。文本字段用 `blob(...)`
+ * 全程委托给平台, 所以"库里支持哪种编码"这个问题本身不成立。文本字段用 `uint8_t[n]`
  * 拿 `Uint8Array`, 编码由调用方自己接。
  */
 export const int8_t = registerType(1, false);

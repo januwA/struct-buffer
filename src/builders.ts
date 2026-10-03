@@ -53,34 +53,20 @@ export function skip(n: number): FieldSpec<never, never> {
 }
 
 /**
- * `blob(ref("len"))` / `blob(16)` / `rest()`.
- *
- * 长度一律是**字节数**, 不是字符数: `"世界"` 的 length 是 2, UTF-8 编码占 6 字节,
- * GBK 占 4 字节 —— 拿字符数当长度头会把正文截掉.
- *
- * 这一层只有字节。`blob()` 收什么编码的正文、怎么变成字符串, 全是调用方的事 —— 本库
- * 一行编解码都没实现, 所以不猜也不记。
- *
- * ```ts
- * { head: uint8_t, payload: blob(ref("len")) }
- * ```
- */
-/**
  * encode 入参收字节, decode 结果也是字节。这段字节是文本、密文还是别的什么, 库不关心:
  * 想读成字符串就自己 `new TextDecoder("gbk").decode(bytes)`, 编码也由调用方决定。
+ *
+ * 定长与长度前缀的字节字段用 `uint8_t[n]` / `uint8_t[ref("len")]`, 不需要专门的工厂 ——
+ * 连续的 `uint8` 就是字节, 见 `StructType.isByteRun`。本类型是 `rest()` 的入参形态。
  */
 export type BlobValue = Uint8Array | number[];
-
-export function blob(spec: CountSpec): FieldSpec<Uint8Array, BlobValue> {
-  return field((b) => new BlobField(b.name, spec));
-}
 
 /**
  * 吃掉"剩下的全部字节"。声明式长度前缀的终点标记 —— 报文尾部那段没有长度头可
  * 引用的变长正文靠它收尾。
  *
  * ```ts
- * { text_len: uint16_t, text: blob(ref("text_len")), tail: rest() }
+ * { text_len: uint16_t, text: uint8_t[ref("text_len")], tail: rest() }
  * ```
  */
 export function rest(): FieldSpec<Uint8Array, BlobValue> {
@@ -121,7 +107,7 @@ export function records<S extends StructSource>(
  *
  * ```ts
  * { msg_type: uint8_t, body: variant("msg_type", {
- *     1: { name: blob(8) },
+ *     1: { name: uint8_t[8] },
  *     2: { x: uint32_t, y: uint32_t },
  *   }) }
  * ```
@@ -162,7 +148,7 @@ export interface VariantSpec<C extends { [key: string]: StructSource }>
  * new DynamicStructBuffer("chat", {
  *   chan: uint8_t,
  *   ...discriminated("body", "msg_type", uint8_t, {
- *     0x0a: { len: uint16_t, text: blob(ref("len")) },
+ *     0x0a: { len: uint16_t, text: uint8_t[ref("len")] },
  *     0x0b: { id: uint32_t },
  *   }),
  * })

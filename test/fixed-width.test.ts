@@ -3,7 +3,6 @@ import {
   DecodeError,
   DynamicStructBuffer,
   InferType,
-  blob,
   field,
   float,
   framed,
@@ -32,7 +31,7 @@ describe("定宽字节字段", () => {
   it("encode 写满宽度: 短补 NUL, 长截断", () => {
     const P = new DynamicStructBuffer("p", {
       head: uint8_t,
-      name: blob(8),
+      name: uint8_t[8],
       tail: uint8_t,
     });
     expect(bytes(P.encode({ head: 1, name: [0x61, 0x62], tail: 9 }))).toEqual([
@@ -48,7 +47,7 @@ describe("定宽字节字段", () => {
   it("decode 原样给满宽度, 不替调用方截 NUL", () => {
     const P = new DynamicStructBuffer("p", {
       head: uint8_t,
-      name: blob(8),
+      name: uint8_t[8],
       tail: uint8_t,
     });
     const d = P.decode(Uint8Array.from([1, 0x61, 0x00, 0, 0, 0, 0, 0, 0, 9]));
@@ -71,10 +70,10 @@ describe("定宽字节字段", () => {
     expect(d2.tail).toBe(9);
   });
 
-  it("定宽 blob 同样写满宽度", () => {
+  it("定宽字节段同样写满宽度", () => {
     const P = new DynamicStructBuffer("p", {
       head: uint8_t,
-      pad: blob(4),
+      pad: uint8_t[4],
       tail: uint8_t,
     });
     expect(bytes(P.encode({ head: 1, pad: [0xaa], tail: 9 }))).toEqual([
@@ -98,7 +97,7 @@ describe("README 示例", () => {
         type: uint8_t,
         len: uint16_t,
         payload: uint8_t[ref("len")],
-        name: blob(8),
+        name: uint8_t[8],
       },
       { littleEndian: true }
     );
@@ -201,12 +200,12 @@ describe("README 示例", () => {
     expect(EntMove.struct).toBeDefined();
   });
 
-  it("blob / rest / variant", () => {
+  it("字节段 / rest / variant", () => {
     const Pkt = new DynamicStructBuffer(
       "pkt",
       {
         len: uint16_t,
-        payload: blob(ref("len")),
+        payload: uint8_t[ref("len")],
         tail: rest(),
       },
       { littleEndian: true }
@@ -221,7 +220,7 @@ describe("README 示例", () => {
     const V = new DynamicStructBuffer("v", {
       msg_type: uint8_t,
       body: variant("msg_type", {
-        1: { name: blob(3) },
+        1: { name: uint8_t[3] },
         2: { x: uint32_t, y: uint32_t },
       }),
     });
@@ -269,7 +268,7 @@ describe("README 示例", () => {
         type: uint8_t,
         len: uint16_t,
         payload: uint8_t[ref("len")],
-        name: blob(8),
+        name: uint8_t[8],
       },
       { littleEndian: true }
     );

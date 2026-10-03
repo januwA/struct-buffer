@@ -25,7 +25,7 @@ import { arrayProxyNext, COUNT, isRef, Ref } from "./utils";
  * D/E 给 `any` 就等于"这里不参与推导", 也正是这层需要的语义.
  */
 export type DynamicFieldType =
-  | StructType<any, any>
+  | StructType<any, any, any>
   | DynamicStructBuffer<DynamicStructDef, any, any>
   | { [k: string]: any };
 export type DynamicStructDef = { [key: string]: DynamicFieldType };

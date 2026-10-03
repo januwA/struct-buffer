@@ -4,7 +4,6 @@ import { InferSource } from "./infer";
 export declare function field<T = any, E = T>(build: (b: FieldBuildCtx) => Field): FieldSpec<T, E>;
 export declare function skip(n: number): FieldSpec<never, never>;
 export type BlobValue = Uint8Array | number[];
-export declare function blob(spec: CountSpec): FieldSpec<Uint8Array, BlobValue>;
 export declare function rest(): FieldSpec<Uint8Array, BlobValue>;
 export declare function records<S extends StructSource>(source: S, spec?: CountSpec): FieldSpec<InferSource<S>[]>;
 export declare function variant<C extends {

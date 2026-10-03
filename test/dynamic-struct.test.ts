@@ -1,5 +1,4 @@
 import {
-  blob,
   createDataView,
   DynamicStructBuffer,
   makeDataView,
@@ -37,7 +36,7 @@ describe("DynamicStructBuffer", () => {
       uknow1: 1,
       uknow2: 2,
       msg_size: 4,
-      msg: [0x11, 0x22, 0x33, 0x44],
+      msg: new Uint8Array([0x11, 0x22, 0x33, 0x44]),
     });
   });
 
@@ -55,21 +54,21 @@ describe("DynamicStructBuffer", () => {
       size: 50,
       uknow1: 9,
       uknow2: 8,
-      msg: [0xaa, 0xbb, 0xcc],
-    } as any);
+      msg: new Uint8Array([0xaa, 0xbb, 0xcc]),
+    });
 
     expect(encoded.byteLength).toBe(10);
 
     const decoded = MessageStruct.decode(encoded);
     expect(decoded.msg_size).toBe(3);
-    expect(decoded.msg).toEqual([0xaa, 0xbb, 0xcc]);
+    expect(decoded.msg).toEqual(new Uint8Array([0xaa, 0xbb, 0xcc]));
   });
 
   it("dynamic text field with ref: 长度按字节数回填, 编码归调用方", () => {
     const ChatPacket = new DynamicStructBuffer("chat", {
       channel: uint8_t,
       text_len: uint16_t,
-      text: blob(ref("text_len")),
+      text: uint8_t[ref("text_len")],
     });
 
     const encoded = ChatPacket.encode({
@@ -135,6 +134,6 @@ describe("DynamicStructBuffer", () => {
 
     const decoded = Transformed.decode(encoded);
     expect(decoded.hdr_len).toBe(5);
-    expect(decoded.data).toEqual([1, 2, 3]);
+    expect(decoded.data).toEqual(new Uint8Array([1, 2, 3]));
   });
 });

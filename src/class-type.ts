@@ -52,7 +52,7 @@ const floatHandle: any = {
   8: "getFloat64",
 };
 
-function typeHandle(type: StructType<any, any>): TypeHandle_t {
+function typeHandle(type: StructType<any, any, any>): TypeHandle_t {
   const h: string | undefined =
     type.kind === "float"
       ? floatHandle[type.size]
@@ -97,7 +97,16 @@ export declare const VARIANT_CASES: unique symbol;
 
 // D decode return type
 // E encode obj type
-export class StructType<D, E> extends Array<StructType<D[], E[]>> {
+/**
+ * `T[n]` 的形态 = `Idx`。默认是"再多一维的 T", 但那个默认值不能直接写成
+ * `StructType<D[], E[]>`(会判成循环默认), 也不能靠接口间接(TS 一样看得穿)。
+ * 所以用 `[Idx] extends [never]` 断开: 方括号防止条件类型对 `never` 分配。
+ *
+ * 只有"1 字节无符号"这一种类型会把 `Idx` 换成字节形态(见 `ByteListType`)。
+ */
+export class StructType<D, E, Idx = never> extends Array<
+  [Idx] extends [never] ? StructType<D[], E[]> : Idx
+> {
   deeps: (number | Ref)[] = [];
 
   /**
@@ -111,6 +120,16 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
    * 是最常用的类型. 挂一个必选的 phantom 属性就绕开了整件事: 不做结构推断, 直接读字段.
    */
   declare readonly [VALUE_TYPE]: D;
+
+  /**
+   * phantom: encode **入参**类型。绝大多数类型解出来是什么就收什么(`E` 跟 `D` 一样),
+   * 只有字节段两者不同 —— 解出来是 `Uint8Array`, 收 `Uint8Array | number[]`
+   * (跟 `rest()` 的 `BlobValue` 保持一致, 不然"同一个字节概念两种收法"又变成新裂缝)。
+   *
+   * `BitsType` / `BitFieldsType` 的 `E` 是 `Partial<D>`, 也就是"子对象可以只写要覆盖的
+   * 字段" —— 之前它们靠 `InferEncode` 兜底回 `InferType` 拿到 `D`, 少了一层可选性。
+   */
+  declare readonly [ENCODE_VALUE_TYPE]: E;
 
   /**
    * ```
@@ -173,6 +192,23 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
     return this.size;
   }
 
+  /**
+   * 我是不是"一段字节"。
+   *
+   * 判据: 1 字节无符号, 且形状只有一个维度。`uint8_t[3]` / `uint8_t[ref("len")]` 在线上
+   * 就是 3 个 / len 个**连续**字节, 解出来自然该是一段字节而不是 `number[]` —— 同一串
+   * 字节不该有两种解法, 而 `blob(n)` 曾经就是那个多出来的第二种。
+   *
+   * 两个反例:
+   *
+   * - 嵌套(`uint8_t[2][3]`)不算: 形状对调用方有意义(第一行 / 第二行), 保持嵌套数组
+   * - `int8_t[3]` 不算: 有符号要做符号扩展, 那是**取值转换**而不是字节重解释。混进来
+   *   等于库替调用方挑了怎么读, 和这库一贯的做法相反
+   */
+  public get isByteRun(): boolean {
+    return this.size === 1 && this.unsigned && this.deeps.length === 1;
+  }
+
   get: string;
   set: string;
 
@@ -217,6 +253,8 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
    * uint32_t.decode( new Uint8Array([0,0,0,1]) ) => 1
    *
    * uint32_t[2].decode( new Uint8Array([0,0,0,1, 0,0,0,2]) ) => [1, 2]
+   *
+   * uint8_t[3].decode( new Uint8Array([1,2,3]) ) => <01 02 03>   // 字节, 不是 [1,2,3]
    * ```
    *
    * @param view
@@ -231,6 +269,18 @@ export class StructType<D, E> extends Array<StructType<D[], E[]>> {
     ctx?: any
   ): D {
     view = makeDataView(view);
+
+    // 字节段直接切片, 不逐个走访问器 —— 结果本来就是一段内存。
+    // slice(): 交出去的是副本, 调用方之后改原缓冲不会污染已解出的值
+    if (this.isByteRun) {
+      const n = this.getCount(ctx);
+      return new Uint8Array(
+        view.buffer,
+        view.byteOffset + offset,
+        n
+      ).slice() as unknown as D;
+    }
+
     const count = this.getCount(ctx);
 
     const result: AnyObject[] = [];
@@ -295,6 +345,12 @@ export class BitsType<
 > extends StructType<D, E> {
   constructor(size: TypeSize_t, public readonly bits: BitsType_t) {
     super(size, true);
+  }
+
+  // 位域解出来是对象, 不是字节。底层那层 number[] 是位映射的输入(见 decode),
+  // 换成 Uint8Array 会让 `Array.isArray` 判断落空, 一个列表被当成单值
+  public override get isByteRun(): boolean {
+    return false;
   }
 
   override decode(
@@ -405,6 +461,11 @@ export class BitFieldsType<
     super(size, true);
   }
 
+  // 同 BitsType: 位域是对象, 底层 number[] 要留给位映射
+  public override get isByteRun(): boolean {
+    return false;
+  }
+
   override decode(
     view: DecodeBuffer_t,
     littleEndian: boolean = false,
@@ -483,6 +544,15 @@ export class BitFieldsType<
 }
 
 /**
+ * `uint8_t` 的列表形态: 解出来是一段字节。
+ *
+ * encode 入参是 `Uint8Array | number[]` —— 两者写出的字节完全一样, 收下哪个都行。
+ * 解出来的类型靠 phantom `VALUE_TYPE` 携带(见 `StructType`), 所以 `InferType` /
+ * `InferEncode` 自动跟着走, 推导侧不需要特判。
+ */
+export type ByteListType = StructType<Uint8Array, Uint8Array | number[]>;
+
+/**
  * 注册一个新类型。参数就是线上的字节形状, 没有类型名 —— 名字对编解码毫无用处。
  *
  * ```ts
@@ -493,6 +563,16 @@ export class BitFieldsType<
  * @param unsigned 整数才看这个; 传 `0` 当"定长未知"的占位, 见 types.ts 的 docstring
  * @param kind 整数或浮点
  */
+export function registerType(
+  size: 1,
+  unsigned: true,
+  kind?: "int"
+): StructType<number, number, ByteListType>;
+export function registerType<D extends number, E extends number>(
+  size: TypeSize_t,
+  unsigned?: boolean,
+  kind?: TypeKind
+): StructType<D, E>;
 export function registerType<D extends number, E extends number>(
   size: TypeSize_t,
   unsigned = true,
@@ -501,10 +581,10 @@ export function registerType<D extends number, E extends number>(
   return new StructType<D, E>(size, unsigned, kind);
 }
 
-export function bits(type: StructType<number, number>, obj: BitsType_t) {
+export function bits(type: StructType<any, any, any>, obj: BitsType_t) {
   return new BitsType(type.size, obj);
 }
 
-export function bitFields(type: StructType<number, number>, obj: BitsType_t) {
+export function bitFields(type: StructType<any, any, any>, obj: BitsType_t) {
   return new BitFieldsType(type.size, obj);
 }

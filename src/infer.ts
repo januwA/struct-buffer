@@ -38,7 +38,7 @@ import type { DynamicStructBuffer } from "./dynamic-struct-buffer";
  * 再套一层是幂等的。
  */
 export type InferType<T> = T extends { [VALUE_TYPE]: infer V }
-  ? V // uint8_t / bits / uint8_t[ref(...)] / blob() / framed()
+  ? V // uint8_t / bits / uint8_t[ref(...)] / rest() / framed()
   : InferShape<T>;
 
 /** 结构体来源(嵌套字段/`records` 的参数)的值类型 */
@@ -105,12 +105,12 @@ export type InferDef<S> = S extends any
   : never;
 
 /**
- * encode 入参类型. 和解码值类型**故意**分开推: `rest()`/`blob()` 解出来是
- * `Uint8Array`, 写回去却接受字节数组; 嵌套子结构体则用 `E`(默认 `Partial<D>`),
- * 也就是"子对象可以只写要覆盖的字段".
+ * encode 入参类型. 和解码值类型**故意**分开推: `rest()` 解出来是 `Uint8Array`, 写回去
+ * 却接受字节数组; `uint8_t[n]` 同理; 嵌套子结构体则用 `E`(默认 `Partial<D>`), 也就是
+ * "子对象可以只写要覆盖的字段"。
  */
 export type InferEncode<T> = T extends { [ENCODE_VALUE_TYPE]: infer V }
-  ? V // blob() / rest() / records() / framed(): 工厂自己声明入参类型
+  ? V // rest() / records() / framed(): 工厂自己声明入参类型
   : T extends DynamicStructBuffer<any, any, infer V>
     ? V // 嵌套子结构体: Partial<D>
     : InferType<T>; // 其余字段: 入参就是解码值类型(能不能省由外层 Partial 决定)

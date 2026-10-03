@@ -5,7 +5,7 @@ import { StructBufferConfig } from "./types";
 import { StructType } from "./class-type";
 import { InferDef, InferEncodeDef } from "./infer";
 import { Ref } from "./utils";
-export type DynamicFieldType = StructType<any, any> | DynamicStructBuffer<DynamicStructDef, any, any> | {
+export type DynamicFieldType = StructType<any, any, any> | DynamicStructBuffer<DynamicStructDef, any, any> | {
     [k: string]: any;
 };
 export type DynamicStructDef = {

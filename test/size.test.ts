@@ -1,5 +1,4 @@
 import {
-  blob,
   DynamicStructBuffer,
   double,
   float,
@@ -169,7 +168,7 @@ describe("test size", () => {
   it("变长字段必须给样本对象, 尺寸靠 encode 量出来", () => {
     const s = new DynamicStructBuffer("Test", {
       n: uint8_t,
-      p: blob(ref("n")),
+      p: uint8_t[ref("n")],
     });
 
     // 全定长字段才允许不带对象问尺寸

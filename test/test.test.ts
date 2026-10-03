@@ -23,7 +23,7 @@ describe("test decode and encode", () => {
     const obj = {
       hp: 10,
       mp: 100,
-      name: [0x61, 0x62, 0x63],
+      name: new Uint8Array([0x61, 0x62, 0x63]),
     };
     const view: DataView = makeDataView([
       0, 0, 0, 10, // hp  = 10
@@ -201,8 +201,14 @@ describe("test struct list", () => {
   let users: DynamicStructBuffer<any, any, any>;
   const obj = {
     users: [
-      { name: [0x61, 0x31], name2: [0x61, 0x32] },
-      { name: [0x62, 0x31], name2: [0x62, 0x32] },
+      {
+        name: new Uint8Array([0x61, 0x31]),
+        name2: new Uint8Array([0x61, 0x32]),
+      },
+      {
+        name: new Uint8Array([0x62, 0x31]),
+        name2: new Uint8Array([0x62, 0x32]),
+      },
     ],
   };
   beforeAll(() => {

@@ -5,9 +5,6 @@ export function field(build) {
 export function skip(n) {
     return field((b) => new SkipField(b.name, n));
 }
-export function blob(spec) {
-    return field((b) => new BlobField(b.name, spec));
-}
 export function rest() {
     return field((b) => new BlobField(b.name, { until: "end" }));
 }

@@ -21,13 +21,13 @@ const buffer: DataView = sbytes("41 20 00 00 42 c8 00 00 61 62 63");
 
 // decode
 const data = struct.decode(buffer);
-// data => { hp: 10, mp: 100, name: [0x61, 0x62, 0x63] }
+// data => { hp: 10, mp: 100, name: Uint8Array [0x61, 0x62, 0x63] }
 
 // encode
 const view = struct.encode({
   hp: 10,
   mp: 100,
-  name: [0x61, 0x62, 0x63],
+  name: new Uint8Array([0x61, 0x62, 0x63]),
 });
 // view => <41 20 00 00 42 c8 00 00 61 62 63>
 ```
@@ -220,7 +220,6 @@ const users = User[2].decode(
 
 ```ts
 import {
-  blob,
   DynamicStructBuffer,
   ref,
   uint8_t,
@@ -233,7 +232,7 @@ const Msg = new DynamicStructBuffer(
     type: uint8_t,
     len: uint16_t, // 后面 payload 的字节数
     payload: uint8_t[ref("len")],
-    name: blob(8),
+    name: uint8_t[8],
   },
   { littleEndian: true }
 );
@@ -264,19 +263,20 @@ Grid.decode(view);
 
 ### 变长字段工厂
 
-`uint8_t[ref(...)]` 只能读裸字节, 字符串和"剩下的全部"要显式说:
+`uint8_t[ref(...)]` 和 `uint8_t[n]` 就是字节字段(连续的 1 字节无符号元素), 只有"剩下的
+全部字节"要显式说:
 
 ```ts
-import { blob, rest, records, variant, framed } from "struct-buffer";
+import { rest, records, variant, framed } from "struct-buffer";
 
 new DynamicStructBuffer("pkt", {
   len: uint16_t,
-  payload: blob(ref("len")), // Uint8Array
+  payload: uint8_t[ref("len")], // Uint8Array
   tail: rest(), // 吃掉剩下的全部字节
 });
 ```
 
-- `blob(spec)`: `Uint8Array`, 长度是字节数
+- `uint8_t[n]` / `uint8_t[ref(...)]`: 连续的 `uint8_t`, 即一段字节, 解成 `Uint8Array`
 - `rest()`: 声明式长度前缀的终点标记
 - `records(Sub)`: 定长子记录一直填到末尾; 子结构体含变长字段会在**构造期**报错
 - `variant(key, cases)`: 变体联合, 判别字段须声明在它之前, 分支字段与判别字段平级
@@ -304,7 +304,8 @@ framed(
 );
 ```
 
-`blob(n)` 是**定宽**字节字段(`char name[8]` 那种): encode 写满 n 字节(短补 NUL / 长截断)。
+`uint8_t[n]` 是**定宽**字节字段(`char name[8]` 那种): encode 写满 n 字节(短补 NUL / 长截断)。
+它同时也是**不定宽**字节字段的写法 —— `uint8_t[ref("len")]` 就是"以 `len` 为字节数的那一段"。
 decode 一律给满 n 字节, **不在 NUL 处截断** —— 截断是 C 风格字符串的约定而不是字节属性,
 定宽字段也常见空格补位或满宽正文, 猜错就是静默丢数据。要截自己切, NUL 是单字节且不会
 出现在多字节序列中间, 所以切在它上面不会劈开 UTF-8 / GBK:
@@ -350,7 +351,7 @@ const { value, errors, consumed } = Msg.decodeLenient(Uint8Array.from([1, 0xff, 
 const Msg = new DynamicStructBuffer("msg", {
   msg_type: uint8_t,
   msg: uint8_t[ref("msg_size")],
-  name: blob(ref("name_size")),
+  name: uint8_t[ref("name_size")],
 });
 
 const data = Msg.decode(view);
@@ -362,7 +363,7 @@ Msg.encode({ msg_typo: 1 }); // 编译期报错
 几个容易踩的点:
 
 - **encode 入参是 Partial, 且长度字段不用给** —— encode 时由框架回填
-- **`blob()` / `rest()` 解出来是 `Uint8Array`**, 写回去也只接受 `Uint8Array | number[]` ——
+- **`uint8_t[n]` / `rest()` 解出来是 `Uint8Array`**, 写回去也只接受 `Uint8Array | number[]` ——
   这一层只有字节, 传字符串编译期就报错(见"文本与编码")
 - **variant 分支字段在父对象上**(`data.name`, 不是 `data.body.name`), 类型上是可选的;
   不做按判别值收窄的 union
@@ -378,7 +379,7 @@ Msg.encode({ msg_typo: 1 }); // 编译期报错
 UTF-16LE / UTF-16BE / GBK / GB18030 / Big5 / Shift-JIS / codepage..., 把其中一种当默认
 就是在替协议做决定。
 
-所以 `blob()` / `rest()` 的 encode 入参只有 `Uint8Array | number[]`: 传字符串编译期就报错,
+所以 `uint8_t[n]` / `rest()` 的 encode 入参只有 `Uint8Array | number[]`: 传字符串编译期就报错,
 绕过类型运行时也报错。`encode({ name: "hello" })` 不会"帮你按 UTF-8 转一下" —— 那等于
 悄悄替你选了编码, 而选了之后 GBK / UTF-16LE 的报文就静默错了。
 
@@ -388,7 +389,7 @@ UTF-16LE / UTF-16BE / GBK / GB18030 / Big5 / Shift-JIS / codepage..., 把其中�
 ```ts
 const Msg = new DynamicStructBuffer("msg", {
   name_size: uint8_t,
-  name: blob(ref("name_size")), // 出 Uint8Array, 长度是字节数
+  name: uint8_t[ref("name_size")], // 出 Uint8Array, 长度是字节数
 });
 
 // 解码: 编码由你指定
@@ -405,7 +406,7 @@ Msg.encode({ name: "hello" });
 ```
 
 长度头一律写**字节数**: `"世界"` 的 `.length` 是 2, UTF-8 占 6 字节, GBK 占 4 字节 ——
-拿字符数当长度会把正文截掉。`blob()` 会在 encode 时按实际字节数回填 `ref` 长度字段。
+拿字符数当长度会把正文截掉。`uint8_t[ref(...)]` 会在 encode 时按实际字节数回填 `ref` 长度字段。
 
 调试用 `TEXT(bytes, new TextDecoder("gbk"))`, 它会按给定编码渲染字节。
 

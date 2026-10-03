@@ -8,7 +8,7 @@ bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那�
 
 - `DynamicStructBuffer`: decode 结果与 encode 入参类型全部自动推出来, 字段名拼错编译期就报错
 - `InferType` / `InferDef` / `InferEncodeDef` 导出, 可以单独拿来推任意字段表
-- `blob` / `rest` / `records` / `framed` / `delimited` / `variant` 声明式字段工厂
+- `rest` / `records` / `framed` / `delimited` / `variant` 声明式字段工厂
 - `decodeLenient`: 坏字段变 `undefined` 并收集错误, 而不是整帧丢掉
 
 ### 🐛 修复
@@ -28,7 +28,7 @@ bug。`DynamicStructBuffer` 已经是解析变长报文的正解, 格式串那�
   (`float` 的 `size=4` / `unsigned=true` 单看这两个属性只能落到 `getUint32`), 于是
   `typedef("my_float", float)` 造出来的类型不含这个名字, `1.5` 被编成 `00 00 00 01` ——
   不报错、字节还合法, 要到对端才发现。类型身份改由 `kind` 字段携带, 名字不再参与派发
-- 定长字节字段(`blob(n)`)encode 现在写满 n 字节(短补 NUL / 长截断) —— 之前短值会把后面
+- 定长字节字段(`uint8_t[n]`)encode 现在写满 n 字节(短补 NUL / 长截断) —— 之前短值会把后面
   所有字段整体前移, 而 `sizeof()` 报的仍是 n
 - `frameReader.read` 类型允许返回 `null`(文档一直是这么说的)
 - 判别字段没有对应分支 / `ref` 指向非法值时, 错误消息不再被塞进 `hex:` 槽位
@@ -64,7 +64,7 @@ uint8_t.names.includes("BYTE")                 →  (删除)
 
 旧 `StructBuffer` 是"每个字段各自持有状态、自己按 offset 递归"的引擎, 新 `DynamicStructBuffer`
 是"构造期把字段表归一化成 `Field[]`, decode/encode 只做一件事: 拿 `Cursor`/`Writer` 从头走到
-尾"。功能上前者是后者的子集(新引擎多出 `blob` / `ref` / `framed` / `delimited` / `records` /
+尾"。功能上前者是后者的子集(新引擎多出 `ref` / `framed` / `delimited` / `records` /
 `variant` / `decodeLenient`, 旧引擎一样都表达不了), 复杂度和 bug 面却是反过来的。
 
 迁移是机械的:
@@ -106,6 +106,37 @@ B.encode(...).byteLength  // 14
 - 去掉 `pack` / `pack_into` / `unpack` / `unpack_from` / `iter_unpack` / `calcsize` /
   `Struct`。格式串表达不了长度前缀、变长正文、未知/保留字节这些真实报文里最常见的形状
 
+**删除 `blob()`: 字节字段只有一个写法**
+
+`uint8_t[n]` 和 `blob(n)` 一直都能描述同一段字节 —— 判据是 `size === 1 && unsigned &&
+deeps.length === 1`, 两者写出**完全相同**的字节, 线上格式、长度回填、ref 解析都一样。
+区别只在解出来的容器: 一个 `number[]`, 一个 `Uint8Array`。同一个含义有两种表示, 就得由
+调用方去猜该用哪个 —— 而这两个 API 各自还有一堆只有对方才有的毛病: `blob()` 裸调用会
+抛 `Cannot use 'in' operator`, `blob({stride})` 静默只读一部分字节, `blob(uint8_t[4])`
+报一个跟调用方式对不上的错。
+
+于是让 `uint8_t[n]` 直接表示字节, `blob()` 删除:
+
+```ts
+blob(n)                  →  uint8_t[n]
+blob(ref("len"))         →  uint8_t[ref("len")]
+
+struct.decode(view).blobField    // number[]   →  Uint8Array
+```
+
+只认"**连续的 1 字节无符号元素**", 两个反例都保持原样:
+
+- 嵌套(`uint8_t[2][3]`)仍是 `number[][]` —— 形状对调用方有意义(第一行 / 第二行)
+- `int8_t[3]` 仍是 `number[]` —— 有符号要做符号扩展, 那是**取值转换**而不是字节重解释。
+  混进来等于库替调用方挑了怎么读
+
+encode 入参两种都收(`Uint8Array | number[]`)。`bits` / `bitFields` 虽然也是 1 字节无符号,
+但解出来是**对象**, 底层那层 `number[]` 是位映射的输入, 因此不走字节段。
+
+> 类型层有个已知缺口: `uint8_t[2][3]` 运行时给 `number[][]`, 但**声明类型**只能给
+> `Uint8Array[]` —— 类型只看得见"下标了一次", 分不出 `uint8_t[2]` 和 `uint8_t[2][2]`。
+> 运行时行为才是准的
+
 **类型导出从 40 个压到 10 个**
 
 - 只保留 `uint8_t`~`uint64_t`、`int8_t`~`int64_t`、`float`、`double`
@@ -122,7 +153,7 @@ B.encode(...).byteLength  // 14
   是协议属性。真实报文的编码有 UTF-8 / UTF-16LE / UTF-16BE / GBK / GB18030 / Big5 /
   Shift-JIS / codepage..., 把其中一种当默认就是在替协议做决定; 而 `string_t` 还在字节之上
   叠了**第二个**协议假设 —— 定宽字段"遇第一个 NUL 截断"。定宽字段也常见空格补位或满宽
-  正文, 猜错就是静默丢数据。文本字段改用 `blob(n)` / `blob(ref(...))`, 拿到 `Uint8Array`,
+  正文, 猜错就是静默丢数据。文本字段改用 `uint8_t[n]` / `uint8_t[ref(...)]`, 拿到 `Uint8Array`,
   编码与截断都归调用方
 - 删除 `padding_t`: 它会把跳过的字节解成 uint8 数组塞进结果, 真实项目里协议表一半的字段
   是"未知/保留/填充", 让它们出现在结果里只会污染每一次消费。动态结构体请用 `skip()`
@@ -150,7 +181,7 @@ Big5 / Shift-JIS ...)。因此:
 
 - 删掉 `StructBufferConfig` 的 `textDecode` / `textEncoder`, 以及 `BlobField` 的
   `as: "text"` 形态 —— 解出来的值一律是字节
-- `blob()` / `rest()` 的 encode 入参是 `BlobValue = Uint8Array | number[]`, **不含 `string`**。
+- `uint8_t[n]` / `rest()` 的 encode 入参是 `Uint8Array | number[]`, **不含 `string`**。
   这一层完全不知道手里的字节是不是文本: 库不猜编码, 也不"顺手按 UTF-8 帮你转一下" ——
   悄悄替调用方选编码, 换来的就是 GBK / UTF-16LE 报文静默错。传字符串编译期就报错, 绕过
   类型运行时也报错。文本自己 `new TextEncoder().encode(...)` / `new TextDecoder("gbk").decode(...)`,

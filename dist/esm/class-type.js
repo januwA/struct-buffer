@@ -81,6 +81,9 @@ export class StructType extends Array {
         }
         return this.size;
     }
+    get isByteRun() {
+        return this.size === 1 && this.unsigned && this.deeps.length === 1;
+    }
     constructor(size, unsigned, kind = "int") {
         super();
         this.size = size;
@@ -104,6 +107,10 @@ export class StructType extends Array {
     }
     decode(view, littleEndian = false, offset = 0, ctx) {
         view = makeDataView(view);
+        if (this.isByteRun) {
+            const n = this.getCount(ctx);
+            return new Uint8Array(view.buffer, view.byteOffset + offset, n).slice();
+        }
         const count = this.getCount(ctx);
         const result = [];
         let i = count;
@@ -133,6 +140,9 @@ export class BitsType extends StructType {
     constructor(size, bits) {
         super(size, true);
         this.bits = bits;
+    }
+    get isByteRun() {
+        return false;
     }
     decode(view, littleEndian = false, offset = 0, ctx) {
         const data = super.decode(view, littleEndian, offset, ctx);
@@ -186,6 +196,9 @@ export class BitFieldsType extends StructType {
     constructor(size, bitFields) {
         super(size, true);
         this.bitFields = bitFields;
+    }
+    get isByteRun() {
+        return false;
     }
     decode(view, littleEndian = false, offset = 0, ctx) {
         const data = super.decode(view, littleEndian, offset, ctx);

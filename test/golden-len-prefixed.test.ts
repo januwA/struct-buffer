@@ -7,7 +7,7 @@
  * - 布局: uknow1:u16 | msg_type:u8 | msg_size:u16 | msg[u8 x msg_size]
  *         | name_size:u8 | name[u8 x name_size] | uknow3:u8[8]
  * - 全程 little-endian
- * - 正文是 **GBK**, 所以按字节拿(`uint8_t` / `blob`)再自己 GBK 解码 —— 库里
+ * - 正文是 **GBK**, 所以按字节拿(`uint8_t[n]`)再自己 GBK 解码 —— 库里
  *   没有字符串类型, 按 UTF-8 解必然乱码
  *
  * 数据是合成的(见 fixtures/len-prefixed.ts), 覆盖长度前缀、自引用长度、

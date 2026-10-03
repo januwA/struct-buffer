@@ -37,7 +37,7 @@ describe("宽松解码 decodeLenient", () => {
     expect(r.errors).toEqual([]);
     expect(r.consumed).toBe(wire.length);
     expect(r.value).toEqual(strict);
-    expect(r.value.body).toEqual([1, 2, 3]);
+    expect(r.value.body).toEqual(bytes(1, 2, 3));
   });
 
   it("定长字段失败: 跳过它继续, 后面的字段照样解出来", () => {
@@ -45,7 +45,7 @@ describe("宽松解码 decodeLenient", () => {
     const wire = bytes(0x10, 0x00, 0x02, 0xaa, 0xbb);
     const r = Frame.decodeLenient(wire);
     expect(r.value.op).toBe(0x10);
-    expect(r.value.body).toEqual([0xaa, 0xbb]);
+    expect(r.value.body).toEqual(bytes(0xaa, 0xbb));
     expect(r.value.tail).toBeUndefined();
     expect(r.errors).toHaveLength(1);
     expect(r.errors[0]).toBeInstanceOf(DecodeError);

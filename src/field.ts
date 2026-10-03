@@ -259,6 +259,9 @@ export function nest(values: any[], shape: number[]): any {
 /** 把(可能多层的)值拍平成元素列表 */
 export function flatten(value: any): any[] {
   if (value == null) return [];
+  // Uint8Array 本身就是"一串字节", 也就是一串数字 —— 字节字段(`uint8_t[n]`)解出来的
+  // 是它而不是 number[]。不按序列展开的话, `uint8_t[ref("len")]` 的长度回填会算成 1
+  if (ArrayBuffer.isView(value)) return Array.from(value as any);
   return Array.isArray(value) ? value.flat(Infinity) : [value];
 }
 
@@ -314,7 +317,7 @@ export class TypeField implements Field {
   constructor(
     readonly name: string,
     private readonly le: boolean,
-    private readonly type: StructType<any, any>
+    private readonly type: StructType<any, any, any>
   ) {
     const deeps = type.deeps ?? [];
     this.spec = countOfDeeps(deeps);
@@ -358,6 +361,20 @@ export class TypeField implements Field {
     if (value == null && count > 0) {
       w.zero(size);
       return;
+    }
+    // 字节段的入参是**整段**, 不是单个数字: 传进来的东西不对(典型是字符串)不能像
+    // 标量那样被访问器悄悄强转成 0, 那会写出一段看着成功的错数据
+    if (
+      this.type.isByteRun &&
+      value != null &&
+      !(value instanceof Uint8Array) &&
+      !Array.isArray(value)
+    ) {
+      throw new EncodeError(
+        "encode",
+        `${this.name}: 期望 Uint8Array/number[], 实际 ${typeof value} —— 这一层只有字节, ` +
+          `文本请自己编码好再传(编码也归调用方决定)`
+      );
     }
     const before = w.raw;
     const after = this.type.encode(value, this.le, w.pos, before, values);
@@ -412,7 +429,7 @@ export class SkipField implements Field {
  *
  * 这里**只出字节, 不出字符串**: 定宽字节不做"遇 NUL 截断"。截断是协议约定而不是
  * 字节属性(定宽字段也常见空格补位或满宽正文), 猜错就是静默丢数据, 需要的话在调用点
- * 自己 `bytes.indexOf(0)`。文本的编码同理 —— `blob` 给字节, 编码交给
+ * 自己 `bytes.indexOf(0)`。文本的编码同理 —— `uint8_t[n]` 给字节, 编码交给
  * `new TextDecoder(...)`.
  */
 export class BlobField implements Field {
@@ -780,14 +797,14 @@ export interface FieldSpec<T = any, E = T> {
   readonly __fieldSpec: true;
   /**
    * phantom: 声明"我这个字段解码出来是 T", 运行时**不存在**这个属性.
-   * 与 `StructType[VALUE_TYPE]` 同一个机制(`blob()` 靠它把 `Uint8Array` 带进
+   * 与 `StructType[VALUE_TYPE]` 同一个机制(`rest()` 靠它把 `Uint8Array` 带进
    * `InferType`) —— 声明式字段的运行时形态只有 `{build}`, 类型只能由工厂自己声明.
    */
   readonly [VALUE_TYPE]: T;
   /**
    * phantom: encode 时这个字段收什么. 解码值和 encode 入参**不是一回事** ——
-   * `rest()`/`blob()` 解出来是 `Uint8Array`, 写回去却接受字节数组, 合成一个类型
-   * 就得把 `Uint8Array` 放宽成 `Uint8Array | number[]`, 而那会让 `d.body.length`
+   * `rest()` 与 `uint8_t[n]` 解出来是 `Uint8Array`, 写回去却接受字节数组, 合成一个
+   * 类型就得更宽 —— 放宽成 `Uint8Array | number[]` 会让 `d.body.length`
    * 这类正常用法也要多一次收窄.
    */
   readonly [ENCODE_VALUE_TYPE]: E;

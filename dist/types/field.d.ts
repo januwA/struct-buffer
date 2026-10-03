@@ -64,7 +64,7 @@ export declare class TypeField implements Field {
     readonly fixedSize?: number;
     private readonly spec;
     private readonly refSpec?;
-    constructor(name: string, le: boolean, type: StructType<any, any>);
+    constructor(name: string, le: boolean, type: StructType<any, any, any>);
     resolveLengths(obj: AnyObject, ctx: Ctx): AnyObject;
     decode(c: Cursor, out: AnyObject, ctx: Ctx, sink?: ErrorSink): void;
     encode(w: Writer, value: any, ctx: Ctx): void;

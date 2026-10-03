@@ -123,6 +123,8 @@ export function nest(values, shape) {
 export function flatten(value) {
     if (value == null)
         return [];
+    if (ArrayBuffer.isView(value))
+        return Array.from(value);
     return Array.isArray(value) ? value.flat(Infinity) : [value];
 }
 function defFixedSize(def, site) {
@@ -192,6 +194,13 @@ export class TypeField {
         if (value == null && count > 0) {
             w.zero(size);
             return;
+        }
+        if (this.type.isByteRun &&
+            value != null &&
+            !(value instanceof Uint8Array) &&
+            !Array.isArray(value)) {
+            throw new EncodeError("encode", `${this.name}: 期望 Uint8Array/number[], 实际 ${typeof value} —— 这一层只有字节, ` +
+                `文本请自己编码好再传(编码也归调用方决定)`);
         }
         const before = w.raw;
         const after = this.type.encode(value, this.le, w.pos, before, values);

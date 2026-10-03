@@ -12,7 +12,7 @@ import { DysplayResult } from "./interfaces";
  */
 export function display(
   view: DataView,
-  type: StructType<any, any>,
+  type: StructType<any, any, any>,
   options?: {
     /**
      * show hex

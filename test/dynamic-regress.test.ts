@@ -1,6 +1,5 @@
 import {
   bitFields,
-  blob,
   BlobValue,
   Cursor,
   DecodeError,
@@ -121,7 +120,7 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
     });
     const encoded = Padded.encode({ n: 3 });
     expect(encoded.byteLength).toBe(4);
-    expect(Padded.decode(encoded)).toEqual({ n: 3, pad: [0, 0, 0] });
+    expect(Padded.decode(encoded)).toEqual({ n: 3, pad: Uint8Array.from([0, 0, 0]) });
   });
 
   it("encode 不修改调用方对象", () => {
@@ -139,7 +138,7 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
   it("中文正文按字节长度而非字符长度", () => {
     const Chat = new DynamicStructBuffer("chat", {
       text_len: uint16_t,
-      text: blob(ref("text_len")),
+      text: uint8_t[ref("text_len")],
     });
     // "世界" 的 length 是 2, UTF-8 是 6 字节 —— 长度头写的是字节数, 拿字符数会把正文截掉.
     // 编码是调用方的事: 库只看到 6 个字节, 不知道它们是"世界"
@@ -279,7 +278,7 @@ describe("DynamicStructBuffer 回归(实测 8 个 bug)", () => {
   });
 });
 
-describe("声明式字段: rest / blob / records / variant / framed", () => {
+describe("声明式字段: rest / records / variant / framed", () => {
   it("rest 吃掉剩余全部字节", () => {
     const Pkt = new DynamicStructBuffer("pkt", {
       op: uint8_t,
@@ -293,7 +292,7 @@ describe("声明式字段: rest / blob / records / variant / framed", () => {
   it("rest 与前面的长度前缀字段共存", () => {
     const Pkt = new DynamicStructBuffer("pkt", {
       text_len: uint16_t,
-      text: blob(ref("text_len")),
+      text: uint8_t[ref("text_len")],
       tail: rest(),
     });
     const encoded = Pkt.encode({
@@ -308,20 +307,20 @@ describe("声明式字段: rest / blob / records / variant / framed", () => {
     });
   });
 
-  it("blob 出 Uint8Array 而不是 number[]", () => {
+  it("uint8_t[ref(..)] 出 Uint8Array 而不是 number[]", () => {
     const Pkt = new DynamicStructBuffer("pkt", {
       len: uint8_t,
-      raw: blob(ref("len")),
+      raw: uint8_t[ref("len")],
     });
     const out = Pkt.decode([3, 1, 2, 3]);
     expect(out.raw).toBeInstanceOf(Uint8Array);
     expect(Array.from(out.raw)).toEqual([1, 2, 3]);
   });
 
-  it("blob 只收字节: string 既不在类型里, 运行时也直接拒绝", () => {
+  it("字节段只收字节: string 既不在类型里, 运行时也直接拒绝", () => {
     const Pkt = new DynamicStructBuffer("pkt", {
       len: uint8_t,
-      raw: blob(ref("len")),
+      raw: uint8_t[ref("len")],
     });
 
     // 编译期: BlobValue 就是字节, 里面没有 string
@@ -369,7 +368,7 @@ describe("声明式字段: rest / blob / records / variant / framed", () => {
     const Pkt = new DynamicStructBuffer("pkt", {
       msg_type: uint8_t,
       body: variant("msg_type", {
-        1: { name: blob(3) },
+        1: { name: uint8_t[3] },
         2: { x: uint32_t, y: uint32_t },
       }),
     });
@@ -401,7 +400,7 @@ describe("声明式字段: rest / blob / records / variant / framed", () => {
     const Pkt = new DynamicStructBuffer("pkt", {
       chan: uint8_t,
       ...discriminated("body", "msg_type", uint8_t, {
-        0x0a: { len: uint16_t, text: blob(ref("len")) },
+        0x0a: { len: uint16_t, text: uint8_t[ref("len")] },
         0x0b: { id: uint32_t },
       }),
     });

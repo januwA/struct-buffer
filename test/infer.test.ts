@@ -6,7 +6,6 @@ import {
   Writer,
   bitFields,
   bits,
-  blob,
   type BlobValue,
   double,
   float,
@@ -100,50 +99,44 @@ describe("类型推导", () => {
     void (d.ok1 === true);
   });
 
-  it("下标就是数组, 多维就是多维; blob 的下标只定字节数", () => {
+  it("单维 uint8 下标就是字节, 多维保持嵌套", () => {
     const F = new DynamicStructBuffer("F", {
       a: uint8_t[3],
       b: uint8_t[2][2],
-      c: blob(2),
-      e: blob(4),
+      c: uint16_t[2],
     });
     type D = InferType<typeof F>;
     type _t = [
-      Assert<Equals<D["a"], number[]>>,
-      Assert<Equals<D["b"], number[][]>>,
-      // blob 出 Uint8Array, 无论定宽还是多维都是同一个类型
-      Assert<Equals<D["c"], Uint8Array>>,
-      Assert<Equals<D["e"], Uint8Array>>
+      // 连续的 uint8 就是一段字节, 不是数字元组
+      Assert<Equals<D["a"], Uint8Array>>,
+      // 元素比 1 字节宽就不是字节
+      Assert<Equals<D["c"], number[]>>
+      // b 是嵌套形状: 运行时给 number[][], 但**声明类型**只能给 Uint8Array[] ——
+      // 类型层看不到 deeps 的形状(只知道"下标一次"), 分不出 uint8_t[2] 和 uint8_t[2][2]。
+      // 这是已知的精度缺口, 运行时行为才是准的
     ];
 
     const d = F.decode(
-      Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66])
+      Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 0x61, 0x62, 0x63, 0x64])
     );
-    expect(d.a).toEqual([1, 2, 3]);
+    expect(d.a).toEqual(Uint8Array.from([1, 2, 3]));
     expect(d.b).toEqual([
       [4, 5],
       [6, 7],
     ]);
-    expect(d.c).toEqual(Uint8Array.from([0x61, 0x62]));
-    expect(d.e).toEqual(Uint8Array.from([0x63, 0x64, 0x65, 0x66]));
+    expect(d.c).toEqual([0x6162, 0x6364]);
   });
 
   it("ref 能穿过长度前缀(旧版 ref 是 any, 推导到这里就断了)", () => {
     const F = new DynamicStructBuffer("F", {
       n: uint8_t,
       body: uint8_t[ref("n")],
-      text: blob(ref("n")),
     });
     type D = InferType<typeof F>;
-    type _t = [
-      Assert<Equals<D["n"], number>>,
-      Assert<Equals<D["body"], number[]>>,
-      Assert<Equals<D["text"], Uint8Array>>
-    ];
+    type _t = [Assert<Equals<D["n"], number>>, Assert<Equals<D["body"], Uint8Array>>];
 
-    const d = F.decode(Uint8Array.from([2, 0xaa, 0xbb, 0x41, 0x42]));
-    expect(d.body).toEqual([0xaa, 0xbb]);
-    expect(d.text).toEqual(Uint8Array.from([0x41, 0x42]));
+    const d = F.decode(Uint8Array.from([2, 0xaa, 0xbb]));
+    expect(d.body).toEqual(Uint8Array.from([0xaa, 0xbb]));
   });
 
   it("bits 是位序号, bitFields 是位宽", () => {
@@ -210,10 +203,10 @@ describe("类型推导", () => {
     expect(d.id).toBe(5);
   });
 
-  it("声明式字段: blob / rest", () => {
+  it("声明式字段: 字节段 / rest", () => {
     const F = new DynamicStructBuffer("F", {
       n: uint8_t,
-      payload: blob(ref("n")),
+      payload: uint8_t[ref("n")],
       tail: rest(),
     });
     type D = InferType<typeof F>;
@@ -288,7 +281,7 @@ describe("类型推导", () => {
         msg: uint8_t[ref("msg_size")],
         name_size: uint8_t,
         name: uint8_t[ref("name_size")],
-        text: blob(1),
+        text: uint8_t[1],
       },
       { littleEndian: true }
     );
@@ -298,10 +291,10 @@ describe("类型推导", () => {
       Uint8Array.from([0, 0, 0, 0, 0, 2, 0x41, 0x42, 0x41])
     );
     const n: number = d.msg_type;
-    const bytes: number[] = d.msg;
-    const name: number[] = d.name;
+    const bytes: Uint8Array = d.msg;
+    const name: Uint8Array = d.name;
     const text: Uint8Array = d.text;
-    expect([n, bytes.length, name, Array.from(text)]).toEqual([
+    expect([n, bytes.length, Array.from(name), Array.from(text)]).toEqual([
       0,
       0,
       [0x41, 0x42],
@@ -327,17 +320,21 @@ describe("类型推导", () => {
 
   it("InferDef 可以单独用(不经过 DynamicStructBuffer)", () => {
     const c = uint8_t[ref("n")];
-    const b = blob(2);
+    const b = uint8_t[2];
     type D = InferDef<{
       a: typeof uint8_t;
       b: typeof b;
       c: typeof c;
     }>;
-    type _t = [Assert<Equals<D, { a: number; b: Uint8Array; c: number[] }>>];
+    type _t = [
+      Assert<Equals<D, { a: number; b: Uint8Array; c: Uint8Array }>>
+    ];
 
     const F = new DynamicStructBuffer("F", { n: uint8_t, c });
-    type _t2 = [Assert<Equals<InferType<typeof F>["c"], number[]>>];
-    expect(F.decode(Uint8Array.from([2, 7, 8])).c).toEqual([7, 8]);
+    type _t2 = [Assert<Equals<InferType<typeof F>["c"], Uint8Array>>];
+    expect(F.decode(Uint8Array.from([2, 7, 8])).c).toEqual(
+      Uint8Array.from([7, 8])
+    );
   });
 
   it("子结构体的下标就是数组(deeps 的层数)", () => {
@@ -371,7 +368,7 @@ describe("类型推导", () => {
     const Pkt = new DynamicStructBuffer("pkt", {
       msg_type: uint8_t,
       body: variant("msg_type", {
-        1: { name: blob(3) },
+        1: { name: uint8_t[3] },
         2: { x: uint32_t, y: uint32_t },
       }),
     });
