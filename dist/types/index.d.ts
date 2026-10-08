@@ -1,5 +1,5 @@
-export { bitFields, bits, bytes, codec, delimited, double, float, framed, int16_t, int32_t, int64_t, int8_t, isRef, list, records, ref, registerType, rest, skip, struct, uint16_t, uint32_t, uint64_t, uint8_t, variant, } from "./schema";
-export type { Codec, CodecSpec, InferDef, InferEncode, InferEncodeDef, InferSource, InferType, ScalarCodec, StructBufferConfig, StructCodec, StructDef, VariantCodec, } from "./schema";
+export { bitFields, bits, bytes, codec, delimited, double, float, framed, int16_t, int32_t, int64_t, int8_t, isRef, list, records, ref, registerType, rest, skip, skipUntil, struct, uint16_t, uint32_t, uint64_t, uint8_t, variant, } from "./schema";
+export type { Codec, CodecSpec, InferDef, InferEncode, InferEncodeDef, InferSource, InferType, ListOptions, ListSyncOptions, PatternBytes, PatternSource, ScalarCodec, SkipUntilOptions, StructBufferConfig, StructCodec, StructDef, VariantCodec, } from "./schema";
 export type { Len, Ref, TypeKind } from "./engine";
 export { DecodeError, EncodeError } from "./errors";
 export type { LenientResult } from "./errors";

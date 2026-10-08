@@ -10,13 +10,19 @@ import {
   fixedSize,
   isRef,
   Len,
+  ListOptions,
   ListNode,
+  ListSyncOptions,
   Node,
+  PatternBytes,
+  PatternSource,
   readNode,
   Ref,
   ScalarNode,
   scalarHandle,
   SkipNode,
+  SkipUntilNode,
+  SkipUntilOptions,
   StructNode,
   TypeKind,
   VariantNode,
@@ -251,7 +257,15 @@ export function ref(
 }
 
 export { isRef };
-export type { Ref, Len };
+export type {
+  Ref,
+  Len,
+  PatternBytes,
+  PatternSource,
+  ListOptions,
+  ListSyncOptions,
+  SkipUntilOptions,
+};
 
 // ------------------------------------------------------------ 字节 / 列表
 
@@ -268,12 +282,14 @@ export function rest(): Codec<Uint8Array, Uint8Array> {
 /** 列表。嵌套用 `list(list(T, 2), 2)`, 不再有 `T[n]` 下标魔法 */
 export function list<C extends Codec<any, any>>(
   item: C,
-  len: number | Ref | "rest"
+  len: number | Ref | "rest",
+  opts?: ListOptions<InferType<C>>
 ): Codec<InferType<C>[], InferEncode<C>[]> {
   return make<InferType<C>[], InferEncode<C>[]>({
     kind: "list",
     item: nodeOf(item),
     len,
+    sync: opts?.sync,
   } as ListNode);
 }
 
@@ -366,6 +382,24 @@ export function bitFields(
 export function skip(n: number): Codec<never, never> {
   return make<never, never>({ kind: "skip", n } as SkipNode);
 }
+
+/**
+ * 扫描指定特征字节 pattern 并调整游标位置, 结果里没有这个字段.
+ * 若未找到: optional=true 时保持或跳到末尾, optional=false(默认) 时抛出 DecodeError.
+ */
+export function skipUntil(
+  pattern: PatternSource,
+  opts?: SkipUntilOptions
+): Codec<never, never> {
+  return make<never, never>({
+    kind: "skipUntil",
+    pattern,
+    offset: opts?.offset,
+    optional: opts?.optional,
+    to: opts?.to,
+  } as SkipUntilNode);
+}
+
 
 // ------------------------------------------------------------ struct
 

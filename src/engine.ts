@@ -100,10 +100,27 @@ export interface BytesNode {
   len: Len;
 }
 
+export type PatternBytes = Uint8Array | DataView;
+
+export interface ListSyncOptions<T = any> {
+  pattern: (
+    prev: T,
+    first: T,
+    all: T[],
+    ctx: AnyObject
+  ) => PatternBytes;
+  offset?: number;
+}
+
+export interface ListOptions<T = any> {
+  sync?: ListSyncOptions<T>;
+}
+
 export interface ListNode {
   kind: "list";
   item: Node;
   len: Len;
+  sync?: ListSyncOptions;
 }
 
 export interface FieldNode {
@@ -142,6 +159,24 @@ export interface SkipNode {
   n: number;
 }
 
+export type PatternSource =
+  | PatternBytes
+  | ((ctx: AnyObject) => PatternBytes);
+
+export interface SkipUntilOptions {
+  offset?: number;
+  optional?: boolean;
+  to?: "stay" | "end";
+}
+
+export interface SkipUntilNode {
+  kind: "skipUntil";
+  pattern: PatternSource;
+  offset?: number;
+  optional?: boolean;
+  to?: "stay" | "end";
+}
+
 export type Node =
   | ScalarNode
   | BitsNode
@@ -151,7 +186,9 @@ export type Node =
   | StructNode
   | VariantNode
   | CodecNode
-  | SkipNode;
+  | SkipNode
+  | SkipUntilNode;
+
 
 // -------------------------------------------------------------- fixedSize
 
@@ -201,6 +238,7 @@ export function fixedSize(node: Node): number | undefined {
       break;
     }
     case "variant":
+    case "skipUntil":
       size = undefined;
       break;
   }
@@ -338,6 +376,9 @@ export function readNode(
     case "variant":
       // variant 没有"自己的值", 分支字段平铺进父对象 —— 由 readField 处理
       throw new Error("readNode: variant 只能作为字段, 不能作为值");
+
+    case "skipUntil":
+      return undefined;
   }
 }
 
@@ -390,7 +431,25 @@ function readList(
   const n = resolveLen(node.len, ctx, c.where, c.pos, name);
   for (let i = 0; i < n; i++) {
     if (sink?.stopped) break;
-    values.push(readNode(node.item, c, name, le, ctx));
+    if (i > 0 && node.sync) {
+      const pat = node.sync.pattern(values[i - 1], values[0], values, ctx);
+      const hit = c.indexOf(pat);
+      if (hit === -1) {
+        const err = DecodeError.reason(
+          c.where,
+          c.pos,
+          `${name}: 无法找到第 ${i} 个元素的同步标记`
+        );
+        if (sink) {
+          sink.errors.push(err);
+          sink.stopped = true;
+          break;
+        }
+        throw err;
+      }
+      c.pos = hit + (node.sync.offset ?? 0);
+    }
+    values.push(readNode(node.item, c, name, le, ctx, sink));
   }
   return values;
 }
@@ -429,6 +488,22 @@ function readField(
   const node = f.node;
   if (node.kind === "skip") {
     c.skip(node.n, f.name);
+    return;
+  }
+  if (node.kind === "skipUntil") {
+    const pat =
+      typeof node.pattern === "function" ? node.pattern(out) : node.pattern;
+    const hit = c.indexOf(pat);
+    if (hit === -1) {
+      if (!node.optional) {
+        throw DecodeError.reason(c.where, c.pos, `${f.name}: 无法找到同步标记`);
+      }
+      if (node.to === "end") {
+        c.pos = c.limit;
+      }
+    } else {
+      c.pos = hit + (node.offset ?? 0);
+    }
     return;
   }
   if (node.kind === "variant") {
@@ -527,7 +602,7 @@ function backfillFields(
 ): void {
   for (const f of fields) {
     const node = f.node;
-    if (node.kind === "skip") continue;
+    if (node.kind === "skip" || node.kind === "skipUntil") continue;
 
     if (
       (node.kind === "bytes" || node.kind === "list") &&
@@ -689,6 +764,9 @@ export function writeNode(
       node.write(w, value, name);
       return;
 
+    case "skipUntil":
+      return;
+
     case "variant":
       throw new Error("writeNode: variant 只能作为字段, 不能作为值");
   }
@@ -703,6 +781,9 @@ function writeField(
   const node = f.node;
   if (node.kind === "skip") {
     w.zero(node.n);
+    return;
+  }
+  if (node.kind === "skipUntil") {
     return;
   }
   if (node.kind === "variant") {

@@ -43,10 +43,19 @@ export interface BytesNode {
     kind: "bytes";
     len: Len;
 }
+export type PatternBytes = Uint8Array | DataView;
+export interface ListSyncOptions<T = any> {
+    pattern: (prev: T, first: T, all: T[], ctx: AnyObject) => PatternBytes;
+    offset?: number;
+}
+export interface ListOptions<T = any> {
+    sync?: ListSyncOptions<T>;
+}
 export interface ListNode {
     kind: "list";
     item: Node;
     len: Len;
+    sync?: ListSyncOptions;
 }
 export interface FieldNode {
     name: string;
@@ -77,7 +86,20 @@ export interface SkipNode {
     kind: "skip";
     n: number;
 }
-export type Node = ScalarNode | BitsNode | BitFieldsNode | BytesNode | ListNode | StructNode | VariantNode | CodecNode | SkipNode;
+export type PatternSource = PatternBytes | ((ctx: AnyObject) => PatternBytes);
+export interface SkipUntilOptions {
+    offset?: number;
+    optional?: boolean;
+    to?: "stay" | "end";
+}
+export interface SkipUntilNode {
+    kind: "skipUntil";
+    pattern: PatternSource;
+    offset?: number;
+    optional?: boolean;
+    to?: "stay" | "end";
+}
+export type Node = ScalarNode | BitsNode | BitFieldsNode | BytesNode | ListNode | StructNode | VariantNode | CodecNode | SkipNode | SkipUntilNode;
 export declare function fixedSize(node: Node): number | undefined;
 export declare function readNode(node: Node, c: Cursor, name: string, le: boolean, ctx: AnyObject, sink?: ErrorSink): any;
 export interface ErrorSink {

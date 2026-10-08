@@ -1,5 +1,5 @@
 import { Cursor } from "./cursor";
-import { isRef, Len, Ref, TypeKind } from "./engine";
+import { isRef, Len, ListOptions, ListSyncOptions, PatternBytes, PatternSource, Ref, SkipUntilOptions, TypeKind } from "./engine";
 import { LenientResult } from "./errors";
 import { AnyObject, Bit_t, DecodeBuffer_t, TypeSize_t } from "./interfaces";
 import { Writer } from "./writer";
@@ -68,10 +68,10 @@ export declare const float: ScalarCodec<number, number>;
 export declare const double: ScalarCodec<number, number>;
 export declare function ref(field: string, transform?: (val: number, ctx: AnyObject) => number): Ref;
 export { isRef };
-export type { Ref, Len };
+export type { Ref, Len, PatternBytes, PatternSource, ListOptions, ListSyncOptions, SkipUntilOptions, };
 export declare function bytes(len: number | Ref | "rest"): Codec<Uint8Array, Uint8Array>;
 export declare function rest(): Codec<Uint8Array, Uint8Array>;
-export declare function list<C extends Codec<any, any>>(item: C, len: number | Ref | "rest"): Codec<InferType<C>[], InferEncode<C>[]>;
+export declare function list<C extends Codec<any, any>>(item: C, len: number | Ref | "rest", opts?: ListOptions<InferType<C>>): Codec<InferType<C>[], InferEncode<C>[]>;
 export declare function records<C extends Codec<any, any>>(source: C, len?: number | Ref): Codec<InferType<C>[], InferEncode<C>[]>;
 export declare function bits(storage: ScalarCodec, positions: {
     [k: string]: number;
@@ -88,6 +88,7 @@ export declare function bitFields(storage: ScalarCodec, widths: {
     [x: string]: number;
 }>>;
 export declare function skip(n: number): Codec<never, never>;
+export declare function skipUntil(pattern: PatternSource, opts?: SkipUntilOptions): Codec<never, never>;
 export type StructDef = {
     [k: string]: Codec<any, any>;
 };

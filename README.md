@@ -113,11 +113,67 @@ bytes(ref("n"))          // 长度取自字段 n
 bytes("rest")            // 等价于 rest(): 吃掉剩余全部字节
 list(T, 2)               // 定长数组 => T[]
 list(T, ref("n"))        // 长度取自字段 n
+list(T, ref("n"), { sync }) // 带有特征标记同步对齐的数组
 list(list(T, 2), 2)      // 多维: 2 x 2
 records(Sub)             // 子记录一直填到末尾(Sub 须定长)
 records(Sub, ref("n"))   // 或显式给个数
 skip(4)                  // 占位 4 字节, 不出现在结果里(encode 写 0)
+skipUntil(pat, opts)     // 扫描特征字节并调整游标, 不出现在结果里
 ```
+
+## 动态对齐与特征寻标: list.sync / skipUntil
+
+用于元素大小不一、含有未知变长填充或需根据特征魔数 (Magic / Sync Marker) 定位下一个数据的场景。支持固定模式串或从已解析字段动态生成 (`Uint8Array | DataView`)。
+
+### 1. `list` 同步选项 (`sync`)
+针对数组容器。解码第 1 个及后续元素前，自动在流中搜索特征 Pattern 并按偏移量对齐游标，保持元素结构体纯粹：
+
+```ts
+import { list, ref, struct, uint16_t, uint32_t, uint8_t } from "struct-buffer";
+
+const Item = struct("Item", {
+  inc_id: uint32_t,
+  id: uint32_t,
+  define_id: uint32_t,
+  type: uint16_t,
+}, { littleEndian: true });
+
+const Packet = struct("Packet", {
+  count: uint8_t,
+  items: list(Item, ref("count"), {
+    sync: {
+      // 动态根据首个 item 的 id 编码特征字节进行寻标
+      pattern: (_prev, first) => uint32_t.encode(first.id, true),
+      offset: -4, // 相对 pattern 匹配位置的元素起始偏移量
+    },
+  }),
+}, { littleEndian: true });
+```
+
+### 2. 字段级跳转 `skipUntil`
+作为结构体字段使用，跳过未知的变长字节直到遇到指定标记。类型为 `never`，**不出现在解码结果中**：
+
+```ts
+import { skipUntil, struct, uint32_t, uint16_t } from "struct-buffer";
+
+const Item = struct("Item", {
+  inc_id: uint32_t,
+  id: uint32_t,
+  define_id: uint32_t,
+  type: uint16_t,
+  // 读完当前 item 后，根据本 item 的 id 寻标下一个 item 的起始位置
+  _next: skipUntil((ctx) => uint32_t.encode(ctx.id, true), {
+    offset: -4,
+    optional: true, // 最后一个元素后面没有标记时不报错
+  }),
+}, { littleEndian: true });
+```
+
+- `pattern`: 固定 `Uint8Array | DataView`，或从当前对象计算 `(ctx) => Uint8Array | DataView`。
+- `offset`: 相对匹配位置的偏移（默认 `0`）。
+- `optional`: 默认 `false`（找不到抛 `DecodeError`）；`true` 时不报错。
+- `to`: 找不到时的游标行为：`"stay"`（默认，留在原地）或 `"end"`（跳到缓冲区末尾）。
+
 
 ## 变长与长度回填
 

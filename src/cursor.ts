@@ -210,4 +210,39 @@ export class Cursor {
   rest(field: string): Uint8Array {
     return this.bytes(this.left, field);
   }
+
+  /**
+   * 在当前游标范围 [pos, limit) 内查找特征字节 pattern.
+   * 找到返回相对 view 起点的绝对偏移 offset, 未找到返回 -1.
+   */
+  indexOf(pattern: Uint8Array | DataView): number {
+    const p =
+      pattern instanceof Uint8Array
+        ? pattern
+        : new Uint8Array(
+            pattern.buffer,
+            pattern.byteOffset,
+            pattern.byteLength
+          );
+    const pLen = p.length;
+    if (pLen === 0) return this.pos;
+    const limit = this.limit - pLen;
+    const view = this.view;
+    const first = p[0];
+
+    for (let i = this.pos; i <= limit; i++) {
+      if (view.getUint8(i) === first) {
+        let matched = true;
+        for (let j = 1; j < pLen; j++) {
+          if (view.getUint8(i + j) !== p[j]) {
+            matched = false;
+            break;
+          }
+        }
+        if (matched) return i;
+      }
+    }
+    return -1;
+  }
 }
+

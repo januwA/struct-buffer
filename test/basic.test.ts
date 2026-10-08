@@ -13,9 +13,145 @@ import {
   makeDataView,
   sview,
   sbytes2 as b2,
+  skip,
+  skipUntil,
+  ref,
+  sbytes,
 } from "../src";
 
 describe("test decode and encode", () => {
+  it("parse list item dynamic size", () => {
+    const itemStruct = struct(
+      "item",
+      {
+        inc_id: uint32_t,
+        id: uint32_t,
+        define_id: uint32_t,
+        type: uint16_t,
+      },
+      {
+        littleEndian: true,
+      },
+    );
+    const packetStruct = struct(
+      "Packet",
+      {
+        seq: uint16_t,
+        box_id: uint32_t,
+        count: uint8_t,
+        _pad1: skip(2),
+        items: list(itemStruct, ref("count"), {
+          sync: {
+            pattern: (_prev, first) => uint32_t.encode(first.id, true),
+            offset: -4,
+          },
+        }),
+      },
+      {
+        littleEndian: true,
+      },
+    );
+
+    const data = packetStruct.decode(
+      sbytes(
+        `00 5d bd 25 00 00 04 ff ff 5d 4c 42 48 09 00 9a 08 35 78 d1 01 34 01 00 00 00 00 00 00 00 00 00 00 00 00 01 01 fa ff 7c 01 00 00 ff ff ff ff ff ff ff ff 01 00 00 00 ff ff ff ff ff 00 00 00 00 00 00 00 00 00 00 00 00 5e 4c 42 48 09 00 9a 0827 4e cb 01 05 00 00 00 00 00 00 00 00 00 00 00 00 00 01 01 fa 01 36 00 00 00 f5 15 05 00 34 00 00 00 01 00 00 00 01 00 00 00 04 00 00 00 00 00 00 00 00 00 00 00 00 5f 4c 42 48 09 00 9a 08 b1 f9 9b 00 16 00 00 00 00 00 00 00 00 00 00 00 00 00 77 00 00 77 00 00 01 0a 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ff ff 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 60 4c 42 48 09 00 9a 08 54 25 9a 00 02 00 00 00 00 00 00 00 00 00 00 00 00 00 72 00 00 72 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 c7 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00`,
+      ),
+    );
+
+    expect(data.box_id).toBe(uint32_t.decode(sbytes("bd 25 00 00"), true));
+    expect(data.count).toBe(uint8_t.decode(sbytes("04"), true));
+    expect(data.items.length).toBe(4);
+    expect(data.items[0].inc_id).toBe(
+      uint32_t.decode(sbytes("5d 4c 42 48"), true),
+    );
+    expect(data.items[0].id).toBe(uint32_t.decode(sbytes("09 00 9a 08"), true));
+    expect(data.items[0].define_id).toBe(
+      uint32_t.decode(sbytes("35 78 d1 01"), true),
+    );
+    expect(data.items[0].type).toBe(uint16_t.decode(sbytes("34 01"), true));
+
+    expect(data.items[1].inc_id).toBe(
+      uint32_t.decode(sbytes("5e 4c 42 48"), true),
+    );
+    expect(data.items[1].id).toBe(uint32_t.decode(sbytes("09 00 9a 08"), true));
+    expect(data.items[1].define_id).toBe(
+      uint32_t.decode(sbytes("27 4e cb 01"), true),
+    );
+    expect(data.items[1].type).toBe(uint16_t.decode(sbytes("05 00"), true));
+
+    expect(data.items[2].inc_id).toBe(
+      uint32_t.decode(sbytes("5f 4c 42 48"), true),
+    );
+    expect(data.items[2].id).toBe(uint32_t.decode(sbytes("09 00 9a 08"), true));
+    expect(data.items[2].define_id).toBe(
+      uint32_t.decode(sbytes("b1 f9 9b 00"), true),
+    );
+    expect(data.items[2].type).toBe(uint16_t.decode(sbytes("16 00"), true));
+
+    expect(data.items[3].inc_id).toBe(
+      uint32_t.decode(sbytes("60 4c 42 48"), true),
+    );
+    expect(data.items[3].id).toBe(uint32_t.decode(sbytes("09 00 9a 08"), true));
+    expect(data.items[3].define_id).toBe(
+      uint32_t.decode(sbytes("54 25 9a 00"), true),
+    );
+    expect(data.items[3].type).toBe(uint16_t.decode(sbytes("02 00"), true));
+  });
+
+  it("test skipUntil with dynamic pattern", () => {
+    const itemStruct = struct(
+      "item",
+      {
+        inc_id: uint32_t,
+        id: uint32_t,
+        define_id: uint32_t,
+        type: uint16_t,
+        _next: skipUntil((ctx) => uint32_t.encode(ctx.id, true), {
+          offset: -4,
+          optional: true,
+        }),
+      },
+      {
+        littleEndian: true,
+      },
+    );
+    const lootPacketStruct = struct(
+      "LootPacket",
+      {
+        seq: uint16_t,
+        box_id: uint32_t,
+        count: uint8_t,
+        _pad1: skip(2),
+        items: list(itemStruct, ref("count")),
+      },
+      {
+        littleEndian: true,
+      },
+    );
+
+    const data = lootPacketStruct.decode(
+      sbytes(
+        `00 5d bd 25 00 00 04 ff ff 5d 4c 42 48 09 00 9a 08 35 78 d1 01 34 01 00 00 00 00 00 00 00 00 00 00 00 00 01 01 fa ff 7c 01 00 00 ff ff ff ff ff ff ff ff 01 00 00 00 ff ff ff ff ff 00 00 00 00 00 00 00 00 00 00 00 00 5e 4c 42 48 09 00 9a 0827 4e cb 01 05 00 00 00 00 00 00 00 00 00 00 00 00 00 01 01 fa 01 36 00 00 00 f5 15 05 00 34 00 00 00 01 00 00 00 01 00 00 00 04 00 00 00 00 00 00 00 00 00 00 00 00 5f 4c 42 48 09 00 9a 08 b1 f9 9b 00 16 00 00 00 00 00 00 00 00 00 00 00 00 00 77 00 00 77 00 00 01 0a 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ff ff 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 60 4c 42 48 09 00 9a 08 54 25 9a 00 02 00 00 00 00 00 00 00 00 00 00 00 00 00 72 00 00 72 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 c7 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00`,
+      ),
+    );
+
+    expect(data.box_id).toBe(uint32_t.decode(sbytes("bd 25 00 00"), true));
+    expect(data.count).toBe(uint8_t.decode(sbytes("04"), true));
+    expect(data.items.length).toBe(4);
+    expect(data.items[0].inc_id).toBe(
+      uint32_t.decode(sbytes("5d 4c 42 48"), true),
+    );
+    expect(data.items[1].inc_id).toBe(
+      uint32_t.decode(sbytes("5e 4c 42 48"), true),
+    );
+    expect(data.items[2].inc_id).toBe(
+      uint32_t.decode(sbytes("5f 4c 42 48"), true),
+    );
+    expect(data.items[3].inc_id).toBe(
+      uint32_t.decode(sbytes("60 4c 42 48"), true),
+    );
+  });
+
   it("test decode and encode", () => {
     const Player = struct("Player", {
       hp: uint32_t,
@@ -28,9 +164,17 @@ describe("test decode and encode", () => {
       name: new Uint8Array([0x61, 0x62, 0x63]),
     };
     const view: DataView = makeDataView([
-      0, 0, 0, 10, // hp  = 10
-      0, 0, 0, 100, // mp  = 100
-      0x61, 0x62, 0x63, // "abc"
+      0,
+      0,
+      0,
+      10, // hp  = 10
+      0,
+      0,
+      0,
+      100, // mp  = 100
+      0x61,
+      0x62,
+      0x63, // "abc"
     ]);
 
     expect(Player.decode(view)).toEqual(obj);
@@ -45,7 +189,9 @@ describe("test decode and encode", () => {
   });
 
   it("test uint32_t decode", () => {
-    const data = list(uint32_t, 2).decode(makeDataView([0, 0, 0, 1, 0, 0, 0, 2]));
+    const data = list(uint32_t, 2).decode(
+      makeDataView([0, 0, 0, 1, 0, 0, 0, 2]),
+    );
 
     expect(data.length).toBe(2);
     expect(data).toEqual([1, 2]);
@@ -99,7 +245,7 @@ describe("test pos", () => {
     // 不经过库的编码器 —— 夹具必须独立于被测代码
     view = new DataView(new ArrayBuffer(8 * 8));
     [1.23, 22.66, 140.67, 742.45, 123.23, 1231.23, 534.23, 873.35].forEach(
-      (v, i) => view.setFloat64(i * 8, v, false)
+      (v, i) => view.setFloat64(i * 8, v, false),
     );
 
     Pos = struct("Pos", {
@@ -172,10 +318,22 @@ describe("test struct nesting", () => {
   it("test decode", () => {
     // uint32_t + uint16_t + uint8_t[2] + int16[4]
     const raw = makeDataView([
-      0, 0, 0, 0, // dwPacketNumber
-      0, 1, // wButtons
-      0, 0, // bLeftTrigger / bRightTrigger
-      0, 1, 0, 2, 0, 3, 0, 4, // sThumbL* / sThumbR*
+      0,
+      0,
+      0,
+      0, // dwPacketNumber
+      0,
+      1, // wButtons
+      0,
+      0, // bLeftTrigger / bRightTrigger
+      0,
+      1,
+      0,
+      2,
+      0,
+      3,
+      0,
+      4, // sThumbL* / sThumbR*
     ]);
     const data = XINPUT_STATE.decode(raw);
     expect(data).toEqual(obj);
@@ -184,7 +342,7 @@ describe("test struct nesting", () => {
   it("test encode", () => {
     const view = XINPUT_STATE.encode(obj);
     expect(sview(view)).toBe(
-      sview(makeDataView([0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0, 3, 0, 4]))
+      sview(makeDataView([0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0, 3, 0, 4])),
     );
   });
 
@@ -220,11 +378,15 @@ describe("test struct list", () => {
 
   it("test decode", () => {
     expect(users.decode(b2("a1a2b1b2", new TextEncoder()))).toEqual(obj);
-    expect(list(user, 2).decode(b2("a1a2b1b2", new TextEncoder())).length).toBe(2);
+    expect(list(user, 2).decode(b2("a1a2b1b2", new TextEncoder())).length).toBe(
+      2,
+    );
   });
 
   it("test encode", () => {
-    expect(sview(users.encode(obj))).toBe(sview(b2("a1a2b1b2", new TextEncoder())));
+    expect(sview(users.encode(obj))).toBe(
+      sview(b2("a1a2b1b2", new TextEncoder())),
+    );
   });
 
   it("test byteLength", () => {
@@ -259,8 +421,8 @@ describe("test struct Multilevel array", () => {
     });
 
     view = makeDataView([
-      0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 4,
-      0, 0, 0, 4,
+      0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 3, 0,
+      0, 0, 4, 0, 0, 0, 4,
     ]);
   });
 
@@ -285,7 +447,9 @@ describe("test int64_t / uint64_t", () => {
     const view = makeDataView([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
     expect(int64_t.decode(view)).toBe(-1);
     expect(
-      int64_t.decode(makeDataView([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe]))
+      int64_t.decode(
+        makeDataView([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe]),
+      ),
     ).toBe(-2);
   });
 
@@ -305,17 +469,16 @@ describe("test int64_t / uint64_t", () => {
 
   it("编码接受 number", () => {
     expect(sview(int64_t.encode(-1))).toBe(
-      sview(makeDataView([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]))
+      sview(makeDataView([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])),
     );
     expect(sview(uint64_t.encode(256))).toBe(
-      sview(makeDataView([0, 0, 0, 0, 0, 0, 0x01, 0x00]))
+      sview(makeDataView([0, 0, 0, 0, 0, 0, 0x01, 0x00])),
     );
   });
 
   it("列表往返", () => {
     const view = makeDataView([
-      0, 0, 0, 0, 0, 0, 0, 1,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
+      0, 0, 0, 0, 0, 0, 0, 1, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
     ]);
     expect(list(int64_t, 2).decode(view)).toEqual([1, -2]);
     expect(sview(list(int64_t, 2).encode([1, -2]))).toBe(sview(view));

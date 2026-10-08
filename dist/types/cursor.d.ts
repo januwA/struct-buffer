@@ -36,6 +36,7 @@ export declare class Cursor {
         size: number;
     };
     rest(field: string): Uint8Array;
+    indexOf(pattern: Uint8Array | DataView): number;
 }
 export {};
 //# sourceMappingURL=cursor.d.ts.map

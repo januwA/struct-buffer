@@ -262,6 +262,35 @@ var Cursor = class _Cursor {
   rest(field) {
     return this.bytes(this.left, field);
   }
+  /**
+   * 在当前游标范围 [pos, limit) 内查找特征字节 pattern.
+   * 找到返回相对 view 起点的绝对偏移 offset, 未找到返回 -1.
+   */
+  indexOf(pattern) {
+    const p = pattern instanceof Uint8Array ? pattern : new Uint8Array(
+      pattern.buffer,
+      pattern.byteOffset,
+      pattern.byteLength
+    );
+    const pLen = p.length;
+    if (pLen === 0) return this.pos;
+    const limit = this.limit - pLen;
+    const view = this.view;
+    const first = p[0];
+    for (let i = this.pos; i <= limit; i++) {
+      if (view.getUint8(i) === first) {
+        let matched = true;
+        for (let j = 1; j < pLen; j++) {
+          if (view.getUint8(i + j) !== p[j]) {
+            matched = false;
+            break;
+          }
+        }
+        if (matched) return i;
+      }
+    }
+    return -1;
+  }
 };
 
 // src/engine.ts
@@ -325,6 +354,7 @@ function fixedSize(node) {
       break;
     }
     case "variant":
+    case "skipUntil":
       size = void 0;
       break;
   }
@@ -420,6 +450,8 @@ function readNode(node, c, name, le, ctx, sink) {
     }
     case "variant":
       throw new Error("readNode: variant 只能作为字段, 不能作为值");
+    case "skipUntil":
+      return void 0;
   }
 }
 function readList(node, c, name, le, ctx, sink) {
@@ -457,7 +489,25 @@ function readList(node, c, name, le, ctx, sink) {
   const n = resolveLen(node.len, ctx, c.where, c.pos, name);
   for (let i = 0; i < n; i++) {
     if (sink?.stopped) break;
-    values.push(readNode(node.item, c, name, le, ctx));
+    if (i > 0 && node.sync) {
+      const pat = node.sync.pattern(values[i - 1], values[0], values, ctx);
+      const hit = c.indexOf(pat);
+      if (hit === -1) {
+        const err = DecodeError.reason(
+          c.where,
+          c.pos,
+          `${name}: 无法找到第 ${i} 个元素的同步标记`
+        );
+        if (sink) {
+          sink.errors.push(err);
+          sink.stopped = true;
+          break;
+        }
+        throw err;
+      }
+      c.pos = hit + (node.sync.offset ?? 0);
+    }
+    values.push(readNode(node.item, c, name, le, ctx, sink));
   }
   return values;
 }
@@ -475,6 +525,21 @@ function readField(f, c, out, le, sink) {
   const node = f.node;
   if (node.kind === "skip") {
     c.skip(node.n, f.name);
+    return;
+  }
+  if (node.kind === "skipUntil") {
+    const pat = typeof node.pattern === "function" ? node.pattern(out) : node.pattern;
+    const hit = c.indexOf(pat);
+    if (hit === -1) {
+      if (!node.optional) {
+        throw DecodeError.reason(c.where, c.pos, `${f.name}: 无法找到同步标记`);
+      }
+      if (node.to === "end") {
+        c.pos = c.limit;
+      }
+    } else {
+      c.pos = hit + (node.offset ?? 0);
+    }
     return;
   }
   if (node.kind === "variant") {
@@ -532,7 +597,7 @@ function measure(node, value) {
 function backfillFields(fields, out, le) {
   for (const f of fields) {
     const node = f.node;
-    if (node.kind === "skip") continue;
+    if (node.kind === "skip" || node.kind === "skipUntil") continue;
     if ((node.kind === "bytes" || node.kind === "list") && isRef(node.len) && !node.len.transform && out[node.len.field] == null && out[f.name] != null) {
       out[node.len.field] = measure(node, out[f.name]);
     }
@@ -655,6 +720,8 @@ function writeNode(node, w, value, name, le, ctx) {
     case "codec":
       node.write(w, value, name);
       return;
+    case "skipUntil":
+      return;
     case "variant":
       throw new Error("writeNode: variant 只能作为字段, 不能作为值");
   }
@@ -663,6 +730,9 @@ function writeField(f, w, out, le) {
   const node = f.node;
   if (node.kind === "skip") {
     w.zero(node.n);
+    return;
+  }
+  if (node.kind === "skipUntil") {
     return;
   }
   if (node.kind === "variant") {
@@ -887,11 +957,12 @@ function bytes(len) {
 function rest() {
   return bytes("rest");
 }
-function list(item, len) {
+function list(item, len, opts) {
   return make({
     kind: "list",
     item: nodeOf(item),
-    len
+    len,
+    sync: opts?.sync
   });
 }
 function records(source, len) {
@@ -957,6 +1028,15 @@ function bitFields(storage, widths) {
 }
 function skip(n) {
   return make({ kind: "skip", n });
+}
+function skipUntil(pattern, opts) {
+  return make({
+    kind: "skipUntil",
+    pattern,
+    offset: opts?.offset,
+    optional: opts?.optional,
+    to: opts?.to
+  });
 }
 function compileFields(def) {
   return Object.entries(def).map(([name, codec2]) => ({
@@ -1086,6 +1166,7 @@ export {
   sbytes,
   sbytes2,
   skip,
+  skipUntil,
   struct,
   sview,
   uint16_t,
