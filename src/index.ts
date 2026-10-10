@@ -25,6 +25,7 @@ export {
   uint64_t,
   uint8_t,
   variant,
+  transform,
 } from "./schema";
 export type {
   Codec,
@@ -43,6 +44,7 @@ export type {
   StructBufferConfig,
   StructCodec,
   StructDef,
+  TransformSpec,
   VariantCodec,
 } from "./schema";
 export type { Len, Ref, TypeKind } from "./engine";

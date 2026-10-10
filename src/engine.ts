@@ -177,6 +177,13 @@ export interface SkipUntilNode {
   to?: "stay" | "end";
 }
 
+export interface TransformNode {
+  kind: "transform";
+  inner: Node;
+  decode: (val: any, ctx: AnyObject) => any;
+  encode?: (val: any, ctx: AnyObject) => any;
+}
+
 export type Node =
   | ScalarNode
   | BitsNode
@@ -187,7 +194,8 @@ export type Node =
   | VariantNode
   | CodecNode
   | SkipNode
-  | SkipUntilNode;
+  | SkipUntilNode
+  | TransformNode;
 
 
 // -------------------------------------------------------------- fixedSize
@@ -212,6 +220,9 @@ export function fixedSize(node: Node): number | undefined {
       break;
     case "codec":
       size = node.fixedSize;
+      break;
+    case "transform":
+      size = fixedSize(node.inner);
       break;
     case "bytes":
       size = typeof node.len === "number" ? node.len : undefined;
@@ -371,6 +382,11 @@ export function readNode(
         );
       }
       return value;
+    }
+
+    case "transform": {
+      const raw = readNode(node.inner, c, name, le, ctx, sink);
+      return node.decode(raw, ctx);
     }
 
     case "variant":
@@ -763,6 +779,18 @@ export function writeNode(
     case "codec":
       node.write(w, value, name);
       return;
+
+    case "transform": {
+      if (!node.encode) {
+        throw new EncodeError(
+          "encode",
+          `${name}: transform 字段未提供 encode 函数`
+        );
+      }
+      const raw = node.encode(value, ctx);
+      writeNode(node.inner, w, raw, name, le, ctx);
+      return;
+    }
 
     case "skipUntil":
       return;

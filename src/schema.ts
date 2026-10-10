@@ -24,6 +24,7 @@ import {
   SkipUntilNode,
   SkipUntilOptions,
   StructNode,
+  TransformNode,
   TypeKind,
   VariantNode,
   writeNode,
@@ -560,3 +561,35 @@ export function framed<T>(spec: CodecSpec<T>): Codec<T[]> {
     len: "rest",
   } as ListNode);
 }
+
+// ------------------------------------------------------------ transform
+
+export type TransformSpec<InD, InE, OutD, OutE> =
+  | ((val: InD, ctx: AnyObject) => OutD)
+  | {
+      decode: (val: InD, ctx: AnyObject) => OutD;
+      encode?: (val: OutE, ctx: AnyObject) => InE;
+    };
+
+/**
+ * 值转换组合器: 对已有 Codec 进行解码/编码值转换(如保留小数、单位换算、格式化等).
+ * 底层继承内层 Codec 的字节大小、字节序与定界特性.
+ */
+export function transform<C extends Codec<any, any>, OutD, OutE = OutD>(
+  inner: C,
+  spec: TransformSpec<InferType<C>, InferEncode<C>, OutD, OutE>
+): Codec<OutD, OutE> {
+  const innerNode = nodeOf(inner);
+  const decodeFn = typeof spec === "function" ? spec : spec.decode;
+  const encodeFn = typeof spec === "function" ? undefined : spec.encode;
+
+  const node: TransformNode = {
+    kind: "transform",
+    inner: innerNode,
+    decode: decodeFn,
+    encode: encodeFn,
+  };
+
+  return make<OutD, OutE>(node);
+}
+

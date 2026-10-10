@@ -118,4 +118,9 @@ export interface CodecSpec<T> {
 export declare function codec<T>(spec: CodecSpec<T>): Codec<T>;
 export declare function delimited<T>(spec: CodecSpec<T>): Codec<T>;
 export declare function framed<T>(spec: CodecSpec<T>): Codec<T[]>;
+export type TransformSpec<InD, InE, OutD, OutE> = ((val: InD, ctx: AnyObject) => OutD) | {
+    decode: (val: InD, ctx: AnyObject) => OutD;
+    encode?: (val: OutE, ctx: AnyObject) => InE;
+};
+export declare function transform<C extends Codec<any, any>, OutD, OutE = OutD>(inner: C, spec: TransformSpec<InferType<C>, InferEncode<C>, OutD, OutE>): Codec<OutD, OutE>;
 //# sourceMappingURL=schema.d.ts.map

@@ -258,7 +258,65 @@ bf.encode({ a: 1, b: 2, c: 3 });
 // => <1D>
 ```
 
-两者存储只支持 1/2/4 字节, 越界/溢出直接报错。
+两者的底层存储支持 1/2/4 字节，越界/溢出直接报错。
+
+## 值转换: transform
+
+对任意 Codec 进行值级别转换（如保留小数、单位换算、时间戳转换等）。底层自动继承内层 Codec 的字节大小（`fixedSize`）、字节序（`littleEndian`）与定界特性。
+
+### 1. 单向转换 (只读 decode)
+适合仅需解码的场景，直接传入转换函数：
+
+```ts
+import { float, struct, transform } from "struct-buffer";
+
+const Sensor = struct(
+  "Sensor",
+  {
+    temperature: transform(float, (v) => Number(v.toFixed(2))),
+  },
+  { littleEndian: true }
+);
+
+const data = Sensor.decode(buffer);
+// => { temperature: 36.52 }
+```
+
+> 若只提供了解码函数，尝试 `encode` 时会抛出 `EncodeError`。
+
+### 2. 双向转换 (decode & encode)
+传入包含 `decode` 与 `encode` 的配置对象：
+
+```ts
+import { struct, transform, uint32_t } from "struct-buffer";
+
+const Device = struct(
+  "Device",
+  {
+    uptimeSec: transform(uint32_t, {
+      decode: (ms) => ms / 1000,
+      encode: (sec) => sec * 1000,
+    }),
+  },
+  { littleEndian: true }
+);
+
+// 解码: 5000ms -> uptimeSec: 5 (秒)
+const report = Device.decode(buffer);
+
+// 编码: uptimeSec: 5 -> 底层写入 5000 (ms)
+const binary = Device.encode({ uptimeSec: 5 });
+```
+
+### 3. 基于同级字段上下文 (ctx) 联动
+转换函数的第二参数为当前已解析的同级字段上下文对象：
+
+```ts
+const ScalePacket = struct("ScalePacket", {
+  scale: uint8_t,
+  val: transform(int16_t, (raw, ctx) => raw * ctx.scale),
+});
+```
 
 ## 自定义字段: codec / delimited / framed
 

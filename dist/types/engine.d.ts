@@ -99,7 +99,13 @@ export interface SkipUntilNode {
     optional?: boolean;
     to?: "stay" | "end";
 }
-export type Node = ScalarNode | BitsNode | BitFieldsNode | BytesNode | ListNode | StructNode | VariantNode | CodecNode | SkipNode | SkipUntilNode;
+export interface TransformNode {
+    kind: "transform";
+    inner: Node;
+    decode: (val: any, ctx: AnyObject) => any;
+    encode?: (val: any, ctx: AnyObject) => any;
+}
+export type Node = ScalarNode | BitsNode | BitFieldsNode | BytesNode | ListNode | StructNode | VariantNode | CodecNode | SkipNode | SkipUntilNode | TransformNode;
 export declare function fixedSize(node: Node): number | undefined;
 export declare function readNode(node: Node, c: Cursor, name: string, le: boolean, ctx: AnyObject, sink?: ErrorSink): any;
 export interface ErrorSink {

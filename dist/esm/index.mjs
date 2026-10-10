@@ -332,6 +332,9 @@ function fixedSize(node) {
     case "codec":
       size = node.fixedSize;
       break;
+    case "transform":
+      size = fixedSize(node.inner);
+      break;
     case "bytes":
       size = typeof node.len === "number" ? node.len : void 0;
       break;
@@ -447,6 +450,10 @@ function readNode(node, c, name, le, ctx, sink) {
         );
       }
       return value;
+    }
+    case "transform": {
+      const raw = readNode(node.inner, c, name, le, ctx, sink);
+      return node.decode(raw, ctx);
     }
     case "variant":
       throw new Error("readNode: variant 只能作为字段, 不能作为值");
@@ -720,6 +727,17 @@ function writeNode(node, w, value, name, le, ctx) {
     case "codec":
       node.write(w, value, name);
       return;
+    case "transform": {
+      if (!node.encode) {
+        throw new EncodeError(
+          "encode",
+          `${name}: transform 字段未提供 encode 函数`
+        );
+      }
+      const raw = node.encode(value, ctx);
+      writeNode(node.inner, w, raw, name, le, ctx);
+      return;
+    }
     case "skipUntil":
       return;
     case "variant":
@@ -948,8 +966,8 @@ var uint32_t = registerType(4, true);
 var uint64_t = registerType(8, true);
 var float = registerType(4, true, "float");
 var double = registerType(8, true, "float");
-function ref(field, transform) {
-  return { __ref: true, field, transform };
+function ref(field, transform2) {
+  return { __ref: true, field, transform: transform2 };
 }
 function bytes(len) {
   return make({ kind: "bytes", len });
@@ -1115,6 +1133,18 @@ function framed(spec) {
     len: "rest"
   });
 }
+function transform(inner, spec) {
+  const innerNode = nodeOf(inner);
+  const decodeFn = typeof spec === "function" ? spec : spec.decode;
+  const encodeFn = typeof spec === "function" ? void 0 : spec.encode;
+  const node = {
+    kind: "transform",
+    inner: innerNode,
+    decode: decodeFn,
+    encode: encodeFn
+  };
+  return make(node);
+}
 
 // src/display.ts
 function display(view, type, options) {
@@ -1169,6 +1199,7 @@ export {
   skipUntil,
   struct,
   sview,
+  transform,
   uint16_t,
   uint32_t,
   uint64_t,
