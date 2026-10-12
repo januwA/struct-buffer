@@ -448,14 +448,15 @@ function resolveLen(len, ctx, where, offset, name) {
       `${name}: ref("${len.field}") 指向的字段尚未解析 —— ref 只能引用同一层里声明在它之前的字段`
     );
   }
-  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+  const val = typeof raw === "bigint" ? Number(raw) : raw;
+  if (typeof val !== "number" || !Number.isFinite(val)) {
     throw DecodeError.reason(
       where,
       offset,
-      `${name}: ref("${len.field}") 取到 ${JSON.stringify(raw)}, 不是有限数字`
+      `${name}: ref("${len.field}") 取到 ${String(raw)}, 不是有限数字`
     );
   }
-  const n = len.transform ? len.transform(raw, ctx) : raw;
+  const n = len.transform ? len.transform(val, ctx) : val;
   if (!Number.isFinite(n) || n < 0) {
     throw DecodeError.reason(
       where,
@@ -469,7 +470,7 @@ function readScalar(c, name, node, le) {
   c.need(node.size, name);
   const v = c.view[node.get](c.pos, le);
   c.pos += node.size;
-  return node.isBig ? Number(v) : v;
+  return v;
 }
 function readNode(node, c, name, le, ctx, sink) {
   switch (node.kind) {

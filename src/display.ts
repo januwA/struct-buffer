@@ -10,7 +10,7 @@ import { ScalarCodec } from "./schema";
  */
 export function display(
   view: DataView,
-  type: ScalarCodec,
+  type: ScalarCodec<any, any>,
   options?: {
     /**
      * show hex

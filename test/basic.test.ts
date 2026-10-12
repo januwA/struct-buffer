@@ -20,6 +20,11 @@ import {
 } from "../src";
 
 describe("test decode and encode", () => {
+  it("test uint64", () => {
+    const data = uint64_t.decode(sbytes("DE 4E 3D 39 00 02 60 00"), true);
+    expect(data).toBe(27023797747797726n);
+    expect(sview(uint64_t.encode(data, true)).toLowerCase()).toBe("DE 4E 3D 39 00 02 60 00".toLowerCase())
+  });
   it("parse list item dynamic size", () => {
     const itemStruct = struct(
       "item",
@@ -442,36 +447,40 @@ describe("test struct Multilevel array", () => {
 
 describe("test int64_t / uint64_t", () => {
   it("int64_t 真的按有符号解, 负数不是一大坨正数", () => {
-    // int64_t 之前是从没显式传 unsigned 的 longlong 来的, 落进默认 true,
-    // 于是走的是 getBigUint64 —— 0xFFFFFFFFFFFFFFFF 解出来是 18446744073709551615
+    // int64_t 走 getBigInt64
     const view = makeDataView([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
-    expect(int64_t.decode(view)).toBe(-1);
+    expect(int64_t.decode(view)).toBe(-1n);
     expect(
       int64_t.decode(
         makeDataView([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe]),
       ),
-    ).toBe(-2);
+    ).toBe(-2n);
   });
 
   it("uint64_t 走无符号解", () => {
     const view = makeDataView([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
-    expect(uint64_t.decode(view)).toBe(18446744073709551615);
+    expect(uint64_t.decode(view)).toBe(18446744073709551615n);
   });
 
-  it("解码结果始终是 number, 不是 bigint", () => {
-    // DataView 的 64 位访问器只给 bigint, 但声明的值类型是 number:
-    // 统一收窄, 调用方不用再自己判断类型
+  it("解码结果是 bigint, 避免 64 位整数丢失精度", () => {
+    // DataView 的 64 位访问器给 bigint, 保持原生 bigint 防止 > 2^53 时丢失精度
     const view = makeDataView([0, 0, 0, 0, 0, 0, 0x01, 0x00]);
     const decoded = int64_t.decode(view);
-    expect(typeof decoded).toBe("number");
-    expect(decoded).toBe(256);
+    expect(typeof decoded).toBe("bigint");
+    expect(decoded).toBe(256n);
   });
 
-  it("编码接受 number", () => {
+  it("编码接受 number 和 bigint", () => {
     expect(sview(int64_t.encode(-1))).toBe(
       sview(makeDataView([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])),
     );
+    expect(sview(int64_t.encode(-1n))).toBe(
+      sview(makeDataView([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])),
+    );
     expect(sview(uint64_t.encode(256))).toBe(
+      sview(makeDataView([0, 0, 0, 0, 0, 0, 0x01, 0x00])),
+    );
+    expect(sview(uint64_t.encode(256n))).toBe(
       sview(makeDataView([0, 0, 0, 0, 0, 0, 0x01, 0x00])),
     );
   });
@@ -480,8 +489,9 @@ describe("test int64_t / uint64_t", () => {
     const view = makeDataView([
       0, 0, 0, 0, 0, 0, 0, 1, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
     ]);
-    expect(list(int64_t, 2).decode(view)).toEqual([1, -2]);
+    expect(list(int64_t, 2).decode(view)).toEqual([1n, -2n]);
     expect(sview(list(int64_t, 2).encode([1, -2]))).toBe(sview(view));
+    expect(sview(list(int64_t, 2).encode([1n, -2n]))).toBe(sview(view));
   });
 });
 

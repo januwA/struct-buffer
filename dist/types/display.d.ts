@@ -1,6 +1,6 @@
 import { DisplayResult } from "./interfaces";
 import { ScalarCodec } from "./schema";
-export declare function display(view: DataView, type: ScalarCodec, options?: {
+export declare function display(view: DataView, type: ScalarCodec<any, any>, options?: {
     hex?: boolean;
     littleEndian?: boolean;
 }): DisplayResult[];

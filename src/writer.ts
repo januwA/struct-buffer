@@ -131,13 +131,13 @@ export class Writer {
     this.pos += 8;
   }
 
-  u64(v: number): void {
+  u64(v: number | bigint): void {
     this.grow(8);
     this.buf.setBigUint64(this.pos, BigInt(v), this.opts.littleEndian);
     this.pos += 8;
   }
 
-  i64(v: number): void {
+  i64(v: number | bigint): void {
     this.grow(8);
     this.buf.setBigInt64(this.pos, BigInt(v), this.opts.littleEndian);
     this.pos += 8;
@@ -151,7 +151,7 @@ export class Writer {
     size: number,
     set: string,
     isBig: boolean,
-    value: number,
+    value: number | bigint,
     le: boolean
   ): void {
     this.grow(size);

@@ -55,15 +55,15 @@ export interface ScalarCodec<D = number, E = D> extends Codec<D, E> {
     decode(view: DecodeBuffer_t, littleEndian?: boolean, offset?: number): D;
     encode(value: E, littleEndian?: boolean, offset?: number, view?: DataView): DataView;
 }
-export declare function registerType(size: TypeSize_t, unsigned?: boolean, kind?: TypeKind): ScalarCodec;
+export declare function registerType<D = number, E = D>(size: TypeSize_t, unsigned?: boolean, kind?: TypeKind): ScalarCodec<D, E>;
 export declare const int8_t: ScalarCodec<number, number>;
 export declare const int16_t: ScalarCodec<number, number>;
 export declare const int32_t: ScalarCodec<number, number>;
-export declare const int64_t: ScalarCodec<number, number>;
+export declare const int64_t: ScalarCodec<bigint, bigint | number>;
 export declare const uint8_t: ScalarCodec<number, number>;
 export declare const uint16_t: ScalarCodec<number, number>;
 export declare const uint32_t: ScalarCodec<number, number>;
-export declare const uint64_t: ScalarCodec<number, number>;
+export declare const uint64_t: ScalarCodec<bigint, bigint | number>;
 export declare const float: ScalarCodec<number, number>;
 export declare const double: ScalarCodec<number, number>;
 export declare function ref(field: string, transform?: (val: number, ctx: AnyObject) => number): Ref;
@@ -73,14 +73,14 @@ export declare function bytes(len: number | Ref | "rest"): Codec<Uint8Array, Uin
 export declare function rest(): Codec<Uint8Array, Uint8Array>;
 export declare function list<C extends Codec<any, any>>(item: C, len: number | Ref | "rest", opts?: ListOptions<InferType<C>>): Codec<InferType<C>[], InferEncode<C>[]>;
 export declare function records<C extends Codec<any, any>>(source: C, len?: number | Ref): Codec<InferType<C>[], InferEncode<C>[]>;
-export declare function bits(storage: ScalarCodec, positions: {
+export declare function bits(storage: ScalarCodec<any, any>, positions: {
     [k: string]: number;
 }): Codec<{
     [x: string]: Bit_t;
 }, Partial<{
     [x: string]: Bit_t;
 }>>;
-export declare function bitFields(storage: ScalarCodec, widths: {
+export declare function bitFields(storage: ScalarCodec<any, any>, widths: {
     [k: string]: number;
 }): Codec<{
     [x: string]: number;

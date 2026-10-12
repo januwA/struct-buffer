@@ -201,11 +201,11 @@ export interface ScalarCodec<D = number, E = D> extends Codec<D, E> {
  * const f32 = registerType(4, true, "float"); // 4 字节浮点
  * ```
  */
-export function registerType(
+export function registerType<D = number, E = D>(
   size: TypeSize_t,
   unsigned = true,
   kind: TypeKind = "int"
-): ScalarCodec {
+): ScalarCodec<D, E> {
   const h = scalarHandle(size, unsigned, kind);
   const node: ScalarNode = {
     kind: "scalar",
@@ -234,19 +234,25 @@ export function registerType(
       return w.finish();
     },
   };
-  return codec as unknown as ScalarCodec;
+  return codec as unknown as ScalarCodec<D, E>;
 }
 
-export const int8_t = registerType(1, false);
-export const int16_t = registerType(2, false);
-export const int32_t = registerType(4, false);
-export const int64_t = registerType(8, false);
-export const uint8_t = registerType(1, true);
-export const uint16_t = registerType(2, true);
-export const uint32_t = registerType(4, true);
-export const uint64_t = registerType(8, true);
-export const float = registerType(4, true, "float");
-export const double = registerType(8, true, "float");
+export const int8_t: ScalarCodec<number, number> = registerType(1, false);
+export const int16_t: ScalarCodec<number, number> = registerType(2, false);
+export const int32_t: ScalarCodec<number, number> = registerType(4, false);
+export const int64_t: ScalarCodec<bigint, bigint | number> = registerType<
+  bigint,
+  bigint | number
+>(8, false);
+export const uint8_t: ScalarCodec<number, number> = registerType(1, true);
+export const uint16_t: ScalarCodec<number, number> = registerType(2, true);
+export const uint32_t: ScalarCodec<number, number> = registerType(4, true);
+export const uint64_t: ScalarCodec<bigint, bigint | number> = registerType<
+  bigint,
+  bigint | number
+>(8, true);
+export const float: ScalarCodec<number, number> = registerType(4, true, "float");
+export const double: ScalarCodec<number, number> = registerType(8, true, "float");
 
 // ------------------------------------------------------------ 长度引用
 
@@ -328,7 +334,7 @@ function assertBitsStorage(size: number, kind: string): void {
 
 /** 位序号: 每一位 0/1。`{ a: 0, b: 2 }` */
 export function bits(
-  storage: ScalarCodec,
+  storage: ScalarCodec<any, any>,
   positions: { [k: string]: number }
 ): Codec<{ [x: string]: Bit_t }, Partial<{ [x: string]: Bit_t }>> {
   const size = storage.size;
@@ -351,7 +357,7 @@ export function bits(
 
 /** 位宽: 值域 0..2^width-1。`{ a: 1, b: 2, c: 3 }` */
 export function bitFields(
-  storage: ScalarCodec,
+  storage: ScalarCodec<any, any>,
   widths: { [k: string]: number }
 ): Codec<{ [x: string]: number }, Partial<{ [x: string]: number }>> {
   const size = storage.size;

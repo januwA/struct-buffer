@@ -295,14 +295,15 @@ function resolveLen(
         `ref 只能引用同一层里声明在它之前的字段`
     );
   }
-  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+  const val = typeof raw === "bigint" ? Number(raw) : raw;
+  if (typeof val !== "number" || !Number.isFinite(val)) {
     throw DecodeError.reason(
       where,
       offset,
-      `${name}: ref("${len.field}") 取到 ${JSON.stringify(raw)}, 不是有限数字`
+      `${name}: ref("${len.field}") 取到 ${String(raw)}, 不是有限数字`
     );
   }
-  const n = len.transform ? len.transform(raw, ctx) : raw;
+  const n = len.transform ? len.transform(val, ctx) : val;
   if (!Number.isFinite(n) || n < 0) {
     throw DecodeError.reason(
       where,
@@ -317,11 +318,11 @@ function resolveLen(
 
 // ------------------------------------------------------------------- read
 
-function readScalar(c: Cursor, name: string, node: ScalarBase, le: boolean): number {
+function readScalar(c: Cursor, name: string, node: ScalarBase, le: boolean): number | bigint {
   c.need(node.size, name);
   const v = (c.view as any)[node.get](c.pos, le);
   c.pos += node.size;
-  return node.isBig ? Number(v) : v;
+  return v;
 }
 
 export function readNode(
@@ -337,7 +338,7 @@ export function readNode(
       return readScalar(c, name, node, le);
 
     case "bits": {
-      const raw = readScalar(c, name, node, le);
+      const raw = readScalar(c, name, node, le) as number;
       const out: { [k: string]: number } = {};
       for (const [k, i] of Object.entries(node.positions)) {
         out[k] = (raw >> i) & 1;
@@ -346,7 +347,7 @@ export function readNode(
     }
 
     case "bitFields": {
-      const raw = readScalar(c, name, node, le);
+      const raw = readScalar(c, name, node, le) as number;
       const out: { [k: string]: number } = {};
       let i = 0;
       for (const [k, len] of Object.entries(node.widths)) {
