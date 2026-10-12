@@ -2,7 +2,8 @@
 var DecodeError = class _DecodeError extends Error {
   constructor(where, offset, need, have, hex) {
     super(
-      `DecodeError: ${where} @${offset} 需要 ${need}B, 只剩 ${have}B` + (hex ? `  hex: ${hex}` : "")
+      `DecodeError: ${where} @${offset} 需要 ${need}B, 只剩 ${have}B` +
+        (hex ? `  hex: ${hex}` : ""),
     );
     this.where = where;
     this.offset = offset;
@@ -48,7 +49,7 @@ function sbytes(str) {
   if (str.length % 2 !== 0) str = str.slice(0, -1);
   str = str.replace(/([0-9a-f]{2})(?=[0-9a-f])/gi, "$1 ");
   return new DataView(
-    Uint8Array.from(str.split(/\s+/).map((it) => parseInt(it, 16))).buffer
+    Uint8Array.from(str.split(/\s+/).map((it) => parseInt(it, 16))).buffer,
   );
 }
 var HEX_EXP = /^(0x([0-9a-f]{1,2})|([0-9a-f]{1,2})h|\\x([0-9a-f]{1,2}))/i;
@@ -65,7 +66,7 @@ function sbytes2(str, encoder) {
     } else if (str.length) {
       if (!encoder)
         throw new Error(
-          "sbytes2: 输入含非十六进制文本, 请传入文本编码器 (如 new TextEncoder())"
+          "sbytes2: 输入含非十六进制文本, 请传入文本编码器 (如 new TextEncoder())",
         );
       const i = str.search(HEX_SEARCH_EXP);
       if (i < 0) {
@@ -103,7 +104,11 @@ function TEXT(buf, decoder, placeholder) {
           str += decoder.decode(Uint8Array.from(strBytes));
           strBytes = [];
         }
-        str += placeholder ? typeof placeholder === "string" ? placeholder : placeholder(byte) : ".";
+        str += placeholder
+          ? typeof placeholder === "string"
+            ? placeholder
+            : placeholder(byte)
+          : ".";
       }
     } catch {
       if (strBytes.length) str += decoder.decode(Uint8Array.from(strBytes));
@@ -135,7 +140,13 @@ var Cursor = class _Cursor {
    * 与 `region()` 的区别: `region` 开一个**独立**的定长窗口, `sub` 只是加标签。
    */
   sub(field) {
-    return new _Cursor(this.view, this.pos, this.end, this.label(field), this.st);
+    return new _Cursor(
+      this.view,
+      this.pos,
+      this.end,
+      this.label(field),
+      this.st,
+    );
   }
   get limit() {
     return this.end ?? this.view.byteLength;
@@ -157,7 +168,10 @@ var Cursor = class _Cursor {
   }
   error(field, need) {
     const where = this.label(field);
-    const hex = this.pos < this.view.byteLength ? this.view.getUint8(this.pos).toString(16).padStart(2, "0") : "";
+    const hex =
+      this.pos < this.view.byteLength
+        ? this.view.getUint8(this.pos).toString(16).padStart(2, "0")
+        : "";
     return new DecodeError(where, this.pos, need, this.left, hex);
   }
   skip(n, field) {
@@ -222,13 +236,17 @@ var Cursor = class _Cursor {
     return Number(v);
   }
   /**
-     * 取 n 字节**零拷贝**子视图(借用底层 buffer, 不复制).
-     * 字节字段(`rest()`)用它把字节直接交出去; 解码源本身是 `readByteArray` 出来的
-     * 独立拷贝, 所以子视图的生命周期安全。
-     */
+   * 取 n 字节**零拷贝**子视图(借用底层 buffer, 不复制).
+   * 字节字段(`rest()`)用它把字节直接交出去; 解码源本身是 `readByteArray` 出来的
+   * 独立拷贝, 所以子视图的生命周期安全。
+   */
   bytes(n, field) {
     this.need(n, field);
-    const v = new Uint8Array(this.view.buffer, this.view.byteOffset + this.pos, n);
+    const v = new Uint8Array(
+      this.view.buffer,
+      this.view.byteOffset + this.pos,
+      n,
+    );
     this.pos += n;
     return v;
   }
@@ -242,7 +260,7 @@ var Cursor = class _Cursor {
     this.need(n, field);
     const start = this.pos;
     const value = fn(
-      new _Cursor(this.view, start, start + n, this.label(field))
+      new _Cursor(this.view, start, start + n, this.label(field)),
     );
     this.pos = start + n;
     return value;
@@ -267,11 +285,14 @@ var Cursor = class _Cursor {
    * 找到返回相对 view 起点的绝对偏移 offset, 未找到返回 -1.
    */
   indexOf(pattern) {
-    const p = pattern instanceof Uint8Array ? pattern : new Uint8Array(
-      pattern.buffer,
-      pattern.byteOffset,
-      pattern.byteLength
-    );
+    const p =
+      pattern instanceof Uint8Array
+        ? pattern
+        : new Uint8Array(
+            pattern.buffer,
+            pattern.byteOffset,
+            pattern.byteLength,
+          );
     const pLen = p.length;
     if (pLen === 0) return this.pos;
     const limit = this.limit - pLen;
@@ -301,17 +322,20 @@ var INT_HANDLE = {
   1: { 1: "getUint8", 0: "getInt8" },
   2: { 1: "getUint16", 0: "getInt16" },
   4: { 1: "getUint32", 0: "getInt32" },
-  8: { 1: "getBigUint64", 0: "getBigInt64" }
+  8: { 1: "getBigUint64", 0: "getBigInt64" },
 };
 var FLOAT_HANDLE = {
   4: "getFloat32",
-  8: "getFloat64"
+  8: "getFloat64",
 };
 function scalarHandle(size, unsigned, kind) {
-  const get = kind === "float" ? FLOAT_HANDLE[size] : INT_HANDLE[size]?.[unsigned ? 1 : 0];
+  const get =
+    kind === "float"
+      ? FLOAT_HANDLE[size]
+      : INT_HANDLE[size]?.[unsigned ? 1 : 0];
   if (!get) {
     throw new Error(
-      `不存在这种字节形状 (size=${size}, unsigned=${unsigned}, kind=${kind})`
+      `不存在这种字节形状 (size=${size}, unsigned=${unsigned}, kind=${kind})`,
     );
   }
   return { get, set: get.replace(/^g/, "s"), isBig: get.startsWith("getBig") };
@@ -340,7 +364,10 @@ function fixedSize(node) {
       break;
     case "list": {
       const item = fixedSize(node.item);
-      size = typeof node.len === "number" && item !== void 0 ? node.len * item : void 0;
+      size =
+        typeof node.len === "number" && item !== void 0
+          ? node.len * item
+          : void 0;
       break;
     }
     case "struct": {
@@ -376,13 +403,14 @@ function specText(len) {
 function resolveLen(len, ctx, where, offset, name) {
   if (typeof len === "number") return len;
   if (len === "rest") throw new Error("resolveLen: rest 由调用点单独处理");
-  if (len === "records") throw new Error("resolveLen: records 由调用点单独处理");
+  if (len === "records")
+    throw new Error("resolveLen: records 由调用点单独处理");
   const raw = ctx[len.field];
   if (raw == null) {
     throw DecodeError.reason(
       where,
       offset,
-      `${name}: ref("${len.field}") 指向的字段尚未解析 —— ref 只能引用同一层里声明在它之前的字段`
+      `${name}: ref("${len.field}") 指向的字段尚未解析 —— ref 只能引用同一层里声明在它之前的字段`,
     );
   }
   const val = typeof raw === "bigint" ? Number(raw) : raw;
@@ -390,7 +418,7 @@ function resolveLen(len, ctx, where, offset, name) {
     throw DecodeError.reason(
       where,
       offset,
-      `${name}: ref("${len.field}") 取到 ${String(raw)}, 不是有限数字`
+      `${name}: ref("${len.field}") 取到 ${String(raw)}, 不是有限数字`,
     );
   }
   const n = len.transform ? len.transform(val, ctx) : val;
@@ -398,7 +426,7 @@ function resolveLen(len, ctx, where, offset, name) {
     throw DecodeError.reason(
       where,
       offset,
-      `${name}: ref("${len.field}")${len.transform ? " 的 transform 之后" : ""}得到 ${n}, 不是非负整数`
+      `${name}: ref("${len.field}")${len.transform ? " 的 transform 之后" : ""}得到 ${n}, 不是非负整数`,
     );
   }
   return n;
@@ -417,7 +445,7 @@ function readNode(node, c, name, le, ctx, sink) {
       const raw = readScalar(c, name, node, le);
       const out = {};
       for (const [k, i] of Object.entries(node.positions)) {
-        out[k] = raw >> i & 1;
+        out[k] = (raw >> i) & 1;
       }
       return out;
     }
@@ -427,13 +455,16 @@ function readNode(node, c, name, le, ctx, sink) {
       let i = 0;
       for (const [k, len] of Object.entries(node.widths)) {
         let val = 0;
-        for (let b = 0; b < len; b++, i++) val |= (raw >> i & 1) << b;
+        for (let b = 0; b < len; b++, i++) val |= ((raw >> i) & 1) << b;
         out[k] = val;
       }
       return out;
     }
     case "bytes": {
-      const n = node.len === "rest" ? c.left : resolveLen(node.len, ctx, c.where, c.pos, name);
+      const n =
+        node.len === "rest"
+          ? c.left
+          : resolveLen(node.len, ctx, c.where, c.pos, name);
       return c.bytes(n, name).slice();
     }
     case "list":
@@ -447,14 +478,14 @@ function readNode(node, c, name, le, ctx, sink) {
         throw DecodeError.reason(
           c.where,
           before,
-          `${name}: 子帧不完整(reader 返回 null), 而本字段声明为单个子帧`
+          `${name}: 子帧不完整(reader 返回 null), 而本字段声明为单个子帧`,
         );
       }
       return value;
     }
     case "transform": {
       const raw = readNode(node.inner, c, name, le, ctx, sink);
-      return node.decode(raw, ctx);
+      return node.decode(raw, ctx, le);
     }
     case "variant":
       throw new Error("readNode: variant 只能作为字段, 不能作为值");
@@ -468,13 +499,16 @@ function readList(node, c, name, le, ctx, sink) {
     while (c.left > 0) {
       if (sink?.stopped) break;
       const before = c.pos;
-      const value = node.item.kind === "codec" ? node.item.read(c, name) : readNode(node.item, c, name, le, ctx);
+      const value =
+        node.item.kind === "codec"
+          ? node.item.read(c, name)
+          : readNode(node.item, c, name, le, ctx);
       if (value == null) break;
       if (c.pos === before) {
         throw DecodeError.reason(
           c.where,
           before,
-          `${name}: 第 ${values.length} 个子帧没有消费任何字节, 会死循环`
+          `${name}: 第 ${values.length} 个子帧没有消费任何字节, 会死循环`,
         );
       }
       values.push(value);
@@ -485,7 +519,7 @@ function readList(node, c, name, le, ctx, sink) {
     const fs = fixedSize(node.item);
     if (fs === void 0) {
       throw new Error(
-        `records("${name}"): 子结构体含变长字段, 无法按定长填到末尾`
+        `records("${name}"): 子结构体含变长字段, 无法按定长填到末尾`,
       );
     }
     while (fs > 0 && c.left >= fs) {
@@ -504,7 +538,7 @@ function readList(node, c, name, le, ctx, sink) {
         const err = DecodeError.reason(
           c.where,
           c.pos,
-          `${name}: 无法找到第 ${i} 个元素的同步标记`
+          `${name}: 无法找到第 ${i} 个元素的同步标记`,
         );
         if (sink) {
           sink.errors.push(err);
@@ -521,11 +555,14 @@ function readList(node, c, name, le, ctx, sink) {
 }
 function pickVariant(node, ctx, where, offset, name, mode) {
   const tag = ctx[node.keyField];
-  const key = tag == null ? void 0 : node.select ? node.select(tag) : String(tag);
+  const key =
+    tag == null ? void 0 : node.select ? node.select(tag) : String(tag);
   const fields = key == null ? void 0 : node.cases[key];
   if (!fields) {
     const reason = `${name}: ${node.keyField}=${JSON.stringify(tag)} 没有对应分支 (已有: ${Object.keys(node.cases).join(", ") || "无"})`;
-    throw mode === "encode" ? new EncodeError(where, reason) : DecodeError.reason(where, offset, reason);
+    throw mode === "encode"
+      ? new EncodeError(where, reason)
+      : DecodeError.reason(where, offset, reason);
   }
   return fields;
 }
@@ -536,7 +573,8 @@ function readField(f, c, out, le, sink) {
     return;
   }
   if (node.kind === "skipUntil") {
-    const pat = typeof node.pattern === "function" ? node.pattern(out) : node.pattern;
+    const pat =
+      typeof node.pattern === "function" ? node.pattern(out) : node.pattern;
     const hit = c.indexOf(pat);
     if (hit === -1) {
       if (!node.optional) {
@@ -595,7 +633,7 @@ function toBytes(value, name) {
   if (value instanceof Uint8Array) return value;
   throw new EncodeError(
     "encode",
-    `${name}: 期望 Uint8Array, 实际 ${Array.isArray(value) ? "number[]" : typeof value} —— 字节只有一种形态, 文本请自己编码好再传`
+    `${name}: 期望 Uint8Array, 实际 ${Array.isArray(value) ? "number[]" : typeof value} —— 字节只有一种形态, 文本请自己编码好再传`,
   );
 }
 function measure(node, value) {
@@ -606,7 +644,13 @@ function backfillFields(fields, out, le) {
   for (const f of fields) {
     const node = f.node;
     if (node.kind === "skip" || node.kind === "skipUntil") continue;
-    if ((node.kind === "bytes" || node.kind === "list") && isRef(node.len) && !node.len.transform && out[node.len.field] == null && out[f.name] != null) {
+    if (
+      (node.kind === "bytes" || node.kind === "list") &&
+      isRef(node.len) &&
+      !node.len.transform &&
+      out[node.len.field] == null &&
+      out[f.name] != null
+    ) {
       out[node.len.field] = measure(node, out[f.name]);
     }
     if (node.kind === "struct") {
@@ -615,20 +659,13 @@ function backfillFields(fields, out, le) {
       const branch = pickVariant(node, out, "encode", 0, f.name, "encode");
       backfillFields(branch, out, le);
     } else if (node.kind === "list" && node.item.kind === "struct") {
-      out[f.name] = asList(out[f.name]).map(
-        (it) => backfillStruct(node.item, it, le)
+      out[f.name] = asList(out[f.name]).map((it) =>
+        backfillStruct(node.item, it, le),
       );
     } else if (node.kind === "list" && node.item.kind === "variant") {
       out[f.name] = asList(out[f.name]).map((it) => {
         const v = it == null ? {} : { ...it };
-        const branch = pickVariant(
-          node.item,
-          v,
-          "encode",
-          0,
-          f.name,
-          "encode"
-        );
+        const branch = pickVariant(node.item, v, "encode", 0, f.name, "encode");
         backfillFields(branch, v, le);
         return v;
       });
@@ -655,7 +692,7 @@ function writeNode(node, w, value, name, le, ctx) {
         if (bit !== 0 && bit !== 1) {
           throw new EncodeError(
             "encode",
-            `bits("${k}"): 位只能是 0 或 1, 实际 ${JSON.stringify(bit)}`
+            `bits("${k}"): 位只能是 0 或 1, 实际 ${JSON.stringify(bit)}`,
           );
         }
         flags |= bit << i;
@@ -671,7 +708,7 @@ function writeNode(node, w, value, name, le, ctx) {
         if (!Number.isInteger(v) || v < 0 || v >= 2 ** len) {
           throw new EncodeError(
             "encode",
-            `bitFields("${k}"): 值 ${JSON.stringify(v)} 放不进 ${len} 位 (0..${2 ** len - 1})`
+            `bitFields("${k}"): 值 ${JSON.stringify(v)} 放不进 ${len} 位 (0..${2 ** len - 1})`,
           );
         }
         flags |= v << shift;
@@ -685,7 +722,10 @@ function writeNode(node, w, value, name, le, ctx) {
         w.bytes(toBytes(value, name));
         return;
       }
-      const n = typeof node.len === "number" ? node.len : resolveLen(node.len, ctx, "encode", w.pos, name);
+      const n =
+        typeof node.len === "number"
+          ? node.len
+          : resolveLen(node.len, ctx, "encode", w.pos, name);
       const src = toBytes(value, name);
       const out = new Uint8Array(n);
       out.set(src.subarray(0, n));
@@ -705,7 +745,7 @@ function writeNode(node, w, value, name, le, ctx) {
         if (n > 0 && fs === void 0) {
           throw new EncodeError(
             "encode",
-            `${name}: 含变长元素, 无法按定长填充`
+            `${name}: 含变长元素, 无法按定长填充`,
           );
         }
         w.zero((fs ?? 0) * n);
@@ -714,7 +754,7 @@ function writeNode(node, w, value, name, le, ctx) {
       if (items.length < n) {
         throw new EncodeError(
           "encode",
-          `${name}: 需要 ${n} 个元素(${specText(node.len)}), 实际给了 ${items.length}`
+          `${name}: 需要 ${n} 个元素(${specText(node.len)}), 实际给了 ${items.length}`,
         );
       }
       for (let i = 0; i < n; i++) {
@@ -732,10 +772,10 @@ function writeNode(node, w, value, name, le, ctx) {
       if (!node.encode) {
         throw new EncodeError(
           "encode",
-          `${name}: transform 字段未提供 encode 函数`
+          `${name}: transform 字段未提供 encode 函数`,
         );
       }
-      const raw = node.encode(value, ctx);
+      const raw = node.encode(value, ctx, le);
       writeNode(node.inner, w, raw, name, le, ctx);
       return;
     }
@@ -774,7 +814,8 @@ var Writer = class {
     this.opts = opts;
     this.pos = 0;
     this.fixed = !!opts.view;
-    this.buf = opts.view ?? new DataView(new ArrayBuffer(opts.capacity ?? MIN_CAPACITY));
+    this.buf =
+      opts.view ?? new DataView(new ArrayBuffer(opts.capacity ?? MIN_CAPACITY));
     this.start = opts.offset ?? 0;
     this.pos = this.start;
   }
@@ -812,7 +853,7 @@ var Writer = class {
     if (this.fixed) {
       throw new EncodeError(
         "encodeInto",
-        `写入越界: 需要 ${n}B, 只剩 ${this.room}B (pos=${this.pos}, view=${this.buf.byteLength}B)`
+        `写入越界: 需要 ${n}B, 只剩 ${this.room}B (pos=${this.pos}, view=${this.buf.byteLength}B)`,
       );
     }
     const need = this.pos + n;
@@ -828,7 +869,7 @@ var Writer = class {
   }
   i8(v) {
     this.grow(1);
-    this.buf.setInt8(this.pos++, v << 24 >> 24);
+    this.buf.setInt8(this.pos++, (v << 24) >> 24);
   }
   u16(v) {
     this.grow(2);
@@ -893,12 +934,14 @@ var Writer = class {
   }
   /** 定长模式返回原 view; 可增长模式返回恰好 `written` 字节的切片 */
   finish() {
-    return this.fixed ? this.buf : new DataView(
-      this.buf.buffer.slice(
-        this.buf.byteOffset + this.start,
-        this.buf.byteOffset + this.pos
-      )
-    );
+    return this.fixed
+      ? this.buf
+      : new DataView(
+          this.buf.buffer.slice(
+            this.buf.byteOffset + this.start,
+            this.buf.byteOffset + this.pos,
+          ),
+        );
   }
 };
 
@@ -920,7 +963,7 @@ function make(node) {
       const w = new Writer({ view, offset, littleEndian });
       writeNode(node, w, value, "value", littleEndian, {});
       return w.finish();
-    }
+    },
   };
   return codec2;
 }
@@ -936,7 +979,7 @@ function registerType(size, unsigned = true, kind = "int") {
     typeKind: kind,
     get: h.get,
     set: h.set,
-    isBig: h.isBig
+    isBig: h.isBig,
   };
   const codec2 = {
     node,
@@ -953,7 +996,7 @@ function registerType(size, unsigned = true, kind = "int") {
       const w = new Writer({ view, offset, littleEndian });
       writeNode(node, w, value, "value", littleEndian, {});
       return w.finish();
-    }
+    },
   };
   return codec2;
 }
@@ -981,26 +1024,26 @@ function list(item, len, opts) {
     kind: "list",
     item: nodeOf(item),
     len,
-    sync: opts?.sync
+    sync: opts?.sync,
   });
 }
 function records(source, len) {
   const item = nodeOf(source);
   if (len === void 0 && fixedSize(item) === void 0) {
     throw new TypeError(
-      `records("${item.name ?? ""}"): 子结构体含变长字段, 无法按定长填到末尾 —— 请显式给长度, 或改用 ref/framed`
+      `records("${item.name ?? ""}"): 子结构体含变长字段, 无法按定长填到末尾 —— 请显式给长度, 或改用 ref/framed`,
     );
   }
   return make({
     kind: "list",
     item,
-    len: len ?? "records"
+    len: len ?? "records",
   });
 }
 function assertBitsStorage(size, kind) {
   if (size !== 1 && size !== 2 && size !== 4) {
     throw new TypeError(
-      `${kind}: 只支持 1/2/4 字节的存储(位运算走 JS 32 位整数), 实际 ${size}`
+      `${kind}: 只支持 1/2/4 字节的存储(位运算走 JS 32 位整数), 实际 ${size}`,
     );
   }
 }
@@ -1010,7 +1053,7 @@ function bits(storage, positions) {
   for (const [k, i] of Object.entries(positions)) {
     if (!Number.isInteger(i) || i < 0 || i >= size * 8) {
       throw new TypeError(
-        `bits: 位 "${k}" 的下标 ${i} 越界, 应在 0..${size * 8 - 1}`
+        `bits: 位 "${k}" 的下标 ${i} 越界, 应在 0..${size * 8 - 1}`,
       );
     }
   }
@@ -1019,7 +1062,7 @@ function bits(storage, positions) {
     kind: "bits",
     size,
     ...h,
-    positions
+    positions,
   });
 }
 function bitFields(storage, widths) {
@@ -1028,12 +1071,14 @@ function bitFields(storage, widths) {
   let total = 0;
   for (const [k, len] of Object.entries(widths)) {
     if (!Number.isInteger(len) || len < 1) {
-      throw new TypeError(`bitFields: 字段 "${k}" 的位宽 ${len} 非法, 应为正整数`);
+      throw new TypeError(
+        `bitFields: 字段 "${k}" 的位宽 ${len} 非法, 应为正整数`,
+      );
     }
     total += len;
     if (total > size * 8) {
       throw new TypeError(
-        `bitFields: 位宽总和 ${total} 超过 ${size * 8} 位(字段 "${k}" 越界)`
+        `bitFields: 位宽总和 ${total} 超过 ${size * 8} 位(字段 "${k}" 越界)`,
       );
     }
   }
@@ -1042,7 +1087,7 @@ function bitFields(storage, widths) {
     kind: "bitFields",
     size,
     ...h,
-    widths
+    widths,
   });
 }
 function skip(n) {
@@ -1054,13 +1099,13 @@ function skipUntil(pattern, opts) {
     pattern,
     offset: opts?.offset,
     optional: opts?.optional,
-    to: opts?.to
+    to: opts?.to,
   });
 }
 function compileFields(def) {
   return Object.entries(def).map(([name, codec2]) => ({
     name,
-    node: nodeOf(codec2)
+    node: nodeOf(codec2),
   }));
 }
 function struct(name, def, config) {
@@ -1068,7 +1113,7 @@ function struct(name, def, config) {
     kind: "struct",
     name,
     fields: compileFields(def),
-    le: config?.littleEndian
+    le: config?.littleEndian,
   };
   const codec2 = {
     node,
@@ -1088,11 +1133,11 @@ function struct(name, def, config) {
       const w = new Writer({
         view,
         offset,
-        littleEndian: config?.littleEndian ?? littleEndian
+        littleEndian: config?.littleEndian ?? littleEndian,
       });
       writeStruct(node, w, obj, littleEndian);
       return w.finish();
-    }
+    },
   };
   return codec2;
 }
@@ -1108,7 +1153,7 @@ function variant(keyField, cases, opts) {
     kind: "variant",
     keyField,
     cases: compileVariantCases(cases),
-    select: opts?.select
+    select: opts?.select,
   };
   return make(node);
 }
@@ -1118,7 +1163,7 @@ function toCodecNode(spec, single) {
     fixedSize: spec.fixedSize,
     single,
     read: spec.read,
-    write: spec.write
+    write: spec.write,
   };
 }
 function codec(spec) {
@@ -1131,7 +1176,7 @@ function framed(spec) {
   return make({
     kind: "list",
     item: toCodecNode(spec, false),
-    len: "rest"
+    len: "rest",
   });
 }
 function transform(inner, spec) {
@@ -1142,9 +1187,45 @@ function transform(inner, spec) {
     kind: "transform",
     inner: innerNode,
     decode: decodeFn,
-    encode: encodeFn
+    encode: encodeFn,
   };
   return make(node);
+}
+function formatBytesToHex(bytes2, opts, le = false) {
+  const isLE = opts?.littleEndian ?? le;
+  const upper = opts?.upperCase ?? false;
+  const sep = opts?.separator ?? "";
+  const prefix = opts?.prefix ?? "";
+  const list2 = isLE ? Array.from(bytes2).reverse() : Array.from(bytes2);
+  const parts = list2.map((b) => {
+    const s = b.toString(16).padStart(2, "0");
+    return upper ? s.toUpperCase() : s.toLowerCase();
+  });
+  return prefix + parts.join(sep);
+}
+function parseHexToBytes(val, len, littleEndian = false) {
+  if (val instanceof Uint8Array) {
+    return littleEndian ? new Uint8Array(Array.from(val).reverse()) : val;
+  }
+  let clean = String(val ?? "").replace(/0x|\\x|h|[^0-9a-fA-F]/gi, "");
+  if (littleEndian && typeof len === "number" && clean.length < len * 2) {
+    clean = clean.padStart(len * 2, "0");
+  } else if (clean.length % 2 !== 0) {
+    clean = clean.padStart(clean.length + 1, "0");
+  }
+  const match = clean.match(/.{1,2}/g);
+  const arr = match ? match.map((b) => parseInt(b, 16)) : [];
+  if (littleEndian) {
+    arr.reverse();
+  }
+  return new Uint8Array(arr);
+}
+function hexStr(len, opts) {
+  return transform(bytes(len), {
+    decode: (buf, _ctx, le) => formatBytesToHex(buf, opts, le),
+    encode: (val, _ctx, le) =>
+      parseHexToBytes(val, len, opts?.littleEndian ?? le),
+  });
 }
 
 // src/display.ts
@@ -1157,7 +1238,10 @@ function display(view, type, options) {
     try {
       let value = view[node.get](offset, opts.littleEndian);
       if (opts.hex) {
-        value = value.toString(16).toUpperCase().padStart(node.size * 2, "0");
+        value = value
+          .toString(16)
+          .toUpperCase()
+          .padStart(node.size * 2, "0");
       }
       result.push({ offset, value });
       offset += node.size;
@@ -1183,6 +1267,7 @@ export {
   double,
   float,
   framed,
+  hexStr,
   int16_t,
   int32_t,
   int64_t,
@@ -1205,6 +1290,6 @@ export {
   uint32_t,
   uint64_t,
   uint8_t,
-  variant
+  variant,
 };
 //# sourceMappingURL=index.mjs.map

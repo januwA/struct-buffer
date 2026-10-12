@@ -26,10 +26,12 @@ export {
   uint8_t,
   variant,
   transform,
+  hexStr,
 } from "./schema";
 export type {
   Codec,
   CodecSpec,
+  HexStrOptions,
   InferDef,
   InferEncode,
   InferEncodeDef,
@@ -53,7 +55,14 @@ export type { LenientResult } from "./errors";
 export { Cursor } from "./cursor";
 export { Writer } from "./writer";
 export { display } from "./display";
-export { makeDataView, createDataView, sbytes, sbytes2, sview, TEXT } from "./utils";
+export {
+  makeDataView,
+  createDataView,
+  sbytes,
+  sbytes2,
+  sview,
+  TEXT,
+} from "./utils";
 export type {
   DecodeBuffer_t,
   DisplayResult,

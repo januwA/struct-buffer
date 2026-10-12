@@ -61,13 +61,13 @@ export interface Codec<D, E = D> {
   decodeLenient(
     view: DecodeBuffer_t,
     littleEndian?: boolean,
-    offset?: number
+    offset?: number,
   ): LenientResult<D>;
   encode(
     value: E,
     littleEndian?: boolean,
     offset?: number,
-    view?: DataView
+    view?: DataView,
   ): DataView;
 }
 
@@ -102,9 +102,9 @@ function nodeOf(codec: Codec<any, any>): Node {
 
 // ------------------------------------------------------------ 类型推导
 
-type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never) extends (
-  k: infer I
-) => void
+type UnionToIntersection<U> = (
+  U extends unknown ? (k: U) => void : never
+) extends (k: infer I) => void
   ? I
   : never;
 
@@ -121,9 +121,7 @@ export type InferType<T> = T extends { [DECODE]: infer D }
     : T;
 
 /** encode 入参类型: 位域是 `Partial<D>`, 其余与解码值一致 */
-export type InferEncode<T> = T extends { [ENCODE]: infer E }
-  ? E
-  : InferType<T>;
+export type InferEncode<T> = T extends { [ENCODE]: infer E } ? E : InferType<T>;
 
 /** variant 一个分支贡献到父对象的字段(可选) */
 type BranchExtras<C> = Partial<
@@ -189,7 +187,7 @@ export interface ScalarCodec<D = number, E = D> extends Codec<D, E> {
     value: E,
     littleEndian?: boolean,
     offset?: number,
-    view?: DataView
+    view?: DataView,
   ): DataView;
 }
 
@@ -204,7 +202,7 @@ export interface ScalarCodec<D = number, E = D> extends Codec<D, E> {
 export function registerType<D = number, E = D>(
   size: TypeSize_t,
   unsigned = true,
-  kind: TypeKind = "int"
+  kind: TypeKind = "int",
 ): ScalarCodec<D, E> {
   const h = scalarHandle(size, unsigned, kind);
   const node: ScalarNode = {
@@ -251,14 +249,22 @@ export const uint64_t: ScalarCodec<bigint, bigint | number> = registerType<
   bigint,
   bigint | number
 >(8, true);
-export const float: ScalarCodec<number, number> = registerType(4, true, "float");
-export const double: ScalarCodec<number, number> = registerType(8, true, "float");
+export const float: ScalarCodec<number, number> = registerType(
+  4,
+  true,
+  "float",
+);
+export const double: ScalarCodec<number, number> = registerType(
+  8,
+  true,
+  "float",
+);
 
 // ------------------------------------------------------------ 长度引用
 
 export function ref(
   field: string,
-  transform?: (val: number, ctx: AnyObject) => number
+  transform?: (val: number, ctx: AnyObject) => number,
 ): Ref {
   return { __ref: true, field, transform };
 }
@@ -277,7 +283,9 @@ export type {
 // ------------------------------------------------------------ 字节 / 列表
 
 /** 一段字节, 长度按字节数。`"rest"` 吃掉剩余全部 */
-export function bytes(len: number | Ref | "rest"): Codec<Uint8Array, Uint8Array> {
+export function bytes(
+  len: number | Ref | "rest",
+): Codec<Uint8Array, Uint8Array> {
   return make<Uint8Array, Uint8Array>({ kind: "bytes", len } as BytesNode);
 }
 
@@ -290,7 +298,7 @@ export function rest(): Codec<Uint8Array, Uint8Array> {
 export function list<C extends Codec<any, any>>(
   item: C,
   len: number | Ref | "rest",
-  opts?: ListOptions<InferType<C>>
+  opts?: ListOptions<InferType<C>>,
 ): Codec<InferType<C>[], InferEncode<C>[]> {
   return make<InferType<C>[], InferEncode<C>[]>({
     kind: "list",
@@ -306,13 +314,13 @@ export function list<C extends Codec<any, any>>(
  */
 export function records<C extends Codec<any, any>>(
   source: C,
-  len?: number | Ref
+  len?: number | Ref,
 ): Codec<InferType<C>[], InferEncode<C>[]> {
   const item = nodeOf(source);
   if (len === undefined && fixedSize(item) === undefined) {
     throw new TypeError(
       `records("${(item as StructNode).name ?? ""}"): 子结构体含变长字段, ` +
-        `无法按定长填到末尾 —— 请显式给长度, 或改用 ref/framed`
+        `无法按定长填到末尾 —— 请显式给长度, 或改用 ref/framed`,
     );
   }
   return make<InferType<C>[], InferEncode<C>[]>({
@@ -327,7 +335,7 @@ export function records<C extends Codec<any, any>>(
 function assertBitsStorage(size: number, kind: string): void {
   if (size !== 1 && size !== 2 && size !== 4) {
     throw new TypeError(
-      `${kind}: 只支持 1/2/4 字节的存储(位运算走 JS 32 位整数), 实际 ${size}`
+      `${kind}: 只支持 1/2/4 字节的存储(位运算走 JS 32 位整数), 实际 ${size}`,
     );
   }
 }
@@ -335,14 +343,14 @@ function assertBitsStorage(size: number, kind: string): void {
 /** 位序号: 每一位 0/1。`{ a: 0, b: 2 }` */
 export function bits(
   storage: ScalarCodec<any, any>,
-  positions: { [k: string]: number }
+  positions: { [k: string]: number },
 ): Codec<{ [x: string]: Bit_t }, Partial<{ [x: string]: Bit_t }>> {
   const size = storage.size;
   assertBitsStorage(size, "bits");
   for (const [k, i] of Object.entries(positions)) {
     if (!Number.isInteger(i) || i < 0 || i >= size * 8) {
       throw new TypeError(
-        `bits: 位 "${k}" 的下标 ${i} 越界, 应在 0..${size * 8 - 1}`
+        `bits: 位 "${k}" 的下标 ${i} 越界, 应在 0..${size * 8 - 1}`,
       );
     }
   }
@@ -358,19 +366,21 @@ export function bits(
 /** 位宽: 值域 0..2^width-1。`{ a: 1, b: 2, c: 3 }` */
 export function bitFields(
   storage: ScalarCodec<any, any>,
-  widths: { [k: string]: number }
+  widths: { [k: string]: number },
 ): Codec<{ [x: string]: number }, Partial<{ [x: string]: number }>> {
   const size = storage.size;
   assertBitsStorage(size, "bitFields");
   let total = 0;
   for (const [k, len] of Object.entries(widths)) {
     if (!Number.isInteger(len) || len < 1) {
-      throw new TypeError(`bitFields: 字段 "${k}" 的位宽 ${len} 非法, 应为正整数`);
+      throw new TypeError(
+        `bitFields: 字段 "${k}" 的位宽 ${len} 非法, 应为正整数`,
+      );
     }
     total += len;
     if (total > size * 8) {
       throw new TypeError(
-        `bitFields: 位宽总和 ${total} 超过 ${size * 8} 位(字段 "${k}" 越界)`
+        `bitFields: 位宽总和 ${total} 超过 ${size * 8} 位(字段 "${k}" 越界)`,
       );
     }
   }
@@ -396,7 +406,7 @@ export function skip(n: number): Codec<never, never> {
  */
 export function skipUntil(
   pattern: PatternSource,
-  opts?: SkipUntilOptions
+  opts?: SkipUntilOptions,
 ): Codec<never, never> {
   return make<never, never>({
     kind: "skipUntil",
@@ -407,30 +417,31 @@ export function skipUntil(
   } as SkipUntilNode);
 }
 
-
 // ------------------------------------------------------------ struct
 
 export type StructDef = { [k: string]: Codec<any, any> };
 
-export interface StructCodec<S extends StructDef>
-  extends Codec<InferDef<S>, Partial<InferEncodeDef<S>>> {
+export interface StructCodec<S extends StructDef> extends Codec<
+  InferDef<S>,
+  Partial<InferEncodeDef<S>>
+> {
   readonly name: string;
   readonly struct: S;
   decode(
     view: DecodeBuffer_t,
     littleEndian?: boolean,
-    offset?: number
+    offset?: number,
   ): InferDef<S>;
   decodeLenient(
     view: DecodeBuffer_t,
     littleEndian?: boolean,
-    offset?: number
+    offset?: number,
   ): LenientResult<InferDef<S>>;
   encode(
     obj: Partial<InferEncodeDef<S>>,
     littleEndian?: boolean,
     offset?: number,
-    view?: DataView
+    view?: DataView,
   ): DataView;
 }
 
@@ -448,7 +459,7 @@ function compileFields<S extends StructDef>(def: S): FieldNode[] {
 export function struct<S extends StructDef>(
   name: string,
   def: S,
-  config?: StructBufferConfig
+  config?: StructBufferConfig,
 ): StructCodec<S> {
   const node: StructNode = {
     kind: "struct",
@@ -471,12 +482,7 @@ export function struct<S extends StructDef>(
       const value = decodeStruct(node, c, sink, littleEndian);
       return { value, errors: sink.errors, consumed: c.pos - offset };
     },
-    encode(
-      obj: any,
-      littleEndian = false,
-      offset = 0,
-      view?: DataView
-    ) {
+    encode(obj: any, littleEndian = false, offset = 0, view?: DataView) {
       const w = new Writer({
         view,
         offset,
@@ -491,13 +497,14 @@ export function struct<S extends StructDef>(
 
 // ------------------------------------------------------------ variant
 
-export interface VariantCodec<C extends { [k: string]: StructDef }>
-  extends Codec<any, any> {
+export interface VariantCodec<
+  C extends { [k: string]: StructDef },
+> extends Codec<any, any> {
   readonly [VARIANT_CASES]: C;
 }
 
 function compileVariantCases<C extends { [k: string]: StructDef }>(
-  cases: C
+  cases: C,
 ): { [k: string]: FieldNode[] } {
   const out: { [k: string]: FieldNode[] } = {};
   for (const [k, def] of Object.entries(cases)) {
@@ -512,7 +519,7 @@ function compileVariantCases<C extends { [k: string]: StructDef }>(
 export function variant<C extends { [k: string]: StructDef }>(
   keyField: string,
   cases: C,
-  opts?: { select?: (tag: any) => string | undefined }
+  opts?: { select?: (tag: any) => string | undefined },
 ): VariantCodec<C> {
   const node: VariantNode = {
     kind: "variant",
@@ -571,10 +578,10 @@ export function framed<T>(spec: CodecSpec<T>): Codec<T[]> {
 // ------------------------------------------------------------ transform
 
 export type TransformSpec<InD, InE, OutD, OutE> =
-  | ((val: InD, ctx: AnyObject) => OutD)
+  | ((val: InD, ctx: AnyObject, le: boolean) => OutD)
   | {
-      decode: (val: InD, ctx: AnyObject) => OutD;
-      encode?: (val: OutE, ctx: AnyObject) => InE;
+      decode: (val: InD, ctx: AnyObject, le: boolean) => OutD;
+      encode?: (val: OutE, ctx: AnyObject, le: boolean) => InE;
     };
 
 /**
@@ -583,7 +590,7 @@ export type TransformSpec<InD, InE, OutD, OutE> =
  */
 export function transform<C extends Codec<any, any>, OutD, OutE = OutD>(
   inner: C,
-  spec: TransformSpec<InferType<C>, InferEncode<C>, OutD, OutE>
+  spec: TransformSpec<InferType<C>, InferEncode<C>, OutD, OutE>,
 ): Codec<OutD, OutE> {
   const innerNode = nodeOf(inner);
   const decodeFn = typeof spec === "function" ? spec : spec.decode;
@@ -599,3 +606,82 @@ export function transform<C extends Codec<any, any>, OutD, OutE = OutD>(
   return make<OutD, OutE>(node);
 }
 
+// ------------------------------------------------------------ hexStr
+
+export interface HexStrOptions {
+  /** 字节之间的分隔符，默认为 "" (如 "de4e3d39...")；可传 " " (如 "de 4e 3d 39...") 等 */
+  separator?: string;
+  /** 字符串前缀，如 "0x"，默认为 "" */
+  prefix?: string;
+  /** 是否大写输出，默认为 false (即小写 a-f) */
+  upperCase?: boolean;
+  /**
+   * 是否按小端序翻转字节顺序展示。
+   * 为 true 时，解码会将字节倒序后再转十六进制（符合数值的十六进制视觉习惯，如 0x00600200393d4ede）；
+   * 编码时若开启 littleEndian，也会将 hex 解析出的字节序倒序写回 Buffer。
+   * 省略则自动跟随当前上下文的字节序(littleEndian)。
+   */
+  littleEndian?: boolean;
+}
+
+function formatBytesToHex(
+  bytes: Uint8Array,
+  opts?: HexStrOptions,
+  le = false,
+): string {
+  const isLE = opts?.littleEndian ?? le;
+  const upper = opts?.upperCase ?? false;
+  const sep = opts?.separator ?? "";
+  const prefix = opts?.prefix ?? "";
+
+  const list = isLE ? Array.from(bytes).reverse() : Array.from(bytes);
+  const parts = list.map((b) => {
+    const s = b.toString(16).padStart(2, "0");
+    return upper ? s.toUpperCase() : s.toLowerCase();
+  });
+  return prefix + parts.join(sep);
+}
+
+function parseHexToBytes(
+  val: string | Uint8Array,
+  len: number | Ref | "rest",
+  littleEndian = false,
+): Uint8Array {
+  if (val instanceof Uint8Array) {
+    return littleEndian ? new Uint8Array(Array.from(val).reverse()) : val;
+  }
+  let clean = String(val ?? "").replace(/0x|\\x|h|[^0-9a-fA-F]/gi, "");
+  if (littleEndian && typeof len === "number" && clean.length < len * 2) {
+    clean = clean.padStart(len * 2, "0");
+  } else if (clean.length % 2 !== 0) {
+    clean = clean.padStart(clean.length + 1, "0");
+  }
+  const match = clean.match(/.{1,2}/g);
+  const arr = match ? match.map((b) => parseInt(b, 16)) : [];
+  if (littleEndian) {
+    arr.reverse();
+  }
+  return new Uint8Array(arr);
+}
+
+/**
+ * 十六进制字符串类型: 在底层按字节存储，解码为十六进制字符串，编码接受十六进制字符串或 Uint8Array。
+ *
+ * @param len 字节大小，可为数字、同层字段引用 ref("len") 或吃掉剩余全部 "rest"
+ * @param opts 转换选项
+ *   - separator: 字节间分隔符，默认为 "" (如 "de4e3d39...")
+ *   - prefix: 字符串前缀，如 "0x"，默认为 ""
+ *   - upperCase: 是否大写输出，默认为 false
+ *   - littleEndian: 是否按小端序翻转字节顺序，默认为跟随环境
+ */
+export function hexStr(
+  len: number | Ref | "rest",
+  opts?: HexStrOptions,
+): Codec<string, string | Uint8Array> {
+  return transform(bytes(len), {
+    decode: (buf: Uint8Array, _ctx: AnyObject, le: boolean) =>
+      formatBytesToHex(buf, opts, le),
+    encode: (val: string | Uint8Array, _ctx: AnyObject, le: boolean) =>
+      parseHexToBytes(val, len, opts?.littleEndian ?? le),
+  });
+}

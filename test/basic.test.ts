@@ -17,13 +17,59 @@ import {
   skipUntil,
   ref,
   sbytes,
+  transform,
+  hexStr,
 } from "../src";
 
 describe("test decode and encode", () => {
+  it("hex str", () => {
+    const hexStrData = hexStr(8, { prefix: "0x" });
+    expect(hexStrData.decode(sbytes("DE 4E 3D 39 00 02 60 00"), true)).toBe(
+      "0x00600200393d4ede",
+    );
+    expect(
+      sview(hexStrData.encode("0x00600200393d4ede", true)).toLowerCase(),
+    ).toBe("de 4e 3d 39 00 02 60 00");
+  });
+
+  it("hex str default and options", () => {
+    const hsDefault = hexStr(8);
+    expect(hsDefault.decode(sbytes("DE 4E 3D 39 00 02 60 00"))).toBe(
+      "de4e3d3900026000",
+    );
+    expect(sview(hsDefault.encode("de4e3d3900026000")).toLowerCase()).toBe(
+      "de 4e 3d 39 00 02 60 00",
+    );
+
+    const hsFormatted = hexStr(8, { separator: " ", upperCase: true });
+    expect(hsFormatted.decode(sbytes("DE 4E 3D 39 00 02 60 00"))).toBe(
+      "DE 4E 3D 39 00 02 60 00",
+    );
+    expect(
+      sview(hsFormatted.encode("DE 4E 3D 39 00 02 60 00")).toLowerCase(),
+    ).toBe("de 4e 3d 39 00 02 60 00");
+  });
+
+  it("hex str in struct with littleEndian", () => {
+    const Packet = struct(
+      "Packet",
+      {
+        id: hexStr(8, { prefix: "0x" }),
+      },
+      { littleEndian: true },
+    );
+    const data = Packet.decode(sbytes("DE 4E 3D 39 00 02 60 00"));
+    expect(data.id).toBe("0x00600200393d4ede");
+    expect(
+      sview(Packet.encode({ id: "0x00600200393d4ede" })).toLowerCase(),
+    ).toBe("de 4e 3d 39 00 02 60 00");
+  });
   it("test uint64", () => {
     const data = uint64_t.decode(sbytes("DE 4E 3D 39 00 02 60 00"), true);
     expect(data).toBe(27023797747797726n);
-    expect(sview(uint64_t.encode(data, true)).toLowerCase()).toBe("DE 4E 3D 39 00 02 60 00".toLowerCase())
+    expect(sview(uint64_t.encode(data, true)).toLowerCase()).toBe(
+      "DE 4E 3D 39 00 02 60 00".toLowerCase(),
+    );
   });
   it("parse list item dynamic size", () => {
     const itemStruct = struct(

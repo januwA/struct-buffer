@@ -56,13 +56,15 @@ const FLOAT_HANDLE: { [size: number]: string } = {
 export function scalarHandle(
   size: number,
   unsigned: boolean,
-  kind: TypeKind
+  kind: TypeKind,
 ): ScalarHandle {
   const get =
-    kind === "float" ? FLOAT_HANDLE[size] : INT_HANDLE[size]?.[unsigned ? 1 : 0];
+    kind === "float"
+      ? FLOAT_HANDLE[size]
+      : INT_HANDLE[size]?.[unsigned ? 1 : 0];
   if (!get) {
     throw new Error(
-      `不存在这种字节形状 (size=${size}, unsigned=${unsigned}, kind=${kind})`
+      `不存在这种字节形状 (size=${size}, unsigned=${unsigned}, kind=${kind})`,
     );
   }
   return { get, set: get.replace(/^g/, "s"), isBig: get.startsWith("getBig") };
@@ -103,12 +105,7 @@ export interface BytesNode {
 export type PatternBytes = Uint8Array | DataView;
 
 export interface ListSyncOptions<T = any> {
-  pattern: (
-    prev: T,
-    first: T,
-    all: T[],
-    ctx: AnyObject
-  ) => PatternBytes;
+  pattern: (prev: T, first: T, all: T[], ctx: AnyObject) => PatternBytes;
   offset?: number;
 }
 
@@ -159,9 +156,7 @@ export interface SkipNode {
   n: number;
 }
 
-export type PatternSource =
-  | PatternBytes
-  | ((ctx: AnyObject) => PatternBytes);
+export type PatternSource = PatternBytes | ((ctx: AnyObject) => PatternBytes);
 
 export interface SkipUntilOptions {
   offset?: number;
@@ -180,8 +175,8 @@ export interface SkipUntilNode {
 export interface TransformNode {
   kind: "transform";
   inner: Node;
-  decode: (val: any, ctx: AnyObject) => any;
-  encode?: (val: any, ctx: AnyObject) => any;
+  decode: (val: any, ctx: AnyObject, le: boolean) => any;
+  encode?: (val: any, ctx: AnyObject, le: boolean) => any;
 }
 
 export type Node =
@@ -196,7 +191,6 @@ export type Node =
   | SkipNode
   | SkipUntilNode
   | TransformNode;
-
 
 // -------------------------------------------------------------- fixedSize
 
@@ -280,11 +274,12 @@ function resolveLen(
   ctx: AnyObject,
   where: string,
   offset: number,
-  name: string
+  name: string,
 ): number {
   if (typeof len === "number") return len;
   if (len === "rest") throw new Error("resolveLen: rest 由调用点单独处理");
-  if (len === "records") throw new Error("resolveLen: records 由调用点单独处理");
+  if (len === "records")
+    throw new Error("resolveLen: records 由调用点单独处理");
 
   const raw = ctx[len.field];
   if (raw == null) {
@@ -292,7 +287,7 @@ function resolveLen(
       where,
       offset,
       `${name}: ref("${len.field}") 指向的字段尚未解析 —— ` +
-        `ref 只能引用同一层里声明在它之前的字段`
+        `ref 只能引用同一层里声明在它之前的字段`,
     );
   }
   const val = typeof raw === "bigint" ? Number(raw) : raw;
@@ -300,7 +295,7 @@ function resolveLen(
     throw DecodeError.reason(
       where,
       offset,
-      `${name}: ref("${len.field}") 取到 ${String(raw)}, 不是有限数字`
+      `${name}: ref("${len.field}") 取到 ${String(raw)}, 不是有限数字`,
     );
   }
   const n = len.transform ? len.transform(val, ctx) : val;
@@ -310,7 +305,7 @@ function resolveLen(
       offset,
       `${name}: ref("${len.field}")${
         len.transform ? " 的 transform 之后" : ""
-      }得到 ${n}, 不是非负整数`
+      }得到 ${n}, 不是非负整数`,
     );
   }
   return n;
@@ -318,7 +313,12 @@ function resolveLen(
 
 // ------------------------------------------------------------------- read
 
-function readScalar(c: Cursor, name: string, node: ScalarBase, le: boolean): number | bigint {
+function readScalar(
+  c: Cursor,
+  name: string,
+  node: ScalarBase,
+  le: boolean,
+): number | bigint {
   c.need(node.size, name);
   const v = (c.view as any)[node.get](c.pos, le);
   c.pos += node.size;
@@ -331,7 +331,7 @@ export function readNode(
   name: string,
   le: boolean,
   ctx: AnyObject,
-  sink?: ErrorSink
+  sink?: ErrorSink,
 ): any {
   switch (node.kind) {
     case "scalar":
@@ -379,7 +379,7 @@ export function readNode(
         throw DecodeError.reason(
           c.where,
           before,
-          `${name}: 子帧不完整(reader 返回 null), 而本字段声明为单个子帧`
+          `${name}: 子帧不完整(reader 返回 null), 而本字段声明为单个子帧`,
         );
       }
       return value;
@@ -387,7 +387,7 @@ export function readNode(
 
     case "transform": {
       const raw = readNode(node.inner, c, name, le, ctx, sink);
-      return node.decode(raw, ctx);
+      return node.decode(raw, ctx, le);
     }
 
     case "variant":
@@ -405,7 +405,7 @@ function readList(
   name: string,
   le: boolean,
   ctx: AnyObject,
-  sink?: ErrorSink
+  sink?: ErrorSink,
 ): any[] {
   const values: any[] = [];
 
@@ -423,7 +423,7 @@ function readList(
         throw DecodeError.reason(
           c.where,
           before,
-          `${name}: 第 ${values.length} 个子帧没有消费任何字节, 会死循环`
+          `${name}: 第 ${values.length} 个子帧没有消费任何字节, 会死循环`,
         );
       }
       values.push(value);
@@ -435,7 +435,7 @@ function readList(
     const fs = fixedSize(node.item);
     if (fs === undefined) {
       throw new Error(
-        `records("${name}"): 子结构体含变长字段, 无法按定长填到末尾`
+        `records("${name}"): 子结构体含变长字段, 无法按定长填到末尾`,
       );
     }
     while (fs > 0 && c.left >= fs) {
@@ -455,7 +455,7 @@ function readList(
         const err = DecodeError.reason(
           c.where,
           c.pos,
-          `${name}: 无法找到第 ${i} 个元素的同步标记`
+          `${name}: 无法找到第 ${i} 个元素的同步标记`,
         );
         if (sink) {
           sink.errors.push(err);
@@ -477,17 +477,16 @@ function pickVariant(
   where: string,
   offset: number,
   name: string,
-  mode: "decode" | "encode"
+  mode: "decode" | "encode",
 ): FieldNode[] {
   const tag = ctx[node.keyField];
   const key =
     tag == null ? undefined : node.select ? node.select(tag) : String(tag);
   const fields = key == null ? undefined : node.cases[key];
   if (!fields) {
-    const reason =
-      `${name}: ${node.keyField}=${JSON.stringify(tag)} 没有对应分支 (已有: ${
-        Object.keys(node.cases).join(", ") || "无"
-      })`;
+    const reason = `${name}: ${node.keyField}=${JSON.stringify(tag)} 没有对应分支 (已有: ${
+      Object.keys(node.cases).join(", ") || "无"
+    })`;
     throw mode === "encode"
       ? new EncodeError(where, reason)
       : DecodeError.reason(where, offset, reason);
@@ -500,7 +499,7 @@ function readField(
   c: Cursor,
   out: AnyObject,
   le: boolean,
-  sink?: ErrorSink
+  sink?: ErrorSink,
 ): void {
   const node = f.node;
   if (node.kind === "skip") {
@@ -536,7 +535,7 @@ function readFields(
   c: Cursor,
   out: AnyObject,
   le: boolean,
-  sink?: ErrorSink
+  sink?: ErrorSink,
 ): void {
   for (const f of fields) {
     if (sink?.stopped) return;
@@ -562,7 +561,7 @@ function readStruct(
   node: StructNode,
   c: Cursor,
   inheritedLE: boolean,
-  sink?: ErrorSink
+  sink?: ErrorSink,
 ): AnyObject {
   const out: AnyObject = {};
   readFields(node.fields, c, out, node.le ?? inheritedLE, sink);
@@ -579,7 +578,7 @@ export function decodeStruct(
   node: StructNode,
   c: Cursor,
   sink?: ErrorSink,
-  inheritedLE = false
+  inheritedLE = false,
 ): AnyObject {
   return readStruct(node, c, inheritedLE, sink);
 }
@@ -599,7 +598,7 @@ function toBytes(value: any, name: string): Uint8Array {
     "encode",
     `${name}: 期望 Uint8Array, 实际 ${
       Array.isArray(value) ? "number[]" : typeof value
-    } —— 字节只有一种形态, 文本请自己编码好再传`
+    } —— 字节只有一种形态, 文本请自己编码好再传`,
   );
 }
 
@@ -615,7 +614,7 @@ function measure(node: Node, value: any): number {
 function backfillFields(
   fields: FieldNode[],
   out: AnyObject,
-  le: boolean
+  le: boolean,
 ): void {
   for (const f of fields) {
     const node = f.node;
@@ -638,7 +637,7 @@ function backfillFields(
       backfillFields(branch, out, le);
     } else if (node.kind === "list" && node.item.kind === "struct") {
       out[f.name] = asList(out[f.name]).map((it) =>
-        backfillStruct(node.item as StructNode, it, le)
+        backfillStruct(node.item as StructNode, it, le),
       );
     } else if (node.kind === "list" && node.item.kind === "variant") {
       out[f.name] = asList(out[f.name]).map((it) => {
@@ -649,7 +648,7 @@ function backfillFields(
           "encode",
           0,
           f.name,
-          "encode"
+          "encode",
         );
         backfillFields(branch, v, le);
         return v;
@@ -661,7 +660,7 @@ function backfillFields(
 function backfillStruct(
   node: StructNode,
   value: any,
-  inheritedLE: boolean
+  inheritedLE: boolean,
 ): AnyObject {
   const out: AnyObject = value == null ? {} : { ...value };
   backfillFields(node.fields, out, node.le ?? inheritedLE);
@@ -672,7 +671,7 @@ function writeScalar(
   w: Writer,
   node: ScalarBase,
   value: any,
-  le: boolean
+  le: boolean,
 ): void {
   w.accessor(node.size, node.set, node.isBig, value, le);
 }
@@ -683,7 +682,7 @@ export function writeNode(
   value: any,
   name: string,
   le: boolean,
-  ctx: AnyObject
+  ctx: AnyObject,
 ): void {
   switch (node.kind) {
     case "scalar":
@@ -697,7 +696,7 @@ export function writeNode(
         if (bit !== 0 && bit !== 1) {
           throw new EncodeError(
             "encode",
-            `bits("${k}"): 位只能是 0 或 1, 实际 ${JSON.stringify(bit)}`
+            `bits("${k}"): 位只能是 0 或 1, 实际 ${JSON.stringify(bit)}`,
           );
         }
         flags |= bit << i;
@@ -716,7 +715,7 @@ export function writeNode(
             "encode",
             `bitFields("${k}"): 值 ${JSON.stringify(v)} 放不进 ${len} 位 (0..${
               2 ** len - 1
-            })`
+            })`,
           );
         }
         flags |= v << shift;
@@ -755,7 +754,7 @@ export function writeNode(
         if (n > 0 && fs === undefined) {
           throw new EncodeError(
             "encode",
-            `${name}: 含变长元素, 无法按定长填充`
+            `${name}: 含变长元素, 无法按定长填充`,
           );
         }
         w.zero((fs ?? 0) * n);
@@ -764,7 +763,7 @@ export function writeNode(
       if (items.length < n) {
         throw new EncodeError(
           "encode",
-          `${name}: 需要 ${n} 个元素(${specText(node.len)}), 实际给了 ${items.length}`
+          `${name}: 需要 ${n} 个元素(${specText(node.len)}), 实际给了 ${items.length}`,
         );
       }
       for (let i = 0; i < n; i++) {
@@ -785,10 +784,10 @@ export function writeNode(
       if (!node.encode) {
         throw new EncodeError(
           "encode",
-          `${name}: transform 字段未提供 encode 函数`
+          `${name}: transform 字段未提供 encode 函数`,
         );
       }
-      const raw = node.encode(value, ctx);
+      const raw = node.encode(value, ctx, le);
       writeNode(node.inner, w, raw, name, le, ctx);
       return;
     }
@@ -805,7 +804,7 @@ function writeField(
   f: FieldNode,
   w: Writer,
   out: AnyObject,
-  le: boolean
+  le: boolean,
 ): void {
   const node = f.node;
   if (node.kind === "skip") {
@@ -827,7 +826,7 @@ export function writeStruct(
   node: StructNode,
   w: Writer,
   value: any,
-  inheritedLE: boolean
+  inheritedLE: boolean,
 ): void {
   const out = backfillStruct(node, value, inheritedLE);
   const le = node.le ?? inheritedLE;
