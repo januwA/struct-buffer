@@ -179,6 +179,16 @@ export interface TransformNode {
   encode?: (val: any, ctx: AnyObject, le: boolean) => any;
 }
 
+/**
+ * 字节重排: 对**定长槽位的原始字节**做交换前后两半, 再交给内层 codec 解释.
+ * decode 时先交换读到的字节, encode 时先让内层写出字节再交换, 两者互逆.
+ * 与字节序正交 —— 内层自己的 `littleEndian` 处理不受影响。
+ */
+export interface SwapNode {
+  kind: "swap";
+  inner: Node;
+}
+
 export type Node =
   | ScalarNode
   | BitsNode
@@ -190,7 +200,8 @@ export type Node =
   | CodecNode
   | SkipNode
   | SkipUntilNode
-  | TransformNode;
+  | TransformNode
+  | SwapNode;
 
 // -------------------------------------------------------------- fixedSize
 
@@ -216,6 +227,7 @@ export function fixedSize(node: Node): number | undefined {
       size = node.fixedSize;
       break;
     case "transform":
+    case "swap":
       size = fixedSize(node.inner);
       break;
     case "bytes":
@@ -313,6 +325,24 @@ function resolveLen(
 
 // ------------------------------------------------------------------- read
 
+/**
+ * 交换字节序列的前后两半(原地). 长度为奇数时抛错 —— 调用点(schema 构造期)已经保证
+ * 是偶数, 这里的检查只兜底手写 AST 的情况。
+ */
+function swapHalvesOf(bytes: Uint8Array): Uint8Array {
+  const n = bytes.length;
+  if (n % 2 !== 0) {
+    throw new Error(`swap: 字节数 ${n} 不是偶数, 无法对半交换`);
+  }
+  const half = n / 2;
+  for (let i = 0; i < half; i++) {
+    const tmp = bytes[i];
+    bytes[i] = bytes[i + half];
+    bytes[i + half] = tmp;
+  }
+  return bytes;
+}
+
 function readScalar(
   c: Cursor,
   name: string,
@@ -388,6 +418,22 @@ export function readNode(
     case "transform": {
       const raw = readNode(node.inner, c, name, le, ctx, sink);
       return node.decode(raw, ctx, le);
+    }
+
+    case "swap": {
+      const size = fixedSize(node.inner);
+      if (size === undefined) {
+        throw new Error(`swap("${name}"): 内层字段不是定长, 无法对半交换`);
+      }
+      const swapped = swapHalvesOf(c.bytes(size, name).slice());
+      return readNode(
+        node.inner,
+        new Cursor(swapped, 0, size, c.label(name)),
+        name,
+        le,
+        ctx,
+        sink,
+      );
     }
 
     case "variant":
@@ -789,6 +835,19 @@ export function writeNode(
       }
       const raw = node.encode(value, ctx, le);
       writeNode(node.inner, w, raw, name, le, ctx);
+      return;
+    }
+
+    case "swap": {
+      const tmp = new Writer({ littleEndian: le });
+      writeNode(node.inner, tmp, value, name, le, ctx);
+      const out = tmp.finish();
+      const bytes = new Uint8Array(
+        out.buffer,
+        out.byteOffset,
+        out.byteLength,
+      ).slice();
+      w.bytes(swapHalvesOf(bytes));
       return;
     }
 

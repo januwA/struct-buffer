@@ -27,6 +27,7 @@ export {
   variant,
   transform,
   hexStr,
+  swapHalves,
 } from "./schema";
 export type {
   Codec,

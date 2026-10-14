@@ -24,6 +24,7 @@ import {
   SkipUntilNode,
   SkipUntilOptions,
   StructNode,
+  SwapNode,
   TransformNode,
   TypeKind,
   VariantNode,
@@ -604,6 +605,42 @@ export function transform<C extends Codec<any, any>, OutD, OutE = OutD>(
   };
 
   return make<OutD, OutE>(node);
+}
+
+// ------------------------------------------------------------ swapHalves
+
+/**
+ * 交换定长字段**原始字节**的前后两半, 再交给内层 codec 按自身字节序解释.
+ *
+ * 纯字节层重排, 与 `littleEndian` 正交: 内层的字节序处理照旧生效, 且 decode/encode
+ * 互逆。内层必须是定长且宽度为偶数, 否则在构造期抛 `TypeError`。
+ *
+ * ```ts
+ * const P = struct("P", {
+ *   raw: swapHalves(uint16_t),                                  // 00 5d -> 93
+ *   id: swapHalves(hexStr(8, { prefix: "0X", upperCase: true })), // 00 02 60 00 de 4e 3d 39 -> "0XDE4E3D3900026000"
+ * }, { littleEndian: true });
+ * ```
+ */
+export function swapHalves<C extends Codec<any, any>>(
+  inner: C,
+): Codec<InferType<C>, InferEncode<C>> {
+  const innerNode = nodeOf(inner);
+  const size = fixedSize(innerNode);
+  if (size === undefined) {
+    throw new TypeError(
+      "swapHalves: 内层字段不是定长, 无法对半交换 —— 请改用定长字段",
+    );
+  }
+  if (size % 2 !== 0) {
+    throw new TypeError(
+      `swapHalves: 内层字段宽度 ${size} 不是偶数, 无法对半交换`,
+    );
+  }
+  return make<InferType<C>, InferEncode<C>>({
+    kind: "swap",
+    inner: innerNode,
+  } as SwapNode);
 }
 
 // ------------------------------------------------------------ hexStr

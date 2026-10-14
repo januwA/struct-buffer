@@ -318,6 +318,36 @@ const ScalePacket = struct("ScalePacket", {
 });
 ```
 
+## 字节重排: swapHalves
+
+把定长字段的**原始字节**前后两半交换, 再交给内层 codec 按自身字节序解释; decode/encode 互逆。
+纯字节层重排, 与 `littleEndian` 正交 —— 内层自己的字节序处理照旧生效。
+
+内层必须定长且宽度为偶数, 否则在构造期抛 `TypeError`。
+
+```ts
+import { hexStr, struct, swapHalves, uint16_t } from "struct-buffer";
+
+const P = struct(
+  "P",
+  {
+    // 线上 00 5d, 两半交换后按小端读出 93
+    raw: swapHalves(uint16_t),
+    // 线上 00 02 60 00 de 4e 3d 39 -> "0XDE4E3D3900026000"
+    id: swapHalves(
+      hexStr(8, { prefix: "0X", upperCase: true, littleEndian: false }),
+    ),
+  },
+  { littleEndian: true },
+);
+
+P.decode(buffer);
+```
+
+> `swapHalves` 只交换槽位字节, 不会压制内层 `hexStr` 自己的字节序反转。要在小端上下文里
+> 只交换两半, 需给 `hexStr` 显式设 `littleEndian: false`(否则它会继承上下文的全反转)。
+> 标量字段(如 `uint16_t`)则照常沿用上下文 `littleEndian`。
+
 ## 自定义字段: codec / delimited / framed
 
 尺寸由 reader 推进 `Cursor` 决定, 适合 NUL 结尾字符串这类长度跑起来才知道的字段。
